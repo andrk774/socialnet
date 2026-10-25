@@ -59,6 +59,30 @@ type Config struct {
 	// Принимать уведомления только с адресов ЮKassa. Выключать — только если
 	// перед API стоит прокси, который не передаёт реальный IP (TRUST_PROXY).
 	YooKassaCheckIP bool
+
+	// S3/MinIO для фото, музыки, голосовых и видео. Пустой S3_ENDPOINT — локальный диск.
+	S3Endpoint  string
+	S3Region    string
+	S3Bucket    string
+	S3AccessKey string
+	S3SecretKey string
+	S3PathStyle bool
+	// MEDIA_CDN_URL — CDN перед бакетом: публичные файлы отдаются редиректом туда.
+	MediaCDNURL string
+
+	// /metrics для Prometheus — на отдельном внутреннем адресе.
+	MetricsAddr  string // по умолчанию :9090; "off" — выключить
+	MetricsToken string // необязательный Bearer-токен
+
+	// Резервные копии (`api backup-loop`).
+	BackupDir  string // папка для копий; "" — только S3
+	BackupKey  []byte // BACKUP_ENC_KEY, 64 hex-символа: шифрование AES-256-GCM
+	BackupKeep int
+	BackupHour int  // час запуска, UTC
+	BackupS3   bool // класть копии в S3 (backups/)
+
+	// REDIS_URL — общие лимиты, тикеты WebSocket и события между экземплярами API.
+	RedisURL string
 }
 
 func Load() (Config, error) {
@@ -108,6 +132,41 @@ func Load() (Config, error) {
 	c.VAPIDPrivate = os.Getenv("VAPID_PRIVATE_KEY")
 	c.AppURL = strings.TrimRight(getenv("APP_URL", "http://localhost:3000"), "/")
 
+	c.RedisURL = os.Getenv("REDIS_URL")
+	c.MetricsAddr = getenv("METRICS_ADDR", ":9090")
+	c.BackupDir = getenv("BACKUP_DIR", "")
+	if k := os.Getenv("BACKUP_ENC_KEY"); k != "" {
+		key, err := hex.DecodeString(k)
+		if err != nil || len(key) != 32 {
+			return c, errors.New("BACKUP_ENC_KEY must be 64 hex characters (openssl rand -hex 32)")
+		}
+		c.BackupKey = key
+	}
+	if c.BackupKeep, err = strconv.Atoi(getenv("BACKUP_KEEP", "14")); err != nil || c.BackupKeep < 1 {
+		return c, errors.New("BACKUP_KEEP must be a positive number")
+	}
+	if c.BackupHour, err = strconv.Atoi(getenv("BACKUP_HOUR", "3")); err != nil || c.BackupHour < 0 || c.BackupHour > 23 {
+		return c, errors.New("BACKUP_HOUR must be 0..23")
+	}
+	if c.BackupS3, err = boolean("BACKUP_S3", false); err != nil {
+		return c, err
+	}
+	c.MetricsToken = os.Getenv("METRICS_TOKEN")
+	c.S3Endpoint = strings.TrimRight(os.Getenv("S3_ENDPOINT"), "/")
+	c.S3Region = getenv("S3_REGION", "us-east-1")
+	c.S3Bucket = os.Getenv("S3_BUCKET")
+	c.S3AccessKey = os.Getenv("S3_ACCESS_KEY")
+	c.S3SecretKey = os.Getenv("S3_SECRET_KEY")
+	if c.S3PathStyle, err = boolean("S3_PATH_STYLE", true); err != nil {
+		return c, err
+	}
+	if c.S3Endpoint != "" && (c.S3Bucket == "" || c.S3AccessKey == "" || c.S3SecretKey == "") {
+		return c, errors.New("S3_BUCKET, S3_ACCESS_KEY and S3_SECRET_KEY are required with S3_ENDPOINT")
+	}
+	c.MediaCDNURL = strings.TrimRight(os.Getenv("MEDIA_CDN_URL"), "/")
+	if c.BackupS3 && c.S3Endpoint == "" {
+		return c, errors.New("BACKUP_S3=true requires S3_ENDPOINT")
+	}
 	c.YooKassaShopID = os.Getenv("YOOKASSA_SHOP_ID")
 	c.YooKassaSecretKey = os.Getenv("YOOKASSA_SECRET_KEY")
 	c.YooKassaAPIURL = strings.TrimRight(getenv("YOOKASSA_API_URL", "https://api.yookassa.ru/v3"), "/")

@@ -21,7 +21,7 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 10
       redis:
-        image: redis:7-alpine
+        image: redis:7.4-alpine
         ports: ["6379:6379"]
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +30,12 @@ jobs:
           go-version-file: go.mod
       - name: ffmpeg (музыка и видео)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: pg_dump/pg_restore 17 (резервные копии; версия не ниже сервера)
+        run: |
+          sudo apt-get install -y --no-install-recommends postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
       - name: OpenAPI в актуальном состоянии
         run: python3 api/gen_openapi.py && git diff --exit-code api/openapi.json
       - run: go vet ./...
@@ -77,6 +83,9 @@ jobs:
           - { pkg: ./internal/auth, fn: FuzzVerifyPassword }
           - { pkg: ./internal/auth, fn: FuzzParseAccess }
           - { pkg: ./internal/httpapi, fn: FuzzCleanText }
+          - { pkg: ./internal/redisx, fn: FuzzReadReply }
+          - { pkg: ./internal/backup, fn: FuzzDecrypt }
+          - { pkg: ./internal/yookassa, fn: FuzzParseKopecks }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

@@ -159,6 +159,8 @@ func (s *Server) syncPayment(ctx context.Context, p *store.Payment) error {
 		return err
 	}
 	if credited {
+		s.m.business.Inc("coins_purchased")
+		s.m.business.Add(uint64(p.Coins), "coins_purchased_amount")
 		s.log.Info("coins purchased", "user_id", p.UserID, "coins", p.Coins, "payment", p.ID)
 		s.hub.Publish(p.UserID, "payment", map[string]any{"id": p.ID, "status": "succeeded", "coins": p.Coins})
 	}

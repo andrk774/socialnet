@@ -184,17 +184,6 @@ func (l *ipRateLimiter) cleanup() {
 	}
 }
 
-func (l *ipRateLimiter) middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !l.allow(clientIP(r)) {
-			w.Header().Set("Retry-After", "60")
-			writeError(w, http.StatusTooManyRequests, "rate_limited", "too many requests, try again later")
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
 func clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

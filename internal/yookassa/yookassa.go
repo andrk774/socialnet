@@ -36,15 +36,28 @@ func ParseKopecks(v string) (int64, error) {
 	if len(kop) == 1 {
 		kop += "0"
 	}
-	if len(kop) != 2 {
+	if len(kop) != 2 || !digits(rub) || !digits(kop) {
 		return 0, fmt.Errorf("bad amount %q", v)
 	}
 	r, err1 := strconv.ParseInt(rub, 10, 64)
 	k, err2 := strconv.ParseInt(kop, 10, 64)
-	if err1 != nil || err2 != nil || r < 0 || k < 0 {
+	// до триллиона рублей: и с запасом больше любого платежа, и без переполнения r*100
+	if err1 != nil || err2 != nil || r < 0 || k < 0 || r > 1e12 {
 		return 0, fmt.Errorf("bad amount %q", v)
 	}
 	return r*100 + k, nil
+}
+
+func digits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 type ReceiptItem struct {

@@ -360,8 +360,10 @@ func (s *Server) DispatchCallbacks(ctx context.Context, max int) (int, error) {
 				return n, err
 			}
 			_ = s.store.SetCallbackStatus(ctx, d.CommunityID, "active", "")
+			s.m.business.Inc("callback_delivered")
 			continue
 		}
+		s.m.business.Inc("callback_failed")
 		backoff := 10 * time.Second << (d.Attempts - 1) // 10 с, 20 с, 40 с … ~5 мин
 		final, ferr := s.store.RetryCallback(ctx, d.ID, err.Error(), backoff, callbackMaxAttempts)
 		if ferr != nil {

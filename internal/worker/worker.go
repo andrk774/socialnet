@@ -25,6 +25,9 @@ type Worker struct {
 	Store *store.Store
 	AV    *av.Store
 	Log   *slog.Logger
+	// Events — мгновенное событие пользователю через шину API (Redis).
+	// nil — пользователь узнает о готовности из уведомления и опроса статуса.
+	Events func(ctx context.Context, userID int64, typ string, data any) error
 }
 
 // Run обрабатывает задачи, пока не отменят ctx.
@@ -117,14 +120,22 @@ func (w *Worker) transcodeVideo(ctx context.Context, job *store.Job) error {
 		_ = os.RemoveAll(dir)
 		return err
 	}
+	if err := w.AV.Commit(ctx, "videos", id); err != nil { // в S3, если настроено
+		return err
+	}
 	secs := int(math.Min(math.Round(probe.Seconds), MaxVideoSeconds))
 	owner, err := w.Store.VideoReady(ctx, id, secs, v.Width, v.Height, made)
 	if errors.Is(err, store.ErrNotFound) {
-		_ = os.RemoveAll(dir) // видео удалили, пока шла обработка
+		_ = w.AV.Delete("videos", id) // видео удалили, пока шла обработка
 	} else if err != nil {
 		return err
 	} else {
 		_, _ = w.Store.CreateNotification(ctx, store.NewNotification{UserID: owner, Type: "video_ready"})
+		if w.Events != nil {
+			if err := w.Events(ctx, owner, "video_ready", map[string]any{"id": id, "qualities": made}); err != nil {
+				w.Log.Warn("publish video_ready", "err", err)
+			}
+		}
 	}
 	_ = os.Remove(src)
 	w.Log.Info("video ready", "id", id, "qualities", made)

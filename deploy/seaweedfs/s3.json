@@ -1,0 +1,11 @@
+{
+  "identities": [
+    {
+      "name": "socialnet",
+      "credentials": [
+        {"accessKey": "socialnet-dev-access", "secretKey": "CHANGE-ME-dev-secret-key-0123456789"}
+      ],
+      "actions": ["Read", "Write", "List", "Admin"]
+    }
+  ]
+}
