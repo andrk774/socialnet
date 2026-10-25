@@ -6410,6 +6410,57 @@
     }
    }
   },
+  "/api/v1/payments/yookassa": {
+   "post": {
+    "tags": [
+     "wallet"
+    ],
+    "summary": "Уведомления ЮKassa (только с её адресов; статус перепроверяется через API)",
+    "operationId": "post_api_v1_payments_yookassa",
+    "security": [],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "type": {
+          "type": "string"
+         },
+         "event": {
+          "type": "string"
+         },
+         "object": {
+          "type": "object"
+         }
+        },
+        "required": [
+         "type",
+         "event",
+         "object"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/playlists": {
    "post": {
     "tags": [
@@ -10196,6 +10247,342 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/TxResult"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/wallet/packages": {
+   "get": {
+    "tags": [
+     "wallet"
+    ],
+    "summary": "Пакеты монет и цены",
+    "operationId": "get_api_v1_wallet_packages",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "enabled": {
+           "type": "boolean"
+          },
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "id": {
+              "type": "string"
+             },
+             "coins": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "price_kopecks": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "price": {
+              "type": "string"
+             }
+            },
+            "required": [
+             "id",
+             "coins",
+             "price_kopecks",
+             "price"
+            ]
+           }
+          }
+         },
+         "required": [
+          "enabled",
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/wallet/purchases": {
+   "get": {
+    "tags": [
+     "wallet"
+    ],
+    "summary": "Мои покупки",
+    "operationId": "get_api_v1_wallet_purchases",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "id": {
+              "type": "string",
+              "format": "uuid"
+             },
+             "package_id": {
+              "type": "string"
+             },
+             "coins": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "amount_kopecks": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "currency": {
+              "type": "string"
+             },
+             "status": {
+              "type": "string",
+              "enum": [
+               "created",
+               "pending",
+               "succeeded",
+               "canceled",
+               "error"
+              ]
+             },
+             "confirmation_url": {
+              "type": "string"
+             },
+             "created_at": {
+              "type": "string",
+              "format": "date-time"
+             }
+            },
+            "required": [
+             "id",
+             "package_id",
+             "coins",
+             "amount_kopecks",
+             "currency",
+             "status",
+             "created_at"
+            ]
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "wallet"
+    ],
+    "summary": "Купить монеты: вернёт confirmation_url страницы оплаты ЮKassa",
+    "operationId": "post_api_v1_wallet_purchases",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "package_id": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "package_id"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string",
+           "format": "uuid"
+          },
+          "package_id": {
+           "type": "string"
+          },
+          "coins": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "amount_kopecks": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "created",
+            "pending",
+            "succeeded",
+            "canceled",
+            "error"
+           ]
+          },
+          "confirmation_url": {
+           "type": "string"
+          },
+          "created_at": {
+           "type": "string",
+           "format": "date-time"
+          }
+         },
+         "required": [
+          "id",
+          "package_id",
+          "coins",
+          "amount_kopecks",
+          "currency",
+          "status",
+          "created_at"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/wallet/purchases/{pid}": {
+   "get": {
+    "tags": [
+     "wallet"
+    ],
+    "summary": "Статус покупки (сверяется с ЮKassa)",
+    "operationId": "get_api_v1_wallet_purchases_pid",
+    "parameters": [
+     {
+      "name": "pid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string",
+           "format": "uuid"
+          },
+          "package_id": {
+           "type": "string"
+          },
+          "coins": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "amount_kopecks": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "created",
+            "pending",
+            "succeeded",
+            "canceled",
+            "error"
+           ]
+          },
+          "confirmation_url": {
+           "type": "string"
+          },
+          "created_at": {
+           "type": "string",
+           "format": "date-time"
+          }
+         },
+         "required": [
+          "id",
+          "package_id",
+          "coins",
+          "amount_kopecks",
+          "currency",
+          "status",
+          "created_at"
+         ]
         }
        }
       }

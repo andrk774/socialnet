@@ -291,6 +291,16 @@ r("DELETE", A + "/events/{id}", "events", "Удалить (организато�
 r("POST", A + "/events/{id}/rsvp", "events", "Пойду / Возможно", obj(status=enum("going", "maybe")), code=204)
 r("DELETE", A + "/events/{id}/rsvp", "events", "Не пойду", code=204)
 r("GET", A + "/events/{id}/attendees", "events", "Участники: ?status=going|maybe", resp=lst(S("UserCard")))
+# --- покупка монет ---
+pay = obj(id=uuid, package_id=str_, coins=int_, amount_kopecks=int_, currency=str_,
+          status=enum("created", "pending", "succeeded", "canceled", "error"), **{"confirmation_url?": str_}, created_at=dt)
+r("GET", A + "/wallet/packages", "wallet", "Пакеты монет и цены", resp=obj(enabled=bool_, items=arr(obj(id=str_, coins=int_, price_kopecks=int_, price=str_))))
+r("POST", A + "/wallet/purchases", "wallet", "Купить монеты: вернёт confirmation_url страницы оплаты ЮKassa", obj(package_id=str_), pay, 201)
+r("GET", A + "/wallet/purchases", "wallet", "Мои покупки", resp=obj(items=arr(pay)))
+r("GET", A + "/wallet/purchases/{pid}", "wallet", "Статус покупки (сверяется с ЮKassa)", resp=pay)
+r("POST", A + "/payments/yookassa", "wallet", "Уведомления ЮKassa (только с её адресов; статус перепроверяется через API)",
+  obj(type=str_, event=str_, object={"type": "object"}), auth=False)
+
 # --- API для разработчиков ---
 authz = obj(response_type=enum("code"), client_id=str_, redirect_uri=str_, scope=str_, **{"state?": str_},
             code_challenge=str_, code_challenge_method=enum("S256"), approve=bool_)
