@@ -175,6 +175,18 @@ func TranscodeAudio(ctx context.Context, in, out, format string, maxSeconds int)
 	return err
 }
 
+// TranscodeVoice — голосовое: MP3 64 kbit/s моно, без метаданных.
+func TranscodeVoice(ctx context.Context, in, out, format string, maxSeconds int) error {
+	args := append(baseArgs(), "-nostdin", "-y",
+		"-f", format, "-i", "file:"+in,
+		"-map", "0:a:0", "-vn", "-sn", "-dn", "-map_metadata", "-1",
+		"-c:a", "libmp3lame", "-b:a", "64k", "-ac", "1", "-ar", "44100",
+		"-t", strconv.Itoa(maxSeconds),
+		"-f", "mp3", "file:"+out)
+	_, err := run(ctx, 2*time.Minute, "ffmpeg", args...)
+	return err
+}
+
 // Rendition — одно качество HLS.
 type Rendition struct {
 	Name     string // 360p
@@ -258,7 +270,7 @@ func Poster(ctx context.Context, in, format, out string, seconds float64) error 
 
 var (
 	idRe   = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	fileRe = regexp.MustCompile(`^(audio\.mp3|master\.m3u8|poster\.jpg|(360p|720p)\.m3u8|(360p|720p)_[0-9]{4}\.ts)$`)
+	fileRe = regexp.MustCompile(`^(audio\.mp3|voice\.mp3|master\.m3u8|poster\.jpg|(360p|720p)\.m3u8|(360p|720p)_[0-9]{4}\.ts)$`)
 )
 
 // Store хранит обработанные файлы: <root>/<kind>/<id[:2]>/<id>/<имя>.
@@ -273,7 +285,7 @@ func NewStore(root string) (*Store, error) {
 }
 
 func (s *Store) Dir(kind, id string) (string, error) {
-	if (kind != "tracks" && kind != "videos") || !idRe.MatchString(id) {
+	if (kind != "tracks" && kind != "videos" && kind != "voices") || !idRe.MatchString(id) {
 		return "", ErrNotFound
 	}
 	return filepath.Join(s.root, kind, id[:2], id), nil

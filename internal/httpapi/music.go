@@ -198,7 +198,9 @@ func (s *Server) serveAVFile(w http.ResponseWriter, r *http.Request, kind, id, n
 	}
 	w.Header().Set("Content-Type", ctype)
 	// не immutable: снятый по жалобе контент должен пропасть из кэшей
-	w.Header().Set("Cache-Control", "public, max-age=3600")
+	if w.Header().Get("Cache-Control") == "" || w.Header().Get("Cache-Control") == "no-store" {
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+	}
 	w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
 	http.ServeContent(w, r, "", st.ModTime(), f)
 }

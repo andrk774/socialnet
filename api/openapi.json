@@ -48,6 +48,14 @@
    "description": "Видео"
   },
   {
+   "name": "stories",
+   "description": "Истории"
+  },
+  {
+   "name": "events",
+   "description": "Мероприятия"
+  },
+  {
    "name": "communities",
    "description": "Сообщества"
   },
@@ -541,6 +549,25 @@
      "liked_by_me": {
       "type": "boolean"
      },
+     "my_reaction": {
+      "type": "string",
+      "enum": [
+       "like",
+       "love",
+       "haha",
+       "wow",
+       "sad",
+       "angry"
+      ],
+      "nullable": true
+     },
+     "reactions": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "integer",
+       "format": "int64"
+      }
+     },
      "created_at": {
       "type": "string",
       "format": "date-time"
@@ -560,6 +587,8 @@
      "likes_count",
      "comments_count",
      "liked_by_me",
+     "my_reaction",
+     "reactions",
      "created_at"
     ]
    },
@@ -571,6 +600,17 @@
       "format": "int64"
      },
      "post_id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "parent_id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "reply_to": {
+      "$ref": "#/components/schemas/UserCard"
+     },
+     "replies_count": {
       "type": "integer",
       "format": "int64"
      },
@@ -588,8 +628,234 @@
     "required": [
      "id",
      "post_id",
+     "replies_count",
      "author",
      "text",
+     "created_at"
+    ]
+   },
+   "Attachment": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "photo",
+       "track",
+       "voice"
+      ]
+     },
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "url": {
+      "type": "string"
+     },
+     "thumb_url": {
+      "type": "string"
+     },
+     "title": {
+      "type": "string"
+     },
+     "artist": {
+      "type": "string"
+     },
+     "duration_sec": {
+      "type": "integer",
+      "format": "int64"
+     }
+    },
+    "required": [
+     "kind",
+     "id",
+     "url"
+    ]
+   },
+   "ChatMember": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "username": {
+      "type": "string"
+     },
+     "first_name": {
+      "type": "string"
+     },
+     "last_name": {
+      "type": "string"
+     },
+     "avatar_url": {
+      "type": "string",
+      "nullable": true
+     },
+     "role": {
+      "type": "string",
+      "enum": [
+       "owner",
+       "admin",
+       "member"
+      ]
+     }
+    },
+    "required": [
+     "id",
+     "username",
+     "first_name",
+     "last_name",
+     "avatar_url",
+     "role"
+    ]
+   },
+   "Story": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "author_id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "photo": {
+      "$ref": "#/components/schemas/Photo"
+     },
+     "video": {
+      "$ref": "#/components/schemas/PostVideo"
+     },
+     "views_count": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "caption": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "expires_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "seen": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "id",
+     "author_id",
+     "caption",
+     "created_at",
+     "expires_at",
+     "seen"
+    ]
+   },
+   "StoryGroup": {
+    "type": "object",
+    "properties": {
+     "author": {
+      "$ref": "#/components/schemas/UserCard"
+     },
+     "all_seen": {
+      "type": "boolean"
+     },
+     "stories": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/Story"
+      }
+     }
+    },
+    "required": [
+     "author",
+     "all_seen",
+     "stories"
+    ]
+   },
+   "Event": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "creator_id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "community": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "integer",
+        "format": "int64"
+       },
+       "slug": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "id",
+       "slug",
+       "name"
+      ]
+     },
+     "ends_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "title": {
+      "type": "string"
+     },
+     "description": {
+      "type": "string"
+     },
+     "place": {
+      "type": "string"
+     },
+     "starts_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "going_count": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "maybe_count": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "my_status": {
+      "type": "string",
+      "enum": [
+       "going",
+       "maybe"
+      ],
+      "nullable": true
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    },
+    "required": [
+     "id",
+     "creator_id",
+     "title",
+     "description",
+     "place",
+     "starts_at",
+     "going_count",
+     "maybe_count",
+     "my_status",
      "created_at"
     ]
    },
@@ -644,6 +910,13 @@
       "type": "integer",
       "format": "int64"
      },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "text",
+       "service"
+      ]
+     },
      "body": {
       "type": "string"
      },
@@ -660,6 +933,12 @@
      "encrypted": {
       "type": "boolean"
      },
+     "attachments": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/Attachment"
+      }
+     },
      "created_at": {
       "type": "string",
       "format": "date-time"
@@ -669,7 +948,9 @@
      "id",
      "conversation_id",
      "sender_id",
+     "kind",
      "encrypted",
+     "attachments",
      "created_at"
     ]
    },
@@ -677,6 +958,20 @@
     "type": "object",
     "properties": {
      "id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "direct",
+       "group"
+      ]
+     },
+     "title": {
+      "type": "string"
+     },
+     "members_count": {
       "type": "integer",
       "format": "int64"
      },
@@ -701,7 +996,7 @@
     },
     "required": [
      "id",
-     "peer",
+     "kind",
      "last_message",
      "unread",
      "peer_delivered_id",
@@ -742,6 +1037,13 @@
        "owner"
       ]
      },
+     "visibility": {
+      "type": "string",
+      "enum": [
+       "open",
+       "closed"
+      ]
+     },
      "created_at": {
       "type": "string",
       "format": "date-time"
@@ -755,6 +1057,7 @@
      "owner_id",
      "members_count",
      "my_role",
+     "visibility",
      "created_at"
     ]
    },
@@ -1997,6 +2300,81 @@
     }
    }
   },
+  "/api/v1/chats": {
+   "post": {
+    "tags": [
+     "messages"
+    ],
+    "summary": "Создать беседу",
+    "operationId": "post_api_v1_chats",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "member_ids": {
+          "type": "array",
+          "items": {
+           "type": "integer",
+           "format": "int64"
+          }
+         }
+        },
+        "required": [
+         "title",
+         "member_ids"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "title": {
+           "type": "string"
+          },
+          "members_count": {
+           "type": "integer",
+           "format": "int64"
+          }
+         },
+         "required": [
+          "id",
+          "title",
+          "members_count"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/comments/{id}": {
    "delete": {
     "tags": [
@@ -2018,6 +2396,65 @@
     "responses": {
      "204": {
       "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/comments/{id}/replies": {
+   "get": {
+    "tags": [
+     "posts"
+    ],
+    "summary": "Ответы в ветке комментария",
+    "operationId": "get_api_v1_comments_id_replies",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Comment"
+           }
+          },
+          "next_cursor": {
+           "type": "integer",
+           "format": "int64",
+           "nullable": true
+          }
+         },
+         "required": [
+          "items",
+          "next_cursor"
+         ]
+        }
+       }
+      }
      },
      "default": {
       "description": "Ошибка",
@@ -2326,6 +2763,59 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/TxResult"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/communities/{id}/events": {
+   "get": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Мероприятия сообщества",
+    "operationId": "get_api_v1_communities_id_events",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Event"
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
         }
        }
       }
@@ -2662,6 +3152,153 @@
     }
    }
   },
+  "/api/v1/communities/{id}/requests": {
+   "get": {
+    "tags": [
+     "communities"
+    ],
+    "summary": "Заявки на вступление (админы)",
+    "operationId": "get_api_v1_communities_id_requests",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/UserCard"
+           }
+          },
+          "next_cursor": {
+           "type": "integer",
+           "format": "int64",
+           "nullable": true
+          }
+         },
+         "required": [
+          "items",
+          "next_cursor"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/communities/{id}/requests/{userID}/approve": {
+   "post": {
+    "tags": [
+     "communities"
+    ],
+    "summary": "Принять заявку",
+    "operationId": "post_api_v1_communities_id_requests_userID_approve",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     },
+     {
+      "name": "userID",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/communities/{id}/requests/{userID}/reject": {
+   "post": {
+    "tags": [
+     "communities"
+    ],
+    "summary": "Отклонить заявку",
+    "operationId": "post_api_v1_communities_id_requests_userID_reject",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     },
+     {
+      "name": "userID",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/communities/{id}/wallet": {
    "get": {
     "tags": [
@@ -2855,6 +3492,274 @@
     }
    }
   },
+  "/api/v1/conversations/{id}": {
+   "patch": {
+    "tags": [
+     "messages"
+    ],
+    "summary": "Переименовать беседу (админы)",
+    "operationId": "patch_api_v1_conversations_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "title"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/conversations/{id}/members": {
+   "get": {
+    "tags": [
+     "messages"
+    ],
+    "summary": "Участники",
+    "operationId": "get_api_v1_conversations_id_members",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/ChatMember"
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "messages"
+    ],
+    "summary": "Добавить в беседу (админы)",
+    "operationId": "post_api_v1_conversations_id_members",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "user_id": {
+          "type": "integer",
+          "format": "int64"
+         }
+        },
+        "required": [
+         "user_id"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/conversations/{id}/members/{uid}": {
+   "delete": {
+    "tags": [
+     "messages"
+    ],
+    "summary": "Выйти или исключить",
+    "operationId": "delete_api_v1_conversations_id_members_uid",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     },
+     {
+      "name": "uid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/conversations/{id}/members/{uid}/role": {
+   "put": {
+    "tags": [
+     "messages"
+    ],
+    "summary": "Роль в беседе (владелец)",
+    "operationId": "put_api_v1_conversations_id_members_uid_role",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     },
+     {
+      "name": "uid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "role": {
+          "type": "string",
+          "enum": [
+           "admin",
+           "member"
+          ]
+         }
+        },
+        "required": [
+         "role"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/conversations/{id}/messages": {
    "get": {
     "tags": [
@@ -2897,6 +3802,95 @@
           "items",
           "next_cursor"
          ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "messages"
+    ],
+    "summary": "Сообщение в диалог или беседу",
+    "operationId": "post_api_v1_conversations_id_messages",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "body": {
+          "type": "string"
+         },
+         "ciphertext": {
+          "type": "string",
+          "format": "byte",
+          "description": "base64"
+         },
+         "nonce": {
+          "type": "string",
+          "format": "byte",
+          "description": "base64"
+         },
+         "attachments": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "kind": {
+             "type": "string",
+             "enum": [
+              "photo",
+              "track",
+              "voice"
+             ]
+            },
+            "id": {
+             "type": "string",
+             "format": "uuid"
+            }
+           },
+           "required": [
+            "kind",
+            "id"
+           ]
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Message"
         }
        }
       }
@@ -3002,6 +3996,407 @@
       }
      }
     ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/events": {
+   "get": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Мои предстоящие мероприятия",
+    "operationId": "get_api_v1_events",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Event"
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Создать мероприятие",
+    "operationId": "post_api_v1_events",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "description": {
+          "type": "string"
+         },
+         "place": {
+          "type": "string"
+         },
+         "starts_at": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "ends_at": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "community_id": {
+          "type": "integer",
+          "format": "int64"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Event"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/events/{id}": {
+   "delete": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Удалить (организатор)",
+    "operationId": "delete_api_v1_events_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Мероприятие",
+    "operationId": "get_api_v1_events_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Event"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Изменить (организатор)",
+    "operationId": "patch_api_v1_events_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "description": {
+          "type": "string"
+         },
+         "place": {
+          "type": "string"
+         },
+         "starts_at": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "ends_at": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "community_id": {
+          "type": "integer",
+          "format": "int64"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Event"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/events/{id}/attendees": {
+   "get": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Участники: ?status=going|maybe",
+    "operationId": "get_api_v1_events_id_attendees",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/UserCard"
+           }
+          },
+          "next_cursor": {
+           "type": "integer",
+           "format": "int64",
+           "nullable": true
+          }
+         },
+         "required": [
+          "items",
+          "next_cursor"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/events/{id}/rsvp": {
+   "delete": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Не пойду",
+    "operationId": "delete_api_v1_events_id_rsvp",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Пойду / Возможно",
+    "operationId": "post_api_v1_events_id_rsvp",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "status": {
+          "type": "string",
+          "enum": [
+           "going",
+           "maybe"
+          ]
+         }
+        },
+        "required": [
+         "status"
+        ]
+       }
+      }
+     }
+    },
     "responses": {
      "204": {
       "description": "Успешно"
@@ -4533,6 +5928,140 @@
     }
    }
   },
+  "/api/v1/posts/{id}/reactions": {
+   "delete": {
+    "tags": [
+     "posts"
+    ],
+    "summary": "Убрать реакцию",
+    "operationId": "delete_api_v1_posts_id_reactions",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "likes_count": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "liked_by_me": {
+           "type": "boolean"
+          }
+         },
+         "required": [
+          "likes_count",
+          "liked_by_me"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "posts"
+    ],
+    "summary": "Поставить или сменить реакцию",
+    "operationId": "post_api_v1_posts_id_reactions",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "reaction": {
+          "type": "string",
+          "enum": [
+           "like",
+           "love",
+           "haha",
+           "wow",
+           "sad",
+           "angry"
+          ]
+         }
+        },
+        "required": [
+         "reaction"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "likes_count": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "my_reaction": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "likes_count",
+          "my_reaction"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/presence": {
    "post": {
     "tags": [
@@ -5061,6 +6590,239 @@
     "responses": {
      "204": {
       "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/stories": {
+   "post": {
+    "tags": [
+     "stories"
+    ],
+    "summary": "Опубликовать историю на 24 часа",
+    "operationId": "post_api_v1_stories",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "photo_id": {
+          "type": "string",
+          "format": "uuid"
+         },
+         "video_id": {
+          "type": "string",
+          "format": "uuid"
+         },
+         "caption": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "expires_in_hours": {
+           "type": "integer",
+           "format": "int64"
+          }
+         },
+         "required": [
+          "id",
+          "expires_in_hours"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/stories/feed": {
+   "get": {
+    "tags": [
+     "stories"
+    ],
+    "summary": "Истории друзей и подписок",
+    "operationId": "get_api_v1_stories_feed",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/StoryGroup"
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/stories/{id}": {
+   "delete": {
+    "tags": [
+     "stories"
+    ],
+    "summary": "Удалить историю",
+    "operationId": "delete_api_v1_stories_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/stories/{id}/view": {
+   "post": {
+    "tags": [
+     "stories"
+    ],
+    "summary": "Отметить просмотр",
+    "operationId": "post_api_v1_stories_id_view",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/stories/{id}/viewers": {
+   "get": {
+    "tags": [
+     "stories"
+    ],
+    "summary": "Кто смотрел (автору)",
+    "operationId": "get_api_v1_stories_id_viewers",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/UserCard"
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
      },
      "default": {
       "description": "Ошибка",
@@ -6680,6 +8442,59 @@
     }
    }
   },
+  "/api/v1/users/{id}/stories": {
+   "get": {
+    "tags": [
+     "stories"
+    ],
+    "summary": "Истории пользователя",
+    "operationId": "get_api_v1_users_id_stories",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/StoryGroup"
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/users/{id}/videos": {
    "get": {
     "tags": [
@@ -6902,6 +8717,116 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/Video"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/voice": {
+   "post": {
+    "tags": [
+     "messages"
+    ],
+    "summary": "Загрузить голосовое (до 5 минут)",
+    "operationId": "post_api_v1_voice",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "file": {
+          "type": "string",
+          "format": "binary"
+         }
+        },
+        "required": [
+         "file"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string",
+           "format": "uuid"
+          },
+          "duration_sec": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "url": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "duration_sec",
+          "url"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/voice/{vid}": {
+   "get": {
+    "tags": [
+     "messages"
+    ],
+    "summary": "Голосовое (только участникам чата)",
+    "operationId": "get_api_v1_voice_vid",
+    "parameters": [
+     {
+      "name": "vid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Файл",
+      "content": {
+       "application/octet-stream": {
+        "schema": {
+         "type": "string",
+         "format": "binary"
         }
        }
       }

@@ -181,6 +181,9 @@ func (s *Server) Router() http.Handler {
 				r.Get("/posts/{id}/comments", s.handleComments)
 				r.Post("/posts/{id}/comments", s.handleAddComment)
 				r.Delete("/comments/{id}", s.handleDeleteComment)
+				r.Get("/comments/{id}/replies", s.handleReplies)
+				r.Post("/posts/{id}/reactions", s.handleReact)
+				r.Delete("/posts/{id}/reactions", s.handleUnlike)
 				r.Get("/users/{id}/posts", s.handleWall)
 				r.Get("/feed", s.handleFeed)
 				r.Get("/hashtags/{tag}/posts", s.handleHashtag)
@@ -195,6 +198,14 @@ func (s *Server) Router() http.Handler {
 				r.Get("/conversations/{id}/messages", s.handleMessages)
 				r.Post("/conversations/{id}/read", s.handleMarkRead)
 				r.Post("/conversations/{id}/typing", s.handleTyping)
+				r.Post("/conversations/{id}/messages", s.handleSendToConversation)
+				r.Post("/chats", s.handleCreateChat)
+				r.Patch("/conversations/{id}", s.handleRenameChat)
+				r.Get("/conversations/{id}/members", s.handleChatMembers)
+				r.Post("/conversations/{id}/members", s.handleAddChatMember)
+				r.Delete("/conversations/{id}/members/{uid}", s.handleRemoveChatMember)
+				r.Put("/conversations/{id}/members/{uid}/role", s.handleSetChatRole)
+				r.Get("/voice/{vid}", s.handleServeVoice)
 				r.Put("/users/me/keys", s.handleSetKey)
 				r.Get("/users/{id}/keys", s.handleGetKey)
 				r.Post("/ws/ticket", s.handleWSTicket)
@@ -266,6 +277,28 @@ func (s *Server) Router() http.Handler {
 				r.Put("/communities/{id}/members/{userID}/role", s.handleSetMemberRole)
 				r.Delete("/communities/{id}/members/{userID}", s.handleRemoveMember)
 				r.Get("/communities/{id}/posts", s.handleCommunityWall)
+				r.Get("/communities/{id}/requests", s.handleJoinRequests)
+				r.Post("/communities/{id}/requests/{userID}/approve", s.handleResolveJoin(true))
+				r.Post("/communities/{id}/requests/{userID}/reject", s.handleResolveJoin(false))
+				r.Get("/communities/{id}/events", s.handleCommunityEvents)
+
+				// истории
+				r.Post("/stories", s.handleCreateStory)
+				r.Get("/stories/feed", s.handleStoriesFeed)
+				r.Get("/users/{id}/stories", s.handleUserStories)
+				r.Post("/stories/{id}/view", s.handleViewStory)
+				r.Get("/stories/{id}/viewers", s.handleStoryViewers)
+				r.Delete("/stories/{id}", s.handleDeleteStory)
+
+				// мероприятия
+				r.Post("/events", s.handleCreateEvent)
+				r.Get("/events", s.handleUpcomingEvents)
+				r.Get("/events/{id}", s.handleGetEvent)
+				r.Patch("/events/{id}", s.handleUpdateEvent)
+				r.Delete("/events/{id}", s.handleDeleteEvent)
+				r.Post("/events/{id}/rsvp", s.handleRSVP)
+				r.Delete("/events/{id}/rsvp", s.handleCancelRSVP)
+				r.Get("/events/{id}/attendees", s.handleAttendees)
 
 				// поиск и жалобы
 				r.Get("/search", s.handleSearch)
@@ -306,6 +339,10 @@ func (s *Server) Router() http.Handler {
 	r.With(deadlines(60*time.Minute), s.requireAuth).Post("/api/v1/videos", s.handleUploadVideo)
 	// HLS: плейлисты, сегменты, превью.
 	r.With(deadlines(10*time.Minute)).Get("/video/{vid}/{file}", s.handleServeVideo)
+
+	// Голосовые сообщения: до 5 МБ.
+	r.With(deadlines(5*time.Minute), middleware.Timeout(4*time.Minute), s.requireAuth).
+		Post("/api/v1/voice", s.handleUploadVoice)
 
 	// Отдача аудио — публичная, для <audio>, с перемоткой (Range).
 	r.With(deadlines(30*time.Minute)).Get("/audio/{file}", s.handleServeAudio)

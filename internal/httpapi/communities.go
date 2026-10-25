@@ -16,6 +16,7 @@ func (s *Server) handleCreateCommunity(w http.ResponseWriter, r *http.Request) {
 		Slug        string `json:"slug"`
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		Visibility  string `json:"visibility"` // open (по умолчанию) | closed
 	}
 	if !decodeJSON(w, r, &req) {
 		return
@@ -31,12 +32,16 @@ func (s *Server) handleCreateCommunity(w http.ResponseWriter, r *http.Request) {
 	if utf8.RuneCountInString(req.Description) > 2000 {
 		errs["description"] = "max 2000 characters"
 	}
+	if req.Visibility == "" {
+		req.Visibility = "open"
+	}
+	oneOf(errs, "visibility", &req.Visibility, "open", "closed")
 	if len(errs) > 0 {
 		writeFieldErrors(w, http.StatusUnprocessableEntity, "validation_failed", "invalid input", errs)
 		return
 	}
 	me := userIDFrom(r.Context())
-	id, err := s.store.CreateCommunity(r.Context(), me, req.Slug, req.Name, req.Description)
+	id, err := s.store.CreateCommunity(r.Context(), me, req.Slug, req.Name, req.Description, req.Visibility)
 	if errors.Is(err, store.ErrSlugTaken) {
 		writeFieldErrors(w, http.StatusConflict, "conflict", "already taken", map[string]string{"slug": "slug already taken"})
 		return
@@ -106,6 +111,7 @@ func (s *Server) handleUpdateCommunity(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name        *string `json:"name"`
 		Description *string `json:"description"`
+		Visibility  *string `json:"visibility"`
 	}
 	if !decodeJSON(w, r, &req) {
 		return
@@ -120,6 +126,10 @@ func (s *Server) handleUpdateCommunity(w http.ResponseWriter, r *http.Request) {
 	if name != nil && *name == "" {
 		errs["name"] = "1-100 characters"
 	}
+	oneOf(errs, "visibility", req.Visibility, "open", "closed")
+	if req.Visibility != nil && c.MyRole != "owner" {
+		errs["visibility"] = "only the owner can change visibility"
+	}
 	if len(errs) > 0 {
 		writeFieldErrors(w, http.StatusUnprocessableEntity, "validation_failed", "invalid input", errs)
 		return
@@ -127,6 +137,12 @@ func (s *Server) handleUpdateCommunity(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.UpdateCommunity(r.Context(), c.ID, name, desc); err != nil {
 		s.internalError(w, r, err)
 		return
+	}
+	if req.Visibility != nil {
+		if err := s.store.SetCommunityVisibility(r.Context(), c.ID, *req.Visibility); err != nil {
+			s.internalError(w, r, err)
+			return
+		}
 	}
 	updated, err := s.store.CommunityByID(r.Context(), userIDFrom(r.Context()), c.ID)
 	if err != nil {
@@ -141,7 +157,21 @@ func (s *Server) handleJoinCommunity(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := s.store.JoinCommunity(r.Context(), c.ID, userIDFrom(r.Context())); err != nil {
+	me := userIDFrom(r.Context())
+	if c.Visibility == "closed" && c.MyRole == "" {
+		// в закрытое — по заявке, её одобряют админы
+		created, err := s.store.RequestJoin(r.Context(), c.ID, me)
+		if err != nil {
+			s.internalError(w, r, err)
+			return
+		}
+		if created {
+			s.notify(r.Context(), store.NewNotification{UserID: c.OwnerID, Type: "join_request", ActorID: me})
+		}
+		writeJSON(w, http.StatusAccepted, map[string]string{"status": "requested"})
+		return
+	}
+	if err := s.store.JoinCommunity(r.Context(), c.ID, me); err != nil {
 		s.internalError(w, r, err)
 		return
 	}
@@ -167,6 +197,10 @@ func (s *Server) handleLeaveCommunity(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCommunityMembers(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.community(w, r)
 	if !ok {
+		return
+	}
+	if c.Visibility == "closed" && c.MyRole == "" {
+		writeError(w, http.StatusForbidden, "private", "members of a closed community are visible to members only")
 		return
 	}
 	p := pageParams(r)
@@ -326,4 +360,51 @@ func nonNil[T any](v []T) []T {
 		return []T{}
 	}
 	return v
+}
+
+// ---------- заявки в закрытое сообщество ----------
+
+func (s *Server) handleJoinRequests(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.community(w, r)
+	if !ok {
+		return
+	}
+	if !store.RoleAtLeast(c.MyRole, "admin") {
+		writeError(w, http.StatusForbidden, "forbidden", "only admins can see join requests")
+		return
+	}
+	p := pageParams(r)
+	items, err := s.store.JoinRequests(r.Context(), c.ID, p.After, p.Limit)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list(items, p.Limit, cardCursor))
+}
+
+func (s *Server) handleResolveJoin(approve bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		c, ok := s.community(w, r)
+		if !ok {
+			return
+		}
+		uid, ok := pathID(w, r, "userID")
+		if !ok {
+			return
+		}
+		if !store.RoleAtLeast(c.MyRole, "admin") {
+			writeError(w, http.StatusForbidden, "forbidden", "only admins can resolve join requests")
+			return
+		}
+		err := s.store.ResolveJoinRequest(r.Context(), c.ID, uid, approve)
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not_found", "request not found")
+			return
+		}
+		if err != nil {
+			s.internalError(w, r, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
 }

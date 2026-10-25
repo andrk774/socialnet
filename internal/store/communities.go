@@ -21,7 +21,8 @@ type Community struct {
 	Description  string    `json:"description"`
 	OwnerID      int64     `json:"owner_id"`
 	MembersCount int       `json:"members_count"`
-	MyRole       string    `json:"my_role"` // пусто, если не участник
+	MyRole       string    `json:"my_role"`    // пусто, если не участник
+	Visibility   string    `json:"visibility"` // open | closed
 	CreatedAt    time.Time `json:"created_at"`
 	Hidden       bool      `json:"-"`
 }
@@ -30,7 +31,7 @@ const communitySelect = `
 	SELECT c.id, c.slug, c.name, c.description, c.owner_id,
 	       (SELECT count(*) FROM community_members m WHERE m.community_id = c.id),
 	       COALESCE((SELECT role FROM community_members m WHERE m.community_id = c.id AND m.user_id = $1), ''),
-	       c.created_at, c.hidden_at IS NOT NULL
+	       c.created_at, c.hidden_at IS NOT NULL, c.visibility
 	FROM communities c`
 
 func scanCommunities(rows pgx.Rows) ([]Community, error) {
@@ -39,7 +40,7 @@ func scanCommunities(rows pgx.Rows) ([]Community, error) {
 	for rows.Next() {
 		var c Community
 		if err := rows.Scan(&c.ID, &c.Slug, &c.Name, &c.Description, &c.OwnerID,
-			&c.MembersCount, &c.MyRole, &c.CreatedAt, &c.Hidden); err != nil {
+			&c.MembersCount, &c.MyRole, &c.CreatedAt, &c.Hidden, &c.Visibility); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
@@ -70,7 +71,7 @@ func (s *Store) CommunityBySlug(ctx context.Context, viewer int64, slug string) 
 	return s.communityOne(ctx, "c.slug = $2", viewer, slug)
 }
 
-func (s *Store) CreateCommunity(ctx context.Context, owner int64, slug, name, desc string) (int64, error) {
+func (s *Store) CreateCommunity(ctx context.Context, owner int64, slug, name, desc, visibility string) (int64, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return 0, err
@@ -78,8 +79,8 @@ func (s *Store) CreateCommunity(ctx context.Context, owner int64, slug, name, de
 	defer tx.Rollback(ctx) //nolint:errcheck
 	var id int64
 	err = tx.QueryRow(ctx, `
-		INSERT INTO communities (slug, name, description, owner_id) VALUES ($1, $2, $3, $4) RETURNING id`,
-		slug, name, desc, owner).Scan(&id)
+		INSERT INTO communities (slug, name, description, owner_id, visibility) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+		slug, name, desc, owner, visibility).Scan(&id)
 	if _, ok := isUnique(err); ok {
 		return 0, ErrSlugTaken
 	}
