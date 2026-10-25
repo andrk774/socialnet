@@ -50,6 +50,15 @@ type Config struct {
 	VAPIDPrivate string
 
 	DocsDisabled bool // DOCS_DISABLED=true — не показывать /docs
+
+	// ЮKassa: покупка монет. Пустой YOOKASSA_SHOP_ID — покупка выключена.
+	YooKassaShopID    string
+	YooKassaSecretKey string
+	YooKassaAPIURL    string // по умолчанию https://api.yookassa.ru/v3
+	YooKassaVATCode   int    // код ставки НДС в чеке: 1 — без НДС, 11 — 22%, 12 — 22/122
+	// Принимать уведомления только с адресов ЮKassa. Выключать — только если
+	// перед API стоит прокси, который не передаёт реальный IP (TRUST_PROXY).
+	YooKassaCheckIP bool
 }
 
 func Load() (Config, error) {
@@ -98,6 +107,21 @@ func Load() (Config, error) {
 	c.VAPIDPublic = os.Getenv("VAPID_PUBLIC_KEY")
 	c.VAPIDPrivate = os.Getenv("VAPID_PRIVATE_KEY")
 	c.AppURL = strings.TrimRight(getenv("APP_URL", "http://localhost:3000"), "/")
+
+	c.YooKassaShopID = os.Getenv("YOOKASSA_SHOP_ID")
+	c.YooKassaSecretKey = os.Getenv("YOOKASSA_SECRET_KEY")
+	c.YooKassaAPIURL = strings.TrimRight(getenv("YOOKASSA_API_URL", "https://api.yookassa.ru/v3"), "/")
+	if c.YooKassaShopID != "" && c.YooKassaSecretKey == "" {
+		return c, errors.New("YOOKASSA_SECRET_KEY is required when YOOKASSA_SHOP_ID is set")
+	}
+	vat, err := strconv.Atoi(getenv("YOOKASSA_VAT_CODE", "1"))
+	if err != nil || vat < 1 || vat > 12 {
+		return c, errors.New("YOOKASSA_VAT_CODE must be 1..12 (1 — без НДС, 11 — НДС 22%)")
+	}
+	c.YooKassaVATCode = vat
+	if c.YooKassaCheckIP, err = boolean("YOOKASSA_CHECK_IP", true); err != nil {
+		return c, err
+	}
 
 	if k := os.Getenv("TOTP_ENC_KEY"); k != "" {
 		key, err := hex.DecodeString(k)

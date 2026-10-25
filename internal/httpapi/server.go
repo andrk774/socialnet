@@ -19,6 +19,7 @@ import (
 	"socialnet/internal/safehttp"
 	"socialnet/internal/store"
 	"socialnet/internal/webpush"
+	"socialnet/internal/yookassa"
 )
 
 type Server struct {
@@ -48,10 +49,12 @@ type Server struct {
 	avStore *av.Store     // музыка и видео
 	avSem   chan struct{} // не больше N одновременных ffmpeg в API
 
-	root           *chi.Mux       // для поиска шаблона маршрута (права токенов API)
-	appLimiter     *ipRateLimiter // запросы на токен приложения
-	botLimiter     *ipRateLimiter // запросы на токен бота
-	callbackClient *http.Client   // Callback API: не ходит во внутреннюю сеть
+	root           *chi.Mux         // для поиска шаблона маршрута (права токенов API)
+	appLimiter     *ipRateLimiter   // запросы на токен приложения
+	botLimiter     *ipRateLimiter   // запросы на токен бота
+	callbackClient *http.Client     // Callback API: не ходит во внутреннюю сеть
+	yookassa       *yookassa.Client // nil — покупка монет выключена
+
 	// callbackInsecure — только для тестов: разрешает http:// и локальный сервер.
 	callbackInsecure bool
 }
@@ -80,12 +83,17 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 		m = &mailer.SMTP{Addr: cfg.SMTPHost + ":" + cfg.SMTPPort, User: cfg.SMTPUser,
 			Password: cfg.SMTPPassword, From: cfg.MailFrom}
 	}
+	var yk *yookassa.Client
+	if cfg.YooKassaShopID != "" {
+		yk = yookassa.New(cfg.YooKassaAPIURL, cfg.YooKassaShopID, cfg.YooKassaSecretKey)
+	}
 	return &Server{
-		cfg:    cfg,
-		store:  st,
-		tokens: auth.NewTokenIssuer(cfg.JWTSecret, cfg.AccessTTL),
-		hub:    realtime.NewHub(),
-		log:    log,
+		yookassa: yk,
+		cfg:      cfg,
+		store:    st,
+		tokens:   auth.NewTokenIssuer(cfg.JWTSecret, cfg.AccessTTL),
+		hub:      realtime.NewHub(),
+		log:      log,
 
 		msgLimiter:    newIPRateLimiter(1, 30),       // 60 в минуту, всплеск 30
 		uploadLimiter: newIPRateLimiter(30.0/60, 20), // 30 фото в минуту
@@ -259,6 +267,10 @@ func (s *Server) Router() http.Handler {
 				r.Get("/wallet", s.handleWallet)
 				r.Post("/wallet/transfer", s.handleTransfer)
 				r.Post("/wallet/daily-bonus", s.handleDailyBonus)
+				r.Get("/wallet/packages", s.handleCoinPackages)
+				r.Get("/wallet/purchases", s.handleMyPurchases)
+				r.Post("/wallet/purchases", s.handleCreatePurchase)
+				r.Get("/wallet/purchases/{pid}", s.handleGetPurchase)
 				r.Get("/gifts/catalog", s.handleGiftCatalog)
 				r.Post("/users/{id}/gifts", s.handleSendGift)
 				r.Get("/users/{id}/gifts", s.handleUserGifts)
@@ -363,6 +375,9 @@ func (s *Server) Router() http.Handler {
 					r.Patch("/vulnerability-reports/{id}", s.handleVulnStatus)
 				})
 			})
+
+			// уведомления ЮKassa — без входа; проверка по IP и через API
+			r.Post("/payments/yookassa", s.handleYooKassaWebhook)
 
 			// приём сообщений об уязвимостях — без входа в аккаунт
 			r.Post("/security/vulnerability-reports", s.handleVulnReport)
