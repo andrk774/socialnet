@@ -1,4 +1,4 @@
-.PHONY: up down logs build test test-db psql fmt
+.PHONY: up down logs build test test-db psql fmt lint openapi fuzz
 
 up:            ## собрать и запустить всё в Docker
 	docker compose up -d --build
@@ -27,3 +27,15 @@ psql:          ## консоль базы
 
 fmt:
 	gofmt -w .
+
+lint:          ## линтер (golangci-lint v2)
+	golangci-lint run ./...
+
+openapi:       ## пересобрать api/openapi.json после изменения маршрутов
+	python3 api/gen_openapi.py
+
+fuzz:          ## короткий фаззинг всех целей (по 30 с)
+	@for t in "textparse FuzzExtract" "media FuzzExif" "media FuzzProcess" "av FuzzSniff" \
+	          "webpush FuzzDecrypt" "webpush FuzzValidateEndpoint" "auth FuzzVerifyPassword" \
+	          "auth FuzzParseAccess" "httpapi FuzzCleanText"; do \
+		set -- $$t; go test ./internal/$$1 -run '^$$' -fuzz "^$$2$$" -fuzztime 30s || exit 1; done

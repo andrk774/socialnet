@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: socialnet_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: ffmpeg (музыка и видео)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: OpenAPI в актуальном состоянии
+        run: python3 api/gen_openapi.py && git diff --exit-code api/openapi.json
+      - run: go vet ./...
+      - name: Тесты с детектором гонок
+        env:
+          TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/socialnet_test?sslmode=disable
+          TEST_REDIS_URL: redis://localhost:6379/0
+        run: go test -race -count=1 ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.5.0
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: govulncheck — известные уязвимости в зависимостях
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - name: gosec — статический анализ безопасности
+        run: go run github.com/securego/gosec/v2/cmd/gosec@latest -exclude-dir=api -exclude=G115 ./...
+
+  fuzz:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { pkg: ./internal/textparse, fn: FuzzExtract }
+          - { pkg: ./internal/media, fn: FuzzExif }
+          - { pkg: ./internal/media, fn: FuzzProcess }
+          - { pkg: ./internal/av, fn: FuzzSniff }
+          - { pkg: ./internal/webpush, fn: FuzzDecrypt }
+          - { pkg: ./internal/webpush, fn: FuzzValidateEndpoint }
+          - { pkg: ./internal/auth, fn: FuzzVerifyPassword }
+          - { pkg: ./internal/auth, fn: FuzzParseAccess }
+          - { pkg: ./internal/httpapi, fn: FuzzCleanText }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: ${{ matrix.target.fn }}
+        run: go test ${{ matrix.target.pkg }} -run '^$' -fuzz '^${{ matrix.target.fn }}$' -fuzztime 60s
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Сборка образа
+        run: docker build -t socialnet:ci .
+      - name: Trivy — уязвимости в образе
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: socialnet:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"

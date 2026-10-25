@@ -185,12 +185,12 @@ func (s *Server) serveAVFile(w http.ResponseWriter, r *http.Request, kind, id, n
 		http.NotFound(w, r)
 		return
 	}
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // путь из av.Store.Path: проверенный UUID и имя из белого списка
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	st, err := f.Stat()
 	if err != nil {
 		s.internalError(w, r, err)

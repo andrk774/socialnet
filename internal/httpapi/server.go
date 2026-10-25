@@ -114,6 +114,11 @@ func (s *Server) Router() http.Handler {
 	r.Use(securityHeaders)
 
 	r.Get("/.well-known/security.txt", s.handleSecurityTxt)
+	r.Get("/api/v1/openapi.json", s.handleOpenAPI)
+	if !s.cfg.DocsDisabled {
+		r.Handle("/docs/*", docsHandler())
+		r.Get("/docs", http.RedirectHandler("/docs/", http.StatusMovedPermanently).ServeHTTP)
+	}
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})

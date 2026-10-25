@@ -46,7 +46,7 @@ func (s *Server) receiveUpload(w http.ResponseWriter, r *http.Request, maxBytes 
 
 	for n := 0; ; n++ {
 		part, err := mr.NextPart()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		var maxErr *http.MaxBytesError
@@ -66,7 +66,9 @@ func (s *Server) receiveUpload(w http.ResponseWriter, r *http.Request, maxBytes 
 			up.Path, up.Filename = f.Name(), part.FileName()
 			h := sha256.New()
 			written, err := io.Copy(io.MultiWriter(f, h), io.LimitReader(part, maxBytes+1))
-			f.Close()
+			if cerr := f.Close(); err == nil {
+				err = cerr // ошибка записи на диск всплывает при закрытии
+			}
 			if errors.As(err, &maxErr) || written > maxBytes {
 				return fail(http.StatusRequestEntityTooLarge, "too_large", "file is too large")
 			}
@@ -105,7 +107,7 @@ func cleanText(s string, max int) string {
 		_, size := utf8.DecodeLastRuneInString(s)
 		s = s[:len(s)-size]
 	}
-	return s
+	return strings.TrimSpace(s) // обрезка могла прийтись на пробел (нашёл фаззер)
 }
 
 // acquireAV ограничивает число одновременных запусков ffmpeg.

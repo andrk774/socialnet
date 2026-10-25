@@ -56,12 +56,12 @@ func (d *Disk) Save(id, size string, data []byte) error {
 		return err
 	}
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		os.Remove(tmp.Name())
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
 		return err
 	}
 	if err := tmp.Close(); err != nil {
-		os.Remove(tmp.Name())
+		_ = os.Remove(tmp.Name())
 		return err
 	}
 	return os.Rename(tmp.Name(), p)
@@ -72,7 +72,7 @@ func (d *Disk) Open(id, size string) (io.ReadSeekCloser, time.Time, error) {
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	f, err := os.Open(p)
+	f, err := os.Open(p) //nolint:gosec // путь собран из проверенного UUID (см. path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, time.Time{}, ErrNotFound
 	}
@@ -81,7 +81,7 @@ func (d *Disk) Open(id, size string) (io.ReadSeekCloser, time.Time, error) {
 	}
 	st, err := f.Stat()
 	if err != nil {
-		f.Close()
+		_ = f.Close()
 		return nil, time.Time{}, err
 	}
 	return f, st.ModTime(), nil

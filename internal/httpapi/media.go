@@ -31,7 +31,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", `multipart field "file" is required`)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	defer func() {
 		if r.MultipartForm != nil {
 			_ = r.MultipartForm.RemoveAll() // временные файлы формы
@@ -107,7 +107,7 @@ func (s *Server) handleServeMedia(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Тип берём из базы (мы его сами определили при загрузке), а не угадываем.
 	w.Header().Set("Content-Type", info.Mime)

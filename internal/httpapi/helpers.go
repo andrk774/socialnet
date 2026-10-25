@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"math"
 	"net/http"
 	"regexp"
@@ -201,7 +202,7 @@ func toProfile(u *store.User, self bool, r store.Relationship) profileView {
 func (s *Server) notify(ctx context.Context, n store.NewNotification) {
 	created, err := s.store.CreateNotification(ctx, n)
 	if err != nil {
-		if err != store.ErrNotFound {
+		if !errors.Is(err, store.ErrNotFound) {
 			s.log.Error("notification", "err", err)
 		}
 		return

@@ -3,6 +3,7 @@ package media
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"hash/crc32"
 	"image"
 	"image/color"
@@ -93,20 +94,20 @@ func pngBomb() []byte {
 }
 
 func TestRejects(t *testing.T) {
-	if _, err := Process(bytes.NewReader(pngBomb())); err != ErrTooManyPixel {
+	if _, err := Process(bytes.NewReader(pngBomb())); !errors.Is(err, ErrTooManyPixel) {
 		t.Fatalf("bomb: %v", err)
 	}
-	if _, err := Process(bytes.NewReader([]byte("<?php system($_GET['c']); ?>"))); err != ErrUnsupported {
+	if _, err := Process(bytes.NewReader([]byte("<?php system($_GET['c']); ?>"))); !errors.Is(err, ErrUnsupported) {
 		t.Fatalf("php: %v", err)
 	}
-	if _, err := Process(bytes.NewReader([]byte("<svg onload=alert(1)>"))); err != ErrUnsupported {
+	if _, err := Process(bytes.NewReader([]byte("<svg onload=alert(1)>"))); !errors.Is(err, ErrUnsupported) {
 		t.Fatalf("svg: %v", err)
 	}
 	// заголовок PNG, а дальше мусор
-	if _, err := Process(bytes.NewReader(append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 100)...))); err != ErrCorrupt {
+	if _, err := Process(bytes.NewReader(append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 100)...))); !errors.Is(err, ErrCorrupt) {
 		t.Fatalf("corrupt: %v", err)
 	}
-	if _, err := Process(bytes.NewReader(make([]byte, MaxBytes+10))); err != ErrTooLarge {
+	if _, err := Process(bytes.NewReader(make([]byte, MaxBytes+10))); !errors.Is(err, ErrTooLarge) {
 		t.Fatalf("too large: %v", err)
 	}
 }

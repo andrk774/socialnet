@@ -56,14 +56,19 @@ func VerifyPassword(password, encoded string) (bool, error) {
 	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &mem, &iters, &threads); err != nil {
 		return false, ErrBadHash
 	}
+	// Защита в глубину: подделанная строка хэша не должна заставить сервер
+	// выделить гигабайты памяти или считать хэш минутами.
+	if mem < 8 || mem > 256*1024 || iters < 1 || iters > 10 || threads < 1 || threads > 16 {
+		return false, ErrBadHash
+	}
 
 	b64 := base64.RawStdEncoding
 	salt, err := b64.DecodeString(parts[4])
-	if err != nil {
+	if err != nil || len(salt) < 8 || len(salt) > 64 {
 		return false, ErrBadHash
 	}
 	want, err := b64.DecodeString(parts[5])
-	if err != nil {
+	if err != nil || len(want) < 16 || len(want) > 64 {
 		return false, ErrBadHash
 	}
 
