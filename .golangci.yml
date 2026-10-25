@@ -1,0 +1,24 @@
+version: "2"
+run:
+  timeout: 5m
+linters:
+  default: standard
+  enable:
+    - gosec        # уязвимости: инъекции, слабая криптография, права на файлы
+    - bodyclose    # незакрытые тела HTTP-ответов
+    - errorlint    # правильное сравнение ошибок (errors.Is/As)
+    - noctx        # HTTP-запросы без контекста
+    - sqlclosecheck
+    - rowserrcheck
+    - misspell
+    - unconvert
+  settings:
+    gosec:
+      excludes:
+        - G115 # переполнение при приведении int — проверено вручную на границах
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters: [gosec, errcheck, noctx, bodyclose]
+formatters:
+  enable: [gofmt]

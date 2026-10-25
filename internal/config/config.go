@@ -48,6 +48,8 @@ type Config struct {
 	// Ключи VAPID для Web Push (команда `api gen-vapid`). Пусто = push выключен.
 	VAPIDPublic  string
 	VAPIDPrivate string
+
+	DocsDisabled bool // DOCS_DISABLED=true — не показывать /docs
 }
 
 func Load() (Config, error) {
@@ -90,6 +92,9 @@ func Load() (Config, error) {
 	c.SMTPPassword = os.Getenv("SMTP_PASSWORD")
 	c.MailFrom = getenv("MAIL_FROM", "Socialnet <no-reply@localhost>")
 	c.SecurityContact = getenv("SECURITY_CONTACT", "security@localhost")
+	if c.DocsDisabled, err = boolean("DOCS_DISABLED", false); err != nil {
+		return c, err
+	}
 	c.VAPIDPublic = os.Getenv("VAPID_PUBLIC_KEY")
 	c.VAPIDPrivate = os.Getenv("VAPID_PRIVATE_KEY")
 	c.AppURL = strings.TrimRight(getenv("APP_URL", "http://localhost:3000"), "/")

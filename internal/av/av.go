@@ -61,11 +61,11 @@ func Sniff(head []byte) (string, error) {
 }
 
 func SniffFile(path string) (string, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // путь создан нами: временный файл загрузки
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	head := make([]byte, 16)
 	n, _ := io.ReadFull(f, head)
 	return Sniff(head[:n])
@@ -232,7 +232,7 @@ func TranscodeHLS(ctx context.Context, in, format, dir string, srcHeight int, ma
 			}
 		}
 	}
-	return made, os.WriteFile(filepath.Join(dir, "master.m3u8"), []byte(m.String()), 0o640)
+	return made, os.WriteFile(filepath.Join(dir, "master.m3u8"), []byte(m.String()), 0o600)
 }
 
 func bitrate(s string) int {

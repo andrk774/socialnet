@@ -98,11 +98,11 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			return err
 		}
 		if _, err := tx.Exec(ctx, string(sql)); err != nil {
-			tx.Rollback(ctx) //nolint:errcheck
+			_ = tx.Rollback(ctx)
 			return fmt.Errorf("migration %s: %w", version, err)
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO schema_migrations (version) VALUES ($1)`, version); err != nil {
-			tx.Rollback(ctx) //nolint:errcheck
+			_ = tx.Rollback(ctx)
 			return err
 		}
 		if err := tx.Commit(ctx); err != nil {

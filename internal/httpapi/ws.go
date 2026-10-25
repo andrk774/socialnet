@@ -81,7 +81,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	defer conn.CloseNow()
+	defer func() { _ = conn.CloseNow() }()
 	conn.SetReadLimit(4096)
 
 	client := s.hub.Subscribe(userID)
@@ -99,7 +99,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 			select {
 			case msg, ok := <-client.Send:
 				if !ok {
-					conn.Close(websocket.StatusPolicyViolation, "too slow")
+					_ = conn.Close(websocket.StatusPolicyViolation, "too slow")
 					return
 				}
 				wctx, c := context.WithTimeout(ctx, 10*time.Second)

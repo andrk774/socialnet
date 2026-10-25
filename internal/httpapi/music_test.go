@@ -76,7 +76,7 @@ func TestMusic(t *testing.T) {
 	// поля формы важнее тегов файла; управляющие символы вырезаются
 	code, tr2 := uploadFile(t, ts, anna, "/api/v1/tracks", "x.mp3",
 		genMedia(t, "b.ogg", "-f", "lavfi", "-i", "sine=frequency=300:duration=2", "-c:a", "libopus"),
-		map[string]string{"title": "Песня‮\nвторая", "artist": "Анна"})
+		map[string]string{"title": "Песня\u202e\nвторая", "artist": "Анна"})
 	if code != 201 || tr2["title"] != "Песня вторая" {
 		t.Fatalf("ogg upload: %d %v", code, tr2)
 	}
