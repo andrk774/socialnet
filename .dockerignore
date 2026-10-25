@@ -1,4 +1,4 @@
 .env
 .git
 bin
-.git
+frontend/node_modules
