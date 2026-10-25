@@ -175,6 +175,9 @@ func (s *Server) handleJoinCommunity(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
+	if c.MyRole == "" {
+		s.emit(r.Context(), c.ID, "group_join", map[string]int64{"user_id": me})
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -190,6 +193,9 @@ func (s *Server) handleLeaveCommunity(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.RemoveMember(r.Context(), c.ID, userIDFrom(r.Context())); err != nil {
 		s.internalError(w, r, err)
 		return
+	}
+	if c.MyRole != "" {
+		s.emit(r.Context(), c.ID, "group_leave", map[string]int64{"user_id": userIDFrom(r.Context())})
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -404,6 +410,9 @@ func (s *Server) handleResolveJoin(approve bool) http.HandlerFunc {
 		if err != nil {
 			s.internalError(w, r, err)
 			return
+		}
+		if approve {
+			s.emit(r.Context(), c.ID, "group_join", map[string]int64{"user_id": uid})
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}

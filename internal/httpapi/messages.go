@@ -84,6 +84,18 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "privacy", "this user does not accept messages from you")
 		return
 	}
+	// Бот не пишет первым — только отвечает тем, кто ему написал.
+	if viewerFrom(r.Context()).Bot != 0 {
+		wrote, err := s.store.UserWroteTo(r.Context(), target.ID, me)
+		if err != nil {
+			s.internalError(w, r, err)
+			return
+		}
+		if !wrote {
+			writeError(w, http.StatusForbidden, "bot_cannot_initiate", "bots can only reply to users who wrote first")
+			return
+		}
+	}
 	convID, err := s.store.Conversation(r.Context(), me, target.ID)
 	if err != nil {
 		s.internalError(w, r, err)
@@ -155,7 +167,25 @@ func (s *Server) deliver(w http.ResponseWriter, r *http.Request, conv *store.Con
 		return
 	}
 	s.broadcast(r.Context(), conv, me, msg)
+	s.emitBotMessages(r.Context(), conv, me, msg)
 	writeJSON(w, http.StatusCreated, msg)
+}
+
+// emitBotMessages: сообщение боту (или в беседу с ботом) — событие message_new его сообществу.
+func (s *Server) emitBotMessages(ctx context.Context, conv *store.ConvInfo, sender int64, msg *store.Message) {
+	for _, uid := range conv.Members {
+		if uid == sender {
+			continue
+		}
+		community, err := s.store.BotCommunity(ctx, uid)
+		if err != nil {
+			s.log.Warn("bot lookup", "err", err)
+			continue
+		}
+		if community != nil {
+			s.emit(ctx, *community, "message_new", map[string]any{"message": msg, "conversation_kind": conv.Kind})
+		}
+	}
 }
 
 // broadcast: всем участникам; тем, кто не в приложении, — push без текста.

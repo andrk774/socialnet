@@ -16,6 +16,7 @@ import (
 	"socialnet/internal/mailer"
 	"socialnet/internal/media"
 	"socialnet/internal/realtime"
+	"socialnet/internal/safehttp"
 	"socialnet/internal/store"
 	"socialnet/internal/webpush"
 )
@@ -46,6 +47,13 @@ type Server struct {
 
 	avStore *av.Store     // музыка и видео
 	avSem   chan struct{} // не больше N одновременных ffmpeg в API
+
+	root           *chi.Mux       // для поиска шаблона маршрута (права токенов API)
+	appLimiter     *ipRateLimiter // запросы на токен приложения
+	botLimiter     *ipRateLimiter // запросы на токен бота
+	callbackClient *http.Client   // Callback API: не ходит во внутреннюю сеть
+	// callbackInsecure — только для тестов: разрешает http:// и локальный сервер.
+	callbackInsecure bool
 }
 
 func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) {
@@ -98,6 +106,10 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 
 		avStore: avStore,
 		avSem:   make(chan struct{}, 2),
+
+		appLimiter:     newIPRateLimiter(5, 20),  // как у ВКонтакте: несколько запросов в секунду
+		botLimiter:     newIPRateLimiter(20, 40), // ботам — больше
+		callbackClient: safehttp.Client(10 * time.Second),
 	}, nil
 }
 
@@ -112,6 +124,8 @@ func (s *Server) Router() http.Handler {
 	}
 	r.Use(middleware.Recoverer)
 	r.Use(securityHeaders)
+
+	s.root = r
 
 	r.Get("/.well-known/security.txt", s.handleSecurityTxt)
 	r.Get("/api/v1/openapi.json", s.handleOpenAPI)
@@ -149,6 +163,13 @@ func (s *Server) Router() http.Handler {
 				r.Post("/email/verify", s.handleVerifyEmail)
 				r.Post("/password/forgot", s.handleForgotPassword)
 				r.Post("/password/reset", s.handleResetPassword)
+			})
+
+			// OAuth 2.0: обмен кода на токен и отзыв (RFC 7009) — без входа, по client_id.
+			r.Route("/oauth", func(r chi.Router) {
+				r.Use(authLimiter.middleware)
+				r.Post("/token", s.handleOAuthToken)
+				r.Post("/revoke", s.handleOAuthRevoke)
 			})
 
 			r.Group(func(r chi.Router) {
@@ -299,6 +320,25 @@ func (s *Server) Router() http.Handler {
 				r.Post("/events/{id}/rsvp", s.handleRSVP)
 				r.Delete("/events/{id}/rsvp", s.handleCancelRSVP)
 				r.Get("/events/{id}/attendees", s.handleAttendees)
+
+				// API для разработчиков: приложения, согласие, боты, Callback API
+				r.Get("/oauth/authorize", s.handleAuthorizeInfo)
+				r.Post("/oauth/authorize", s.handleAuthorize)
+				r.Get("/apps", s.handleMyApps)
+				r.Post("/apps", s.handleCreateApp)
+				r.Get("/apps/{id}", s.handleGetApp)
+				r.Patch("/apps/{id}", s.handleUpdateApp)
+				r.Delete("/apps/{id}", s.handleDeleteApp)
+				r.Post("/apps/{id}/secret", s.handleRotateAppSecret)
+				r.Get("/users/me/authorized-apps", s.handleAuthorizedApps)
+				r.Delete("/users/me/authorized-apps/{id}", s.handleRevokeAuthorizedApp)
+				r.Get("/communities/{id}/bot/tokens", s.handleBotTokens)
+				r.Post("/communities/{id}/bot/tokens", s.handleCreateBotToken)
+				r.Delete("/communities/{id}/bot/tokens/{tid}", s.handleRevokeBotToken)
+				r.Get("/communities/{id}/callback", s.handleGetCallback)
+				r.Put("/communities/{id}/callback", s.handleSetCallback)
+				r.Delete("/communities/{id}/callback", s.handleDeleteCallback)
+				r.Post("/communities/{id}/callback/confirm", s.handleConfirmCallback)
 
 				// поиск и жалобы
 				r.Get("/search", s.handleSearch)

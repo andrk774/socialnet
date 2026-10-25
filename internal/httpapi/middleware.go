@@ -23,6 +23,10 @@ type viewer struct {
 	ID   int64
 	Role string // user | moderator | admin
 	SID  string // текущая сессия
+
+	API    bool     // запрос с токеном приложения или бота
+	Scopes []string // права токена API
+	Bot    int64    // сообщество, если это бот
 }
 
 func viewerFrom(ctx context.Context) viewer {
@@ -42,6 +46,10 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 		token, ok := strings.CutPrefix(h, "Bearer ")
 		if !ok || token == "" {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "missing bearer token")
+			return
+		}
+		if strings.HasPrefix(token, apiTokenPrefix) {
+			s.apiTokenAuth(w, r, next, token)
 			return
 		}
 		id, sid, err := s.tokens.ParseAccess(token)
