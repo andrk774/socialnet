@@ -1819,6 +1819,278 @@
     }
    }
   },
+  "/api/v1/admin/alerts": {
+   "get": {
+    "tags": [
+     "moderation"
+    ],
+    "summary": "Тревоги детектора аномалий: ?status=all",
+    "operationId": "get_api_v1_admin_alerts",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "rule": {
+              "type": "string"
+             },
+             "subject": {
+              "type": "string"
+             },
+             "severity": {
+              "type": "string",
+              "enum": [
+               "low",
+               "medium",
+               "high"
+              ]
+             },
+             "details": {
+              "type": "object"
+             },
+             "created_at": {
+              "type": "string",
+              "format": "date-time"
+             },
+             "acknowledged_by": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+             }
+            },
+            "required": [
+             "id",
+             "rule",
+             "subject",
+             "severity",
+             "details",
+             "created_at",
+             "acknowledged_by"
+            ]
+           }
+          },
+          "next_cursor": {
+           "type": "integer",
+           "format": "int64",
+           "nullable": true
+          }
+         },
+         "required": [
+          "items",
+          "next_cursor"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/admin/alerts/{id}/ack": {
+   "post": {
+    "tags": [
+     "moderation"
+    ],
+    "summary": "Отметить тревогу разобранной",
+    "operationId": "post_api_v1_admin_alerts_id_ack",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/admin/audit": {
+   "get": {
+    "tags": [
+     "moderation"
+    ],
+    "summary": "Журнал действий модераторов и админов: ?actor_id=&before=",
+    "operationId": "get_api_v1_admin_audit",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "actor_id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "actor_role": {
+              "type": "string"
+             },
+             "action": {
+              "type": "string"
+             },
+             "target": {
+              "type": "string"
+             },
+             "details": {
+              "type": "object"
+             },
+             "status": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "ip": {
+              "type": "string"
+             },
+             "user_agent": {
+              "type": "string"
+             },
+             "request_id": {
+              "type": "string"
+             },
+             "created_at": {
+              "type": "string",
+              "format": "date-time"
+             }
+            },
+            "required": [
+             "id",
+             "actor_id",
+             "actor_role",
+             "action",
+             "target",
+             "status",
+             "ip",
+             "user_agent",
+             "request_id",
+             "created_at"
+            ]
+           }
+          },
+          "next_cursor": {
+           "type": "integer",
+           "format": "int64",
+           "nullable": true
+          }
+         },
+         "required": [
+          "items",
+          "next_cursor"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/admin/audit/verify": {
+   "get": {
+    "tags": [
+     "moderation"
+    ],
+    "summary": "Проверить цепочку хешей журнала",
+    "operationId": "get_api_v1_admin_audit_verify",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "ok": {
+           "type": "boolean"
+          },
+          "checked": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "broken_at": {
+           "type": "integer",
+           "format": "int64"
+          }
+         },
+         "required": [
+          "ok",
+          "checked",
+          "broken_at"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/admin/users/{id}/role": {
    "put": {
     "tags": [

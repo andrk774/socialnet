@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"socialnet/internal/av"
+	"socialnet/internal/s3"
 	"socialnet/internal/store"
 )
 
@@ -94,6 +96,9 @@ func (s *Server) handleUploadTrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	st, err := os.Stat(out)
+	if err == nil {
+		err = s.avStore.Commit(r.Context(), "tracks", id)
+	}
 	if err == nil {
 		err = s.store.CreateTrack(r.Context(), store.NewTrack{ID: id, Title: title, Artist: artist,
 			UploaderID: me, DurationSec: int(probe.Seconds + 0.5), Size: st.Size(), SourceSHA: up.SHA})
@@ -180,6 +185,10 @@ func (s *Server) handleServeAudio(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) serveAVFile(w http.ResponseWriter, r *http.Request, kind, id, name, ctype string) {
+	if s.avStore.Remote != nil {
+		s.serveRemoteAV(w, r, kind, id, name, ctype)
+		return
+	}
 	path, err := s.avStore.Path(kind, id, name)
 	if err != nil {
 		http.NotFound(w, r)
@@ -203,6 +212,56 @@ func (s *Server) serveAVFile(w http.ResponseWriter, r *http.Request, kind, id, n
 	}
 	w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
 	http.ServeContent(w, r, "", st.ModTime(), f)
+}
+
+// serveRemoteAV: файл из S3. Публичное — редиректом на CDN, если он есть;
+// иначе (и всегда для голосовых) — проксируем с поддержкой Range.
+func (s *Server) serveRemoteAV(w http.ResponseWriter, r *http.Request, kind, id, name, ctype string) {
+	key, err := s.avStore.Key(kind, id, name)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if s.cfg.MediaCDNURL != "" && kind != "voices" {
+		w.Header().Set("Cache-Control", "public, max-age=300")
+		http.Redirect(w, r, s.cfg.MediaCDNURL+"/"+key, http.StatusFound)
+		return
+	}
+	obj, err := s.avStore.Remote.Get(r.Context(), key, r.Header.Get("Range"))
+	switch {
+	case errors.Is(err, s3.ErrNotFound):
+		http.NotFound(w, r)
+		return
+	case errors.Is(err, s3.ErrRange):
+		w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+		return
+	case err != nil:
+		s.log.Warn("s3 get", "err", err, "key", key)
+		http.Error(w, "storage unavailable", http.StatusBadGateway)
+		return
+	}
+	defer func() { _ = obj.Body.Close() }()
+	h := w.Header()
+	h.Set("Content-Type", ctype)
+	if h.Get("Cache-Control") == "" || h.Get("Cache-Control") == "no-store" {
+		h.Set("Cache-Control", "public, max-age=3600")
+	}
+	h.Set("Cross-Origin-Resource-Policy", "cross-origin")
+	h.Set("Accept-Ranges", "bytes")
+	if obj.ContentLength >= 0 {
+		h.Set("Content-Length", strconv.FormatInt(obj.ContentLength, 10))
+	}
+	if obj.ContentRange != "" {
+		h.Set("Content-Range", obj.ContentRange)
+	}
+	if obj.ETag != "" {
+		h.Set("ETag", obj.ETag)
+	}
+	if !obj.LastModified.IsZero() {
+		h.Set("Last-Modified", obj.LastModified.UTC().Format(http.TimeFormat))
+	}
+	w.WriteHeader(obj.Status)
+	_, _ = io.Copy(w, obj.Body)
 }
 
 // ---------- «Моя музыка» ----------

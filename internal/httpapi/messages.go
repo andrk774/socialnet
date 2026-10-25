@@ -166,6 +166,7 @@ func (s *Server) deliver(w http.ResponseWriter, r *http.Request, conv *store.Con
 		s.internalError(w, r, err)
 		return
 	}
+	s.m.business.Inc("message_sent")
 	s.broadcast(r.Context(), conv, me, msg)
 	s.emitBotMessages(r.Context(), conv, me, msg)
 	writeJSON(w, http.StatusCreated, msg)
@@ -607,6 +608,11 @@ func (s *Server) handleUploadVoice(w http.ResponseWriter, r *http.Request) {
 	secs := int(probe.Seconds + 0.5)
 	if secs < 1 {
 		secs = 1
+	}
+	if err := s.avStore.Commit(r.Context(), "voices", id); err != nil {
+		_ = s.avStore.Delete("voices", id)
+		s.internalError(w, r, err)
+		return
 	}
 	if err := s.store.CreateVoice(r.Context(), id, me, secs); err != nil {
 		_ = s.avStore.Delete("voices", id)

@@ -1,0 +1,80 @@
+groups:
+  - name: socialnet
+    rules:
+      - alert: APIDown
+        expr: up{job="socialnet-api"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "API не отвечает на /metrics"
+
+      - alert: High5xxRate
+        expr: |
+          sum(rate(socialnet_http_requests_total{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(socialnet_http_requests_total[5m])), 1) > 0.02
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Больше 2% ответов с ошибкой 5xx"
+
+      - alert: SlowRequests
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(socialnet_http_request_duration_seconds_bucket{route!="/api/v1/ws"}[5m]))) > 1
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "95-й перцентиль времени ответа больше секунды"
+
+      - alert: LoginFailuresSpike
+        expr: sum(rate(socialnet_security_events_total{type="login_failed"}[5m])) * 60 > 30
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Больше 30 неудачных входов в минуту — возможен перебор паролей"
+
+      - alert: SecurityAlertRaised
+        expr: increase(socialnet_security_alerts_total{severity="high"}[10m]) > 0
+        labels: {severity: critical}
+        annotations:
+          summary: "Детектор аномалий: {{ $labels.rule }}"
+          description: "Смотрите /api/v1/admin/alerts"
+
+      - alert: OpenSecurityAlerts
+        expr: socialnet_queue_depth{queue="open_alerts"} > 0
+        for: 24h
+        labels: {severity: warning}
+        annotations:
+          summary: "Есть неразобранные тревоги безопасности старше суток"
+
+      - alert: VideoQueueBacklog
+        expr: socialnet_queue_depth{queue="jobs"} > 50
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Очередь обработки видео растёт"
+
+      - alert: CallbackFailures
+        expr: increase(socialnet_events_total{event="callback_failed"}[15m]) > 20
+        labels: {severity: warning}
+        annotations:
+          summary: "Callback API: много неудачных доставок"
+
+      - alert: BackupTooOld
+        expr: time() - socialnet_backup{metric="last_success_timestamp"} > 26 * 3600
+        for: 30m
+        labels: {severity: critical}
+        annotations:
+          summary: "Больше 26 часов нет удачной резервной копии с проверкой восстановлением"
+
+      - alert: BackupRestoreFailed
+        expr: socialnet_backup{metric="last_restore_ok"} == 0 and socialnet_backup{metric="last_run_timestamp"} > 0
+        labels: {severity: critical}
+        annotations:
+          summary: "Последняя резервная копия не прошла проверку восстановлением"
+
+      - alert: DBPoolExhausted
+        expr: socialnet_db_pool_connections{state="acquired"} / socialnet_db_pool_connections{state="max"} > 0.9
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Пул соединений с базой почти исчерпан"

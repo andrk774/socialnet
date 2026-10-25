@@ -1,16 +1,20 @@
 package media
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"time"
+
+	"socialnet/internal/s3"
 )
 
-// Storage — где лежат файлы. Сейчас локальный диск; для S3/MinIO
-// достаточно написать другую реализацию этого интерфейса.
+// Storage — где лежат файлы: локальный диск (Disk) или S3/MinIO (S3).
 type Storage interface {
 	Save(id, size string, data []byte) error
 	Open(id, size string) (io.ReadSeekCloser, time.Time, error)
@@ -94,6 +98,70 @@ func (d *Disk) Delete(id string) error {
 			return err
 		}
 		if err := os.Remove(p); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
+}
+
+// S3 — фото в объектном хранилище: photos/<id>/<size>.
+type S3 struct {
+	C *s3.Client
+}
+
+func s3Key(id, size string) (string, error) {
+	if !idRe.MatchString(id) || (size != "full" && size != "thumb") {
+		return "", ErrNotFound
+	}
+	return "photos/" + id + "/" + size, nil
+}
+
+func (s *S3) Save(id, size string, data []byte) error {
+	key, err := s3Key(id, size)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	return s.C.Put(ctx, key, data, http.DetectContentType(data))
+}
+
+type readSeekNopCloser struct{ *bytes.Reader }
+
+func (readSeekNopCloser) Close() error { return nil }
+
+// Open читает фото целиком (до 32 МБ): http.ServeContent нужен Seek.
+func (s *S3) Open(id, size string) (io.ReadSeekCloser, time.Time, error) {
+	key, err := s3Key(id, size)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	obj, err := s.C.Get(ctx, key, "")
+	if errors.Is(err, s3.ErrNotFound) {
+		return nil, time.Time{}, ErrNotFound
+	}
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	defer func() { _ = obj.Body.Close() }()
+	data, err := io.ReadAll(io.LimitReader(obj.Body, 32<<20))
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	return readSeekNopCloser{bytes.NewReader(data)}, obj.LastModified, nil
+}
+
+func (s *S3) Delete(id string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	for _, size := range []string{"full", "thumb"} {
+		key, err := s3Key(id, size)
+		if err != nil {
+			return err
+		}
+		if err := s.C.Delete(ctx, key); err != nil {
 			return err
 		}
 	}

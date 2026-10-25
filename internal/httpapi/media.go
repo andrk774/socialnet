@@ -98,6 +98,11 @@ func (s *Server) handleServeMedia(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
+	if _, remote := s.files.(*media.S3); remote && s.cfg.MediaCDNURL != "" {
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		http.Redirect(w, r, s.cfg.MediaCDNURL+"/photos/"+id+"/"+size, http.StatusFound)
+		return
+	}
 	f, mod, err := s.files.Open(id, size)
 	if errors.Is(err, media.ErrNotFound) {
 		http.NotFound(w, r)

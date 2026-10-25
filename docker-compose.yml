@@ -1,3 +1,7 @@
+# Базовый набор: db, redis, api, worker, backup, mailpit.
+# Дополнительно:
+#   docker compose --profile s3 up         — локальное S3 (SeaweedFS) для медиа и копий
+#   docker compose --profile monitoring up — Prometheus + Grafana (http://127.0.0.1:3001)
 services:
   db:
     image: postgres:17-alpine
@@ -18,16 +22,40 @@ services:
       timeout: 3s
       retries: 10
 
+  # Общие лимиты, тикеты WebSocket и события между экземплярами API.
+  # Данные не нужны после перезапуска — без сохранения на диск.
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}",
+              "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-ttl"]
+    networks: [backend]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
   api:
     build: .
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment: &env
       DATABASE_URL: postgres://socialnet:${POSTGRES_PASSWORD}@db:5432/socialnet?sslmode=disable
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       HTTP_ADDR: ":8080"
+      METRICS_ADDR: ":9090"
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
       ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-15m}
       REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL:-720h}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
@@ -45,6 +73,20 @@ services:
       YOOKASSA_SECRET_KEY: ${YOOKASSA_SECRET_KEY:-}
       YOOKASSA_VAT_CODE: ${YOOKASSA_VAT_CODE:-1}
       YOOKASSA_CHECK_IP: ${YOOKASSA_CHECK_IP:-true}
+      # Пустой S3_ENDPOINT — файлы на локальном диске (том media).
+      # Для профиля s3: S3_ENDPOINT=http://s3:8333
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-socialnet}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      S3_PATH_STYLE: ${S3_PATH_STYLE:-true}
+      MEDIA_CDN_URL: ${MEDIA_CDN_URL:-}
+      BACKUP_DIR: /backups
+      BACKUP_ENC_KEY: ${BACKUP_ENC_KEY:-}
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
+      BACKUP_HOUR: ${BACKUP_HOUR:-3}
+      BACKUP_S3: ${BACKUP_S3:-false}
       # По умолчанию письма уходят в Mailpit (http://127.0.0.1:8025).
       # Для настоящей почты укажите в .env свой SMTP.
       SMTP_HOST: ${SMTP_HOST:-mailpit}
@@ -56,6 +98,7 @@ services:
       - media:/data/media
     ports:
       - "127.0.0.1:8080:8080"
+      # 9090 (/metrics) наружу не публикуется: его читает Prometheus по сети backend
     networks: [default, backend]
     read_only: true
     tmpfs: [/tmp]
@@ -65,7 +108,8 @@ services:
 
   # Фоновая обработка видео (ffmpeg). Изолирован сильнее всего:
   # только внутренняя сеть (нет интернета), файловая система только для
-  # чтения, никаких привилегий, лимиты CPU и памяти.
+  # чтения, никаких привилегий, лимиты CPU и памяти. Внешнее S3 (облако)
+  # отсюда недоступно — для него дайте воркеру выход только к адресу S3.
   worker:
     build: .
     command: ["worker"]
@@ -84,6 +128,28 @@ services:
     mem_limit: 2g
     cpus: 2
 
+  # Резервные копии раз в сутки (BACKUP_HOUR, UTC): pg_dump → шифрование →
+  # том backups (и S3 при BACKUP_S3=true) → проверка восстановлением во
+  # временную базу. Итог виден в метрике socialnet_backup.
+  backup:
+    build: .
+    command: ["backup-loop"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      <<: *env
+      TMPDIR: /backups/.tmp   # дамп может быть больше, чем влезет в tmpfs
+    volumes:
+      - backups:/backups
+    networks: [backend]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+
   # Тестовый почтовый сервер для разработки: все письма видны в браузере
   # на http://127.0.0.1:8025. На боевом сервере этот сервис можно удалить.
   mailpit:
@@ -91,6 +157,47 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8025:8025"
+
+  # Локальное S3-совместимое хранилище (SeaweedFS). Бесплатные образы MinIO
+  # с октября 2025 не публикуются. Ключи — из deploy/seaweedfs/s3.json,
+  # их же пропишите в S3_ACCESS_KEY/S3_SECRET_KEY.
+  s3:
+    image: chrislusf/seaweedfs:${SEAWEEDFS_VERSION:-latest}
+    profiles: [s3]
+    restart: unless-stopped
+    command: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json", "-ip.bind=0.0.0.0"]
+    volumes:
+      - s3data:/data
+      - ./deploy/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+    networks: [backend]
+
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    profiles: [monitoring]
+    restart: unless-stopped
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=30d"]
+    volumes:
+      - ./deploy/prometheus:/etc/prometheus:ro
+      - promdata:/prometheus
+    ports:
+      - "127.0.0.1:9091:9090"
+    networks: [backend]
+
+  grafana:
+    image: grafana/grafana:12.2.0
+    profiles: [monitoring]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3001:3000"
+    networks: [default, backend]
 
 networks:
   default:
@@ -100,3 +207,7 @@ networks:
 volumes:
   pgdata:
   media:
+  backups:
+  s3data:
+  promdata:
+  grafanadata:

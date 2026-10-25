@@ -91,6 +91,7 @@ func (s *Server) handleCreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.notifyMentions(r.Context(), req.Text, me, id, nil)
+	s.m.business.Inc("post_created")
 
 	post, err := s.store.PostForViewer(r.Context(), me, id)
 	if err != nil {

@@ -23,6 +23,7 @@ const (
 
 // event пишет запись в журнал безопасности пользователя.
 func (s *Server) event(r *http.Request, userID int64, typ string) {
+	s.m.events.Inc(typ)
 	if err := s.store.AddSecurityEvent(r.Context(), userID, typ, sessionMeta(r)); err != nil {
 		s.log.Error("security event", "err", err, "type", typ)
 	}

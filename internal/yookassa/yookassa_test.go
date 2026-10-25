@@ -14,7 +14,7 @@ func TestAmounts(t *testing.T) {
 			t.Errorf("ParseKopecks(%s) = %d %v", v, got, err)
 		}
 	}
-	for _, bad := range []string{"", "1.234", "-1.00", "1e3", "x.00", "1.-5"} {
+	for _, bad := range []string{"", "1.234", "-1.00", "1e3", "x.00", "1.-5", "5.+1", "+5.00", " 5.00", "92270000000000000"} {
 		if _, err := ParseKopecks(bad); err == nil {
 			t.Errorf("ParseKopecks(%q) accepted", bad)
 		}

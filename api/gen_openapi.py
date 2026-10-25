@@ -291,6 +291,16 @@ r("DELETE", A + "/events/{id}", "events", "Удалить (организато�
 r("POST", A + "/events/{id}/rsvp", "events", "Пойду / Возможно", obj(status=enum("going", "maybe")), code=204)
 r("DELETE", A + "/events/{id}/rsvp", "events", "Не пойду", code=204)
 r("GET", A + "/events/{id}/attendees", "events", "Участники: ?status=going|maybe", resp=lst(S("UserCard")))
+# --- журнал аудита и тревоги ---
+audit = obj(id=int_, actor_id=int_, actor_role=str_, action=str_, target=str_, **{"details?": {"type": "object"}},
+            status=int_, ip=str_, user_agent=str_, request_id=str_, created_at=dt)
+alert = obj(id=int_, rule=str_, subject=str_, severity=enum("low", "medium", "high"), details={"type": "object"},
+            created_at=dt, acknowledged_by=nullable(int_))
+r("GET", A + "/admin/audit", "moderation", "Журнал действий модераторов и админов: ?actor_id=&before=", resp=lst(audit))
+r("GET", A + "/admin/audit/verify", "moderation", "Проверить цепочку хешей журнала", resp=obj(ok=bool_, checked=int_, broken_at=int_))
+r("GET", A + "/admin/alerts", "moderation", "Тревоги детектора аномалий: ?status=all", resp=lst(alert))
+r("POST", A + "/admin/alerts/{id}/ack", "moderation", "Отметить тревогу разобранной", code=204)
+
 # --- покупка монет ---
 pay = obj(id=uuid, package_id=str_, coins=int_, amount_kopecks=int_, currency=str_,
           status=enum("created", "pending", "succeeded", "canceled", "error"), **{"confirmation_url?": str_}, created_at=dt)

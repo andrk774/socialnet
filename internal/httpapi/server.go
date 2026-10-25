@@ -16,6 +16,7 @@ import (
 	"socialnet/internal/mailer"
 	"socialnet/internal/media"
 	"socialnet/internal/realtime"
+	"socialnet/internal/redisx"
 	"socialnet/internal/safehttp"
 	"socialnet/internal/store"
 	"socialnet/internal/webpush"
@@ -29,37 +30,41 @@ type Server struct {
 	hub    *realtime.Hub
 	log    *slog.Logger
 
-	msgLimiter    *ipRateLimiter // лимит сообщений на пользователя (антиспам)
-	uploadLimiter *ipRateLimiter
-	wsTickets     *wsTickets
+	msgLimiter    limiter // лимит сообщений на пользователя (антиспам)
+	uploadLimiter limiter
+	wsTickets     ticketStore
 	files         media.Storage
 
 	mailer      mailer.Mailer
 	box         *auth.SecretBox // шифрование секретов 2FA
-	mfaLimiter  *ipRateLimiter  // попытки кодов 2FA и пароля на пользователя
-	mailLimiter *ipRateLimiter  // повторная отправка писем
-	vulnLimiter *ipRateLimiter  // сообщения об уязвимостях с одного IP
+	mfaLimiter  limiter         // попытки кодов 2FA и пароля на пользователя
+	mailLimiter limiter         // повторная отправка писем
+	vulnLimiter limiter         // сообщения об уязвимостях с одного IP
 
 	vapid      *webpush.VAPID // nil — push выключен
 	pushClient *http.Client
 	pushHosts  []string // разрешённые push-сервисы (защита от SSRF)
 
-	walletLimiter *ipRateLimiter // денежные операции на пользователя
+	walletLimiter limiter // денежные операции на пользователя
 
 	avStore *av.Store     // музыка и видео
 	avSem   chan struct{} // не больше N одновременных ffmpeg в API
 
 	root           *chi.Mux         // для поиска шаблона маршрута (права токенов API)
-	appLimiter     *ipRateLimiter   // запросы на токен приложения
-	botLimiter     *ipRateLimiter   // запросы на токен бота
+	appLimiter     limiter          // запросы на токен приложения
+	botLimiter     limiter          // запросы на токен бота
 	callbackClient *http.Client     // Callback API: не ходит во внутреннюю сеть
 	yookassa       *yookassa.Client // nil — покупка монет выключена
+	m              *serverMetrics
+	redis          *redisx.Client // nil — один экземпляр, всё в памяти
+	instance       string         // id экземпляра для шины событий
 
 	// callbackInsecure — только для тестов: разрешает http:// и локальный сервер.
 	callbackInsecure bool
 }
 
 func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) {
+	var files media.Storage
 	files, err := media.NewDisk(cfg.MediaDir)
 	if err != nil {
 		return nil, err
@@ -67,6 +72,10 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 	avStore, err := av.NewStore(filepath.Join(cfg.MediaDir, "av"))
 	if err != nil {
 		return nil, err
+	}
+	if s3c := NewS3(cfg); s3c != nil {
+		files = &media.S3{C: s3c}
+		avStore.Remote = s3c
 	}
 	box, err := auth.NewSecretBox(cfg.TOTPKey)
 	if err != nil {
@@ -83,42 +92,64 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 		m = &mailer.SMTP{Addr: cfg.SMTPHost + ":" + cfg.SMTPPort, User: cfg.SMTPUser,
 			Password: cfg.SMTPPassword, From: cfg.MailFrom}
 	}
+	var rc *redisx.Client
+	if cfg.RedisURL != "" {
+		opt, err := redisx.ParseURL(cfg.RedisURL)
+		if err != nil {
+			return nil, err
+		}
+		rc = redisx.New(opt)
+	}
+	lim := func(name string, rps float64, burst int) limiter {
+		if rc != nil {
+			return newRedisLimiter(rc, log, name, rps, burst)
+		}
+		return newIPRateLimiter(rps, burst)
+	}
+	var tickets ticketStore = newWSTickets()
+	if rc != nil {
+		tickets = &redisTickets{r: rc, local: newWSTickets(), log: log}
+	}
 	var yk *yookassa.Client
 	if cfg.YooKassaShopID != "" {
 		yk = yookassa.New(cfg.YooKassaAPIURL, cfg.YooKassaShopID, cfg.YooKassaSecretKey)
 	}
-	return &Server{
+	srv := &Server{
 		yookassa: yk,
+		redis:    rc,
+		instance: newInstanceID(),
 		cfg:      cfg,
 		store:    st,
 		tokens:   auth.NewTokenIssuer(cfg.JWTSecret, cfg.AccessTTL),
 		hub:      realtime.NewHub(),
 		log:      log,
 
-		msgLimiter:    newIPRateLimiter(1, 30),       // 60 в минуту, всплеск 30
-		uploadLimiter: newIPRateLimiter(30.0/60, 20), // 30 фото в минуту
-		wsTickets:     newWSTickets(),
+		msgLimiter:    lim("msg", 1, 30),          // 60 в минуту, всплеск 30
+		uploadLimiter: lim("upload", 30.0/60, 20), // 30 фото в минуту
+		wsTickets:     tickets,
 		files:         files,
 
 		mailer:      m,
 		box:         box,
-		mfaLimiter:  newIPRateLimiter(5.0/300, 5),  // 5 попыток за 5 минут
-		mailLimiter: newIPRateLimiter(3.0/3600, 3), // 3 письма в час
-		vulnLimiter: newIPRateLimiter(5.0/3600, 5), // 5 отчётов в час с IP
+		mfaLimiter:  lim("mfa", 5.0/300, 5),   // 5 попыток за 5 минут
+		mailLimiter: lim("mail", 3.0/3600, 3), // 3 письма в час
+		vulnLimiter: lim("vuln", 5.0/3600, 5), // 5 отчётов в час с IP
 
 		vapid:      vapid,
 		pushClient: webpush.SafeClient(),
 		pushHosts:  webpush.DefaultHosts,
 
-		walletLimiter: newIPRateLimiter(20.0/60, 20), // 20 операций в минуту
+		walletLimiter: lim("wallet", 20.0/60, 20), // 20 операций в минуту
 
 		avStore: avStore,
 		avSem:   make(chan struct{}, 2),
 
-		appLimiter:     newIPRateLimiter(5, 20),  // как у ВКонтакте: несколько запросов в секунду
-		botLimiter:     newIPRateLimiter(20, 40), // ботам — больше
+		appLimiter:     lim("app", 5, 20),  // как у ВКонтакте: несколько запросов в секунду
+		botLimiter:     lim("bot", 20, 40), // ботам — больше
 		callbackClient: safehttp.Client(10 * time.Second),
-	}, nil
+	}
+	srv.initMetrics()
+	return srv, nil
 }
 
 func (s *Server) Router() http.Handler {
@@ -130,6 +161,7 @@ func (s *Server) Router() http.Handler {
 		// иначе любой сможет подставить чужой IP и обойти rate limit.
 		r.Use(middleware.RealIP)
 	}
+	r.Use(s.instrument)
 	r.Use(middleware.Recoverer)
 	r.Use(securityHeaders)
 
@@ -152,7 +184,7 @@ func (s *Server) Router() http.Handler {
 	if burst <= 0 {
 		burst = 20
 	}
-	authLimiter := newIPRateLimiter(float64(perMin)/60, burst)
+	authLimiter := limitMiddleware(s.limiter("auth", float64(perMin)/60, burst))
 
 	// Обычные JSON-запросы: таймаут и лимит тела 1 MiB.
 	r.Group(func(r chi.Router) {
@@ -162,7 +194,7 @@ func (s *Server) Router() http.Handler {
 
 		r.Route("/api/v1", func(r chi.Router) {
 			r.Route("/auth", func(r chi.Router) {
-				r.Use(authLimiter.middleware)
+				r.Use(authLimiter)
 				r.Post("/register", s.handleRegister)
 				r.Post("/login", s.handleLogin)
 				r.Post("/refresh", s.handleRefresh)
@@ -175,7 +207,7 @@ func (s *Server) Router() http.Handler {
 
 			// OAuth 2.0: обмен кода на токен и отзыв (RFC 7009) — без входа, по client_id.
 			r.Route("/oauth", func(r chi.Router) {
-				r.Use(authLimiter.middleware)
+				r.Use(authLimiter)
 				r.Post("/token", s.handleOAuthToken)
 				r.Post("/revoke", s.handleOAuthRevoke)
 			})
@@ -359,6 +391,7 @@ func (s *Server) Router() http.Handler {
 				// модерация
 				r.Route("/mod", func(r chi.Router) {
 					r.Use(requireRole("moderator", "admin"))
+					r.Use(s.audit)
 					r.Get("/reports", s.handleModReports)
 					r.Post("/reports/{id}/resolve", s.handleResolveReport)
 					r.Post("/users/{id}/ban", s.handleBan)
@@ -369,6 +402,11 @@ func (s *Server) Router() http.Handler {
 				})
 				r.Route("/admin", func(r chi.Router) {
 					r.Use(requireRole("admin"))
+					r.Use(s.audit)
+					r.Get("/audit", s.handleAuditLog)
+					r.Get("/audit/verify", s.handleAuditVerify)
+					r.Get("/alerts", s.handleAlerts)
+					r.Post("/alerts/{id}/ack", s.handleAckAlert)
 					r.Put("/users/{id}/role", s.handleSetRole)
 					r.Post("/wallet/mint", s.handleMint)
 					r.Get("/vulnerability-reports", s.handleVulnList)

@@ -26,6 +26,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"socialnet/internal/s3"
 )
 
 var (
@@ -275,7 +277,12 @@ var (
 
 // Store хранит обработанные файлы: <root>/<kind>/<id[:2]>/<id>/<имя>.
 // Путь собирается только из проверенного UUID и имени из белого списка.
-type Store struct{ root string }
+// С Remote (S3) локальный диск — только место обработки: Commit выгружает
+// готовые файлы в хранилище с ключами <kind>/<id>/<имя> и чистит диск.
+type Store struct {
+	root   string
+	Remote *s3.Client
+}
 
 func NewStore(root string) (*Store, error) {
 	if err := os.MkdirAll(root, 0o750); err != nil {
@@ -303,6 +310,63 @@ func (s *Store) Delete(kind, id string) error {
 	dir, err := s.Dir(kind, id)
 	if err != nil {
 		return err
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		return err
+	}
+	if s.Remote == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	keys, err := s.Remote.List(ctx, kind+"/"+id+"/")
+	if err != nil {
+		return err
+	}
+	for _, k := range keys {
+		if err := s.Remote.Delete(ctx, k); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Key — ключ объекта в S3 (имя проверено белым списком).
+func (s *Store) Key(kind, id, name string) (string, error) {
+	if _, err := s.Path(kind, id, name); err != nil {
+		return "", err
+	}
+	return kind + "/" + id + "/" + name, nil
+}
+
+var contentTypes = map[string]string{".mp3": "audio/mpeg", ".m3u8": "application/vnd.apple.mpegurl",
+	".ts": "video/mp2t", ".jpg": "image/jpeg"}
+
+// Commit выгружает обработанные файлы в S3 (если оно настроено).
+func (s *Store) Commit(ctx context.Context, kind, id string) error {
+	if s.Remote == nil {
+		return nil
+	}
+	dir, err := s.Dir(kind, id)
+	if err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		key, err := s.Key(kind, id, e.Name())
+		if err != nil || e.IsDir() {
+			continue // посторонние файлы ffmpeg не выгружаем
+		}
+		data, err := os.ReadFile(filepath.Join(dir, e.Name())) //nolint:gosec // имя из белого списка
+		if err != nil {
+			return err
+		}
+		if err := s.Remote.Put(ctx, key, data, contentTypes[filepath.Ext(e.Name())]); err != nil {
+			return err
+		}
 	}
 	return os.RemoveAll(dir)
 }
