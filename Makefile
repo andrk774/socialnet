@@ -1,4 +1,4 @@
-.PHONY: up down logs build test test-db psql fmt lint openapi fuzz
+.PHONY: web vendor-preact e2e up down logs build test test-db psql fmt lint openapi fuzz
 
 up:            ## собрать и запустить всё в Docker
 	docker compose up -d --build
@@ -39,3 +39,15 @@ fuzz:          ## короткий фаззинг всех целей (по 30 �
 	          "webpush FuzzDecrypt" "webpush FuzzValidateEndpoint" "auth FuzzVerifyPassword" \
 	          "auth FuzzParseAccess" "httpapi FuzzCleanText"; do \
 		set -- $$t; go test ./internal/$$1 -run '^$$' -fuzz "^$$2$$" -fuzztime 30s || exit 1; done
+
+# Фронтенд: TypeScript → web/static/app (результат хранится в репозитории)
+web:
+	cd web && tsc -p .
+
+# Обновить Preact: git clone --branch <версия> https://github.com/preactjs/preact /tmp/preact
+vendor-preact:
+	node web/tools/vendor-preact.mjs /tmp/preact
+
+# Сквозной тест в Chromium (нужны node и playwright)
+e2e:
+	go test -count=1 -run TestFrontendE2E ./internal/httpapi/
