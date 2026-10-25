@@ -319,7 +319,8 @@ func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Text string `json:"text"`
+		Text      string `json:"text"`
+		ReplyToID *int64 `json:"reply_to_id"` // ответ на комментарий
 	}
 	if !decodeJSON(w, r, &req) {
 		return
@@ -331,16 +332,42 @@ func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	me := userIDFrom(r.Context())
-	id, err := s.store.AddComment(r.Context(), post.ID, me, req.Text)
+
+	// Ответ: комментарий должен быть из этого же поста (иначе можно было бы
+	// «привязать» ответ к чужой закрытой ветке). Ветка — одноуровневая.
+	var parentID *int64
+	var replyAuthor int64
+	if req.ReplyToID != nil {
+		meta, err := s.store.CommentMeta(r.Context(), *req.ReplyToID)
+		if errors.Is(err, store.ErrNotFound) || (err == nil && meta.PostID != post.ID) {
+			writeFieldErrors(w, http.StatusUnprocessableEntity, "validation_failed", "invalid input",
+				map[string]string{"reply_to_id": "comment not found in this post"})
+			return
+		}
+		if err != nil {
+			s.internalError(w, r, err)
+			return
+		}
+		root := *req.ReplyToID
+		if meta.ParentID != nil {
+			root = *meta.ParentID
+		}
+		parentID, replyAuthor = &root, meta.AuthorID
+	}
+
+	id, err := s.store.AddComment(r.Context(), post.ID, me, req.Text, parentID, req.ReplyToID)
 	if err != nil {
 		s.internalError(w, r, err)
 		return
 	}
 	pid, cid := post.ID, id
 	s.notify(r.Context(), store.NewNotification{UserID: post.Author.ID, Type: "comment", ActorID: me, PostID: &pid, CommentID: &cid})
+	if replyAuthor != 0 && replyAuthor != post.Author.ID {
+		s.notify(r.Context(), store.NewNotification{UserID: replyAuthor, Type: "reply", ActorID: me, PostID: &pid, CommentID: &cid})
+	}
 	s.notifyMentions(r.Context(), req.Text, me, post.ID, &cid)
 
-	writeJSON(w, http.StatusCreated, map[string]any{"id": id, "post_id": post.ID, "text": req.Text})
+	writeJSON(w, http.StatusCreated, map[string]any{"id": id, "post_id": post.ID, "parent_id": parentID, "text": req.Text})
 }
 
 // Удалить комментарий может его автор, автор поста или админ сообщества.
@@ -384,4 +411,63 @@ func (s *Server) handleDeleteComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleReplies: GET /comments/{id}/replies — ответы в ветке.
+func (s *Server) handleReplies(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	me := userIDFrom(r.Context())
+	meta, err := s.store.CommentMeta(r.Context(), id)
+	if err == nil {
+		_, err = s.store.PostForViewer(r.Context(), me, meta.PostID) // ветка видна, только если виден пост
+	}
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not_found", "comment not found")
+		return
+	}
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	p := pageParams(r)
+	items, err := s.store.Replies(r.Context(), me, id, p.After, p.Limit)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list(items, p.Limit, commentCursor))
+}
+
+// handleReact: POST /posts/{id}/reactions {"reaction": "love"} — поставить или сменить.
+func (s *Server) handleReact(w http.ResponseWriter, r *http.Request) {
+	post, ok := s.visiblePost(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Reaction string `json:"reaction"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	errs := map[string]string{}
+	oneOf(errs, "reaction", &req.Reaction, store.Reactions...)
+	if len(errs) > 0 {
+		writeFieldErrors(w, http.StatusUnprocessableEntity, "validation_failed", "invalid input", errs)
+		return
+	}
+	me := userIDFrom(r.Context())
+	count, created, err := s.store.React(r.Context(), post.ID, me, req.Reaction)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	if created {
+		pid := post.ID
+		s.notify(r.Context(), store.NewNotification{UserID: post.Author.ID, Type: "like", ActorID: me, PostID: &pid})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"likes_count": count, "my_reaction": req.Reaction})
 }

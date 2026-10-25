@@ -131,9 +131,16 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		if json.Unmarshal(data, &in) != nil {
 			continue
 		}
-		peer, err := s.store.ConversationPeer(ctx, in.ConversationID, userID)
+		conv, err := s.store.ConvAccess(ctx, in.ConversationID, userID)
 		if err != nil {
 			continue // чужой или несуществующий диалог — молча игнорируем
+		}
+		others := func(typ string, data any) {
+			for _, uid := range conv.Members {
+				if uid != userID {
+					s.hub.Publish(uid, typ, data)
+				}
+			}
 		}
 		switch in.Type {
 		case "typing":
@@ -141,10 +148,10 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 				continue // не чаще раза в 2 секунды
 			}
 			lastTyping = time.Now()
-			s.hub.Publish(peer, "typing", map[string]int64{"conversation_id": in.ConversationID, "user_id": userID})
+			others("typing", map[string]int64{"conversation_id": in.ConversationID, "user_id": userID})
 		case "delivered":
 			if up, err := s.store.MarkDelivered(ctx, in.ConversationID, userID, in.UpTo); err == nil {
-				s.hub.Publish(peer, "delivered", map[string]int64{"conversation_id": in.ConversationID, "user_id": userID, "up_to": up})
+				others("delivered", map[string]int64{"conversation_id": in.ConversationID, "user_id": userID, "up_to": up})
 			}
 		}
 	}

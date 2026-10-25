@@ -41,18 +41,20 @@ type PostVideo struct {
 func VideoURL(id, file string) string { return "/video/" + id + "/" + file }
 
 type Post struct {
-	ID            int64         `json:"id"`
-	Author        UserCard      `json:"author"`
-	Community     *CommunityRef `json:"community,omitempty"`
-	Text          string        `json:"text"`
-	Photos        []Photo       `json:"photos"`
-	Tracks        []PostTrack   `json:"tracks"`
-	Videos        []PostVideo   `json:"videos"`
-	LikesCount    int           `json:"likes_count"`
-	CommentsCount int           `json:"comments_count"`
-	LikedByMe     bool          `json:"liked_by_me"`
-	CreatedAt     time.Time     `json:"created_at"`
-	EditedAt      *time.Time    `json:"edited_at,omitempty"`
+	ID            int64          `json:"id"`
+	Author        UserCard       `json:"author"`
+	Community     *CommunityRef  `json:"community,omitempty"`
+	Text          string         `json:"text"`
+	Photos        []Photo        `json:"photos"`
+	Tracks        []PostTrack    `json:"tracks"`
+	Videos        []PostVideo    `json:"videos"`
+	LikesCount    int            `json:"likes_count"`
+	CommentsCount int            `json:"comments_count"`
+	LikedByMe     bool           `json:"liked_by_me"`
+	MyReaction    *string        `json:"my_reaction"`
+	Reactions     map[string]int `json:"reactions"`
+	CreatedAt     time.Time      `json:"created_at"`
+	EditedAt      *time.Time     `json:"edited_at,omitempty"`
 }
 
 // postVisible — единое правило видимости поста для зрителя $1.
@@ -61,6 +63,9 @@ type Post struct {
 const postVisible = `
 	p.deleted_at IS NULL AND p.hidden_at IS NULL AND a.banned_at IS NULL
 	AND (c.id IS NULL OR c.hidden_at IS NULL)
+	-- посты закрытого сообщества видят только его участники
+	AND (c.id IS NULL OR c.visibility = 'open'
+	     OR EXISTS (SELECT 1 FROM community_members cmv WHERE cmv.community_id = c.id AND cmv.user_id = $1))
 	AND (
 		p.community_id IS NOT NULL
 		OR p.author_id = $1
@@ -78,7 +83,9 @@ const postSelect = `
 	SELECT p.id, a.id, a.username, a.first_name, a.last_name, a.avatar_media_id::text,
 	       c.id, c.slug, c.name,
 	       p.text, p.likes_count, p.comments_count, p.created_at, p.edited_at,
-	       EXISTS (SELECT 1 FROM post_likes l WHERE l.post_id = p.id AND l.user_id = $1),
+	       (SELECT l.reaction FROM post_likes l WHERE l.post_id = p.id AND l.user_id = $1),
+	       COALESCE((SELECT json_object_agg(reaction, n) FROM
+	                   (SELECT reaction, count(*) AS n FROM post_likes WHERE post_id = p.id GROUP BY reaction) r), '{}'),
 	       COALESCE((SELECT array_agg(pm.media_id::text ORDER BY pm.position)
 	                 FROM post_media pm WHERE pm.post_id = p.id), '{}'),
 	       COALESCE((SELECT json_agg(json_build_object('id', t.id, 'title', t.title, 'artist', t.artist,
@@ -102,19 +109,24 @@ func (s *Store) queryPosts(ctx context.Context, sql string, args ...any) ([]Post
 	out := []Post{}
 	for rows.Next() {
 		var (
-			p        Post
-			avatar   *string
-			cID      *int64
-			cSlug    *string
-			cName    *string
-			mediaIDs []string
-			tracks   []byte
-			videos   []byte
+			p         Post
+			avatar    *string
+			cID       *int64
+			cSlug     *string
+			cName     *string
+			mediaIDs  []string
+			tracks    []byte
+			videos    []byte
+			reactions []byte
 		)
 		if err := rows.Scan(&p.ID, &p.Author.ID, &p.Author.Username, &p.Author.FirstName, &p.Author.LastName, &avatar,
 			&cID, &cSlug, &cName,
-			&p.Text, &p.LikesCount, &p.CommentsCount, &p.CreatedAt, &p.EditedAt, &p.LikedByMe, &mediaIDs,
+			&p.Text, &p.LikesCount, &p.CommentsCount, &p.CreatedAt, &p.EditedAt, &p.MyReaction, &reactions, &mediaIDs,
 			&tracks, &videos); err != nil {
+			return nil, err
+		}
+		p.LikedByMe = p.MyReaction != nil
+		if err := json.Unmarshal(reactions, &p.Reactions); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(tracks, &p.Tracks); err != nil {
@@ -317,18 +329,27 @@ func (s *Store) HashtagPosts(ctx context.Context, viewer int64, tag string, befo
 		ORDER BY p.id DESC LIMIT $4`, viewer, tag, before, limit)
 }
 
-// Like — атомарно: вставка и счётчик в одном запросе, без гонок.
-func (s *Store) Like(ctx context.Context, postID, userID int64) (count int, created bool, err error) {
-	var n int
+var Reactions = []string{"like", "love", "haha", "wow", "sad", "angry"}
+
+// React ставит или меняет реакцию — атомарно, вместе со счётчиком.
+// xmax = 0 у вставленной строки: так отличаем новую реакцию от смены старой.
+func (s *Store) React(ctx context.Context, postID, userID int64, reaction string) (count int, created bool, err error) {
 	err = s.pool.QueryRow(ctx, `
-		WITH ins AS (
-			INSERT INTO post_likes (post_id, user_id) VALUES ($1, $2)
-			ON CONFLICT DO NOTHING RETURNING 1
+		WITH up AS (
+			INSERT INTO post_likes (post_id, user_id, reaction) VALUES ($1, $2, $3)
+			ON CONFLICT (post_id, user_id) DO UPDATE SET reaction = EXCLUDED.reaction
+			RETURNING (xmax = 0) AS inserted
 		)
-		UPDATE posts SET likes_count = likes_count + (SELECT count(*) FROM ins)
+		UPDATE posts SET likes_count = likes_count + (SELECT count(*) FROM up WHERE inserted)
 		WHERE id = $1
-		RETURNING likes_count, (SELECT count(*) FROM ins)`, postID, userID).Scan(&count, &n)
-	return count, n == 1, err
+		RETURNING likes_count, COALESCE((SELECT bool_or(inserted) FROM up), false)`,
+		postID, userID, reaction).Scan(&count, &created)
+	return count, created, err
+}
+
+// Like — реакция «нравится» (старый эндпоинт /like).
+func (s *Store) Like(ctx context.Context, postID, userID int64) (int, bool, error) {
+	return s.React(ctx, postID, userID, "like")
 }
 
 func (s *Store) Unlike(ctx context.Context, postID, userID int64) (int, error) {
@@ -346,74 +367,114 @@ func (s *Store) Unlike(ctx context.Context, postID, userID int64) (int, error) {
 // ---------- комментарии ----------
 
 type Comment struct {
-	ID        int64     `json:"id"`
-	PostID    int64     `json:"post_id"`
-	Author    UserCard  `json:"author"`
-	Text      string    `json:"text"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           int64     `json:"id"`
+	PostID       int64     `json:"post_id"`
+	ParentID     *int64    `json:"parent_id,omitempty"` // корневой комментарий ветки
+	ReplyTo      *UserCard `json:"reply_to,omitempty"`  // кому ответили
+	RepliesCount int       `json:"replies_count"`
+	Author       UserCard  `json:"author"`
+	Text         string    `json:"text"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
-func (s *Store) AddComment(ctx context.Context, postID, authorID int64, text string) (int64, error) {
+// AddComment: parentID — корень ветки (nil для корневого), replyTo — на что ответили.
+func (s *Store) AddComment(ctx context.Context, postID, authorID int64, text string, parentID, replyTo *int64) (int64, error) {
 	var id int64
 	err := s.pool.QueryRow(ctx, `
 		WITH c AS (
-			INSERT INTO comments (post_id, author_id, text) VALUES ($1, $2, $3) RETURNING id
+			INSERT INTO comments (post_id, author_id, text, parent_id, reply_to_id)
+			VALUES ($1, $2, $3, $4, $5) RETURNING id
+		), root AS (
+			UPDATE comments SET replies_count = replies_count + 1 WHERE id = $4
 		)
 		UPDATE posts SET comments_count = comments_count + 1
 		WHERE id = $1
-		RETURNING (SELECT id FROM c)`, postID, authorID, text).Scan(&id)
+		RETURNING (SELECT id FROM c)`, postID, authorID, text, parentID, replyTo).Scan(&id)
 	return id, err
 }
 
 type CommentMeta struct {
 	PostID   int64
 	AuthorID int64
+	ParentID *int64
 }
 
 func (s *Store) CommentMeta(ctx context.Context, id int64) (CommentMeta, error) {
 	var m CommentMeta
-	err := s.pool.QueryRow(ctx, `SELECT post_id, author_id FROM comments WHERE id = $1 AND deleted_at IS NULL`,
-		id).Scan(&m.PostID, &m.AuthorID)
+	err := s.pool.QueryRow(ctx, `
+		SELECT post_id, author_id, parent_id FROM comments WHERE id = $1 AND deleted_at IS NULL AND hidden_at IS NULL`,
+		id).Scan(&m.PostID, &m.AuthorID, &m.ParentID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return m, ErrNotFound
 	}
 	return m, err
 }
 
+// DeleteComment: удаление корня убирает и всю ветку; счётчики поправляются.
 func (s *Store) DeleteComment(ctx context.Context, id int64) error {
 	_, err := s.pool.Exec(ctx, `
 		WITH d AS (
 			UPDATE comments SET deleted_at = now()
-			WHERE id = $1 AND deleted_at IS NULL RETURNING post_id
+			WHERE (id = $1 OR parent_id = $1) AND deleted_at IS NULL
+			RETURNING post_id, parent_id
+		), root AS (
+			UPDATE comments SET replies_count = replies_count - (SELECT count(*) FROM d WHERE parent_id IS NOT NULL)
+			WHERE id = (SELECT parent_id FROM d WHERE parent_id IS NOT NULL AND parent_id <> $1 LIMIT 1)
 		)
-		UPDATE posts SET comments_count = comments_count - 1
-		WHERE id = (SELECT post_id FROM d)`, id)
+		UPDATE posts SET comments_count = comments_count - (SELECT count(*) FROM d)
+		WHERE id = (SELECT post_id FROM d LIMIT 1)`, id)
 	return err
 }
 
-func (s *Store) Comments(ctx context.Context, viewer, postID, after int64, limit int) ([]Comment, error) {
-	rows, err := s.pool.Query(ctx, `
-		SELECT cm.id, cm.post_id, u.id, u.username, u.first_name, u.last_name, u.avatar_media_id::text,
-		       cm.text, cm.created_at
-		FROM comments cm JOIN users u ON u.id = cm.author_id
-		WHERE cm.post_id = $2 AND cm.id > $3
-		  AND cm.deleted_at IS NULL AND cm.hidden_at IS NULL AND u.banned_at IS NULL
-		  AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $1 AND b.blocked_id = cm.author_id)
-		ORDER BY cm.id LIMIT $4`, viewer, postID, after, limit)
+const commentSelect = `
+	SELECT cm.id, cm.post_id, cm.parent_id, cm.replies_count,
+	       u.id, u.username, u.first_name, u.last_name, u.avatar_media_id::text, cm.text, cm.created_at,
+	       ru.id, ru.username, ru.first_name, ru.last_name
+	FROM comments cm
+	JOIN users u ON u.id = cm.author_id
+	LEFT JOIN comments rc ON rc.id = cm.reply_to_id
+	LEFT JOIN users ru ON ru.id = rc.author_id
+	WHERE cm.deleted_at IS NULL AND cm.hidden_at IS NULL AND u.banned_at IS NULL
+	  AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $1 AND b.blocked_id = cm.author_id)`
+
+func (s *Store) queryComments(ctx context.Context, sql string, args ...any) ([]Comment, error) {
+	rows, err := s.pool.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := []Comment{}
 	for rows.Next() {
-		var c Comment
-		var avatar *string
-		if err := rows.Scan(&c.ID, &c.PostID, &c.Author.ID, &c.Author.Username, &c.Author.FirstName,
-			&c.Author.LastName, &avatar, &c.Text, &c.CreatedAt); err != nil {
+		var (
+			c                    Comment
+			avatar               *string
+			rID                  *int64
+			rUser, rFirst, rLast *string
+		)
+		if err := rows.Scan(&c.ID, &c.PostID, &c.ParentID, &c.RepliesCount,
+			&c.Author.ID, &c.Author.Username, &c.Author.FirstName, &c.Author.LastName, &avatar, &c.Text, &c.CreatedAt,
+			&rID, &rUser, &rFirst, &rLast); err != nil {
 			return nil, err
 		}
 		c.Author.AvatarURL = MediaURL(avatar, "thumb")
+		if rID != nil && c.ParentID != nil {
+			c.ReplyTo = &UserCard{ID: *rID, Username: *rUser, FirstName: *rFirst, LastName: *rLast}
+		}
 		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+// Comments — корневые комментарии поста (ответы — через Replies).
+func (s *Store) Comments(ctx context.Context, viewer, postID, after int64, limit int) ([]Comment, error) {
+	return s.queryComments(ctx, commentSelect+`
+		AND cm.post_id = $2 AND cm.parent_id IS NULL AND cm.id > $3
+		ORDER BY cm.id LIMIT $4`, viewer, postID, after, limit)
+}
+
+// Replies — ответы в ветке.
+func (s *Store) Replies(ctx context.Context, viewer, rootID, after int64, limit int) ([]Comment, error) {
+	return s.queryComments(ctx, commentSelect+`
+		AND cm.parent_id = $2 AND cm.id > $3
+		ORDER BY cm.id LIMIT $4`, viewer, rootID, after, limit)
 }

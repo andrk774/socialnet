@@ -52,16 +52,31 @@ schemas = {
     "PostVideo": obj(id=uuid, title=str_, duration_sec=int_, poster_url=str_, hls_url=str_),
     "Post": obj(id=int_, author=S("UserCard"), **{"community?": obj(id=int_, slug=str_, name=str_)}, text=str_,
                 photos=arr(S("Photo")), tracks=arr(S("PostTrack")), videos=arr(S("PostVideo")),
-                likes_count=int_, comments_count=int_, liked_by_me=bool_, created_at=dt, **{"edited_at?": dt}),
-    "Comment": obj(id=int_, post_id=int_, author=S("UserCard"), text=str_, created_at=dt),
+                likes_count=int_, comments_count=int_, liked_by_me=bool_,
+                my_reaction=nullable(enum("like", "love", "haha", "wow", "sad", "angry")),
+                reactions={"type": "object", "additionalProperties": int_},
+                created_at=dt, **{"edited_at?": dt}),
+    "Comment": obj(id=int_, post_id=int_, **{"parent_id?": int_, "reply_to?": S("UserCard")}, replies_count=int_,
+                   author=S("UserCard"), text=str_, created_at=dt),
+    "Attachment": obj(kind=enum("photo", "track", "voice"), id=uuid, url=str_,
+                      **{"thumb_url?": str_, "title?": str_, "artist?": str_, "duration_sec?": int_}),
+    "ChatMember": obj(id=int_, username=str_, first_name=str_, last_name=str_, avatar_url=nullable(str_),
+                      role=enum("owner", "admin", "member")),
+    "Story": obj(id=int_, author_id=int_, **{"photo?": S("Photo"), "video?": S("PostVideo"), "views_count?": int_},
+                 caption=str_, created_at=dt, expires_at=dt, seen=bool_),
+    "StoryGroup": obj(author=S("UserCard"), all_seen=bool_, stories=arr(S("Story"))),
+    "Event": obj(id=int_, creator_id=int_, **{"community?": obj(id=int_, slug=str_, name=str_), "ends_at?": dt},
+                 title=str_, description=str_, place=str_, starts_at=dt, going_count=int_, maybe_count=int_,
+                 my_status=nullable(enum("going", "maybe")), created_at=dt),
     "Notification": obj(id=int_, type=str_, **{"actor?": S("UserCard"), "post_id?": int_, "comment_id?": int_},
                         created_at=dt, read=bool_),
-    "Message": obj(id=int_, conversation_id=int_, sender_id=int_, **{"body?": str_, "ciphertext?": b64, "nonce?": b64},
-                   encrypted=bool_, created_at=dt),
-    "Conversation": obj(id=int_, peer=S("UserCard"), last_message=S("Message"), unread=int_,
-                        peer_delivered_id=int_, peer_read_id=int_),
+    "Message": obj(id=int_, conversation_id=int_, sender_id=int_, kind=enum("text", "service"),
+                   **{"body?": str_, "ciphertext?": b64, "nonce?": b64},
+                   encrypted=bool_, attachments=arr(S("Attachment")), created_at=dt),
+    "Conversation": obj(id=int_, kind=enum("direct", "group"), **{"title?": str_, "members_count?": int_, "peer?": S("UserCard")},
+                        last_message=S("Message"), unread=int_, peer_delivered_id=int_, peer_read_id=int_),
     "Community": obj(id=int_, slug=str_, name=str_, description=str_, owner_id=int_, members_count=int_,
-                     my_role=enum("", "member", "editor", "admin", "owner"), created_at=dt),
+                     my_role=enum("", "member", "editor", "admin", "owner"), visibility=enum("open", "closed"), created_at=dt),
     "Member": obj(id=int_, username=str_, first_name=str_, last_name=str_, avatar_url=nullable(str_),
                   role=enum("owner", "admin", "editor", "member")),
     "Session": obj(id=uuid, user_agent=str_, ip=nullable(str_), started_at=dt, last_active=dt, current=bool_),
@@ -228,13 +243,52 @@ r("DELETE", A + "/videos/{vid}", "video", "Удалить", code=204)
 r("GET", A + "/users/{id}/videos", "video", "Видео пользователя", resp=obj(items=arr(S("Video"))))
 r("GET", "/video/{vid}/{file}", "video", "HLS: master.m3u8, 360p.m3u8, сегменты .ts, poster.jpg", auth=False, resp="binary")
 
+# --- ветки комментариев и реакции ---
+r("GET", A + "/comments/{id}/replies", "posts", "Ответы в ветке комментария", resp=lst(S("Comment")))
+r("POST", A + "/posts/{id}/reactions", "posts", "Поставить или сменить реакцию",
+  obj(reaction=enum("like", "love", "haha", "wow", "sad", "angry")), obj(likes_count=int_, my_reaction=str_))
+r("DELETE", A + "/posts/{id}/reactions", "posts", "Убрать реакцию", resp=obj(likes_count=int_, liked_by_me=bool_))
+# --- групповые чаты и голосовые ---
+msg_body = obj(**{"body?": str_, "ciphertext?": b64, "nonce?": b64, "attachments?": arr(obj(kind=enum("photo", "track", "voice"), id=uuid))})
+r("POST", A + "/conversations/{id}/messages", "messages", "Сообщение в диалог или беседу", msg_body, S("Message"), 201)
+r("POST", A + "/chats", "messages", "Создать беседу", obj(title=str_, member_ids=arr(int_)), obj(id=int_, title=str_, members_count=int_), 201)
+r("PATCH", A + "/conversations/{id}", "messages", "Переименовать беседу (админы)", obj(title=str_), code=204)
+r("GET", A + "/conversations/{id}/members", "messages", "Участники", resp=obj(items=arr(S("ChatMember"))))
+r("POST", A + "/conversations/{id}/members", "messages", "Добавить в беседу (админы)", obj(user_id=int_), code=204)
+r("DELETE", A + "/conversations/{id}/members/{uid}", "messages", "Выйти или исключить", code=204)
+r("PUT", A + "/conversations/{id}/members/{uid}/role", "messages", "Роль в беседе (владелец)", obj(role=enum("admin", "member")), code=204)
+r("POST", A + "/voice", "messages", "Загрузить голосовое (до 5 минут)", resp=obj(id=uuid, duration_sec=int_, url=str_), code=201, content=upload_form())
+r("GET", A + "/voice/{vid}", "messages", "Голосовое (только участникам чата)", resp="binary")
+# --- закрытые сообщества ---
+r("GET", A + "/communities/{id}/requests", "communities", "Заявки на вступление (админы)", resp=lst(S("UserCard")))
+r("POST", A + "/communities/{id}/requests/{userID}/approve", "communities", "Принять заявку", code=204)
+r("POST", A + "/communities/{id}/requests/{userID}/reject", "communities", "Отклонить заявку", code=204)
+r("GET", A + "/communities/{id}/events", "events", "Мероприятия сообщества", resp=obj(items=arr(S("Event"))))
+# --- истории ---
+r("POST", A + "/stories", "stories", "Опубликовать историю на 24 часа", obj(**{"photo_id?": uuid, "video_id?": uuid, "caption?": str_}), obj(id=int_, expires_in_hours=int_), 201)
+r("GET", A + "/stories/feed", "stories", "Истории друзей и подписок", resp=obj(items=arr(S("StoryGroup"))))
+r("GET", A + "/users/{id}/stories", "stories", "Истории пользователя", resp=obj(items=arr(S("StoryGroup"))))
+r("POST", A + "/stories/{id}/view", "stories", "Отметить просмотр", code=204)
+r("GET", A + "/stories/{id}/viewers", "stories", "Кто смотрел (автору)", resp=obj(items=arr(S("UserCard"))))
+r("DELETE", A + "/stories/{id}", "stories", "Удалить историю", code=204)
+# --- мероприятия ---
+ev = obj(**{"title?": str_, "description?": str_, "place?": str_, "starts_at?": dt, "ends_at?": dt, "community_id?": int_})
+r("POST", A + "/events", "events", "Создать мероприятие", ev, S("Event"), 201)
+r("GET", A + "/events", "events", "Мои предстоящие мероприятия", resp=obj(items=arr(S("Event"))))
+r("GET", A + "/events/{id}", "events", "Мероприятие", resp=S("Event"))
+r("PATCH", A + "/events/{id}", "events", "Изменить (организатор)", ev, S("Event"))
+r("DELETE", A + "/events/{id}", "events", "Удалить (организатор)", code=204)
+r("POST", A + "/events/{id}/rsvp", "events", "Пойду / Возможно", obj(status=enum("going", "maybe")), code=204)
+r("DELETE", A + "/events/{id}/rsvp", "events", "Не пойду", code=204)
+r("GET", A + "/events/{id}/attendees", "events", "Участники: ?status=going|maybe", resp=lst(S("UserCard")))
+
 
 def build(routes_file=None):
     paths = {}
     for (method, path), d in sorted(R.items(), key=lambda x: (x[0][1], x[0][0])):
         # числовые id, кроме /mod/{type}/{id}: там бывает и UUID трека или видео
         params = [{"name": n, "in": "path", "required": True,
-                   "schema": int_ if n in ("id", "userID") and "{type}" not in path else str_}
+                   "schema": int_ if n in ("id", "userID", "uid") and "{type}" not in path else str_}
                   for n in re.findall(r"{(\w+)}", path)]
         op = {"tags": [d["tag"]], "summary": d["summary"], "operationId": (method.lower() + re.sub(r"[^a-zA-Z0-9]+", "_", path)).strip("_")}
         if params:
@@ -269,7 +323,7 @@ def build(routes_file=None):
             ("friends", "Друзья и блокировки"), ("posts", "Посты, лента, комментарии"),
             ("messages", "Личные сообщения и WebSocket"), ("notifications", "Уведомления и push"),
             ("media", "Фото"), ("music", "Музыка и плейлисты"), ("video", "Видео"),
-            ("communities", "Сообщества"), ("wallet", "Монеты, подарки"), ("search", "Поиск"),
+            ("stories", "Истории"), ("events", "Мероприятия"), ("communities", "Сообщества"), ("wallet", "Монеты, подарки"), ("search", "Поиск"),
             ("moderation", "Жалобы, модерация, администрирование"), ("service", "Служебное")]],
         "security": [{"bearer": []}],
         "components": {"securitySchemes": {"bearer": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}},

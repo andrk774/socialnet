@@ -48,7 +48,10 @@ func Connect(ctx context.Context, url string, timeout time.Duration) (*pgxpool.P
 // Migrate применяет новые файлы из migrations/ по порядку имён.
 // Каждая миграция идёт в своей транзакции; advisory lock не даёт двум
 // экземплярам API мигрировать одновременно.
-func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
+func Migrate(ctx context.Context, pool *pgxpool.Pool) error { return migrateUpTo(ctx, pool, "") }
+
+// migrateUpTo применяет миграции с версией <= upTo ("" — все); нужно тестам обновления.
+func migrateUpTo(ctx context.Context, pool *pgxpool.Pool, upTo string) error {
 	conn, err := pool.Acquire(ctx)
 	if err != nil {
 		return err
@@ -77,6 +80,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 
 	for _, f := range files {
 		version := strings.TrimSuffix(strings.TrimPrefix(f, "migrations/"), ".sql")
+		if upTo != "" && version > upTo {
+			break
+		}
 
 		var exists bool
 		if err := conn.QueryRow(ctx,

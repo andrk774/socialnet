@@ -81,8 +81,8 @@ func (s *Server) handlePresence(w http.ResponseWriter, r *http.Request) {
 // ---------- настройки уведомлений ----------
 
 var notificationTypes = []string{
-	"friend_request", "friend_accepted", "like", "comment", "mention", "message",
-	"gift", "transfer", "donation", "video_ready",
+	"friend_request", "friend_accepted", "like", "comment", "reply", "mention", "message",
+	"gift", "transfer", "donation", "video_ready", "join_request",
 }
 
 func (s *Server) handleGetNotificationSettings(w http.ResponseWriter, r *http.Request) {
@@ -288,6 +288,8 @@ func pushText(n *store.Notification) pushPayload {
 		p.Body = name + " оценил(а) вашу запись"
 	case "comment":
 		p.Body = name + " прокомментировал(а) вашу запись"
+	case "reply":
+		p.Body = name + " ответил(а) на ваш комментарий"
 	case "mention":
 		p.Body = name + " упомянул(а) вас"
 	case "gift":
