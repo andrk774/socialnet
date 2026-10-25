@@ -8,7 +8,7 @@ import (
 )
 
 func FuzzCleanText(f *testing.F) {
-	f.Add("Песня‮\nвторая", 200)
+	f.Add("Песня\u202e\nвторая", 200)
 	f.Add("\x00\xff", 5)
 	f.Fuzz(func(t *testing.T, s string, max int) {
 		if max < 0 || max > 1000 {
