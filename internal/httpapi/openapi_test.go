@@ -26,7 +26,7 @@ func TestOpenAPICoversRoutes(t *testing.T) {
 	}
 	routes := map[string]bool{}
 	_ = chi.Walk(srv.Router().(chi.Routes), func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
-		if strings.HasPrefix(route, "/docs") {
+		if strings.HasPrefix(route, "/docs") || strings.HasPrefix(route, "/static") { // документация и файлы фронтенда — не API
 			return nil
 		}
 		routes[method+" "+strings.ReplaceAll(route, "/*", "")] = true
