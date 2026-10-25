@@ -56,8 +56,9 @@ type Server struct {
 	callbackClient *http.Client     // Callback API: не ходит во внутреннюю сеть
 	yookassa       *yookassa.Client // nil — покупка монет выключена
 	m              *serverMetrics
-	redis          *redisx.Client // nil — один экземпляр, всё в памяти
-	instance       string         // id экземпляра для шины событий
+	static         map[string]staticFile // встроенный фронтенд
+	redis          *redisx.Client        // nil — один экземпляр, всё в памяти
+	instance       string                // id экземпляра для шины событий
 
 	// callbackInsecure — только для тестов: разрешает http:// и локальный сервер.
 	callbackInsecure bool
@@ -149,6 +150,7 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 		callbackClient: safehttp.Client(10 * time.Second),
 	}
 	srv.initMetrics()
+	srv.static = loadStatic()
 	return srv, nil
 }
 
@@ -442,6 +444,10 @@ func (s *Server) Router() http.Handler {
 
 	// Отдача фото — публичная, для тегов <img>.
 	r.With(deadlines(60*time.Second)).Get("/media/{id}/{size}", s.handleServeMedia)
+
+	// Фронтенд: файлы и все «страничные» адреса.
+	r.With(deadlines(60*time.Second)).Get("/static/*", s.handleStatic)
+	r.NotFound(s.handleSPA)
 
 	// WebSocket — долгоживущее соединение: дедлайны снимаем, живость
 	// соединения проверяется ping-ами.
