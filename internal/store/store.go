@@ -23,6 +23,7 @@ var (
 	ErrTokenReused   = errors.New("refresh token reuse detected")
 	ErrBadMedia      = errors.New("media not found or not owned by user")
 	ErrConflict      = errors.New("conflict")
+	ErrLimit         = errors.New("limit reached")
 )
 
 type Store struct {

@@ -93,6 +93,12 @@ schemas = {
     "Gift": obj(id=int_, gift=obj(id=int_, name=str_, price=int_), sender=nullable(S("UserCard")), message=str_, created_at=dt),
     "Track": obj(id=uuid, title=str_, artist=str_, duration_sec=int_, url=str_, uploader_id=int_, in_my_music=bool_, created_at=dt),
     "Playlist": obj(id=int_, owner_id=int_, title=str_, track_count=int_, **{"tracks?": arr(S("Track"))}, created_at=dt),
+    "App": obj(id=int_, owner_id=int_, name=str_, client_id=str_, confidential=bool_, redirect_uris=arr(str_),
+               **{"client_secret?": str_}, created_at=dt),
+    "AuthorizedApp": obj(app_id=int_, name=str_, scopes=arr(str_), granted_at=dt, last_used_at=nullable(dt)),
+    "BotToken": obj(id=int_, name=str_, scopes=arr(str_), created_at=dt, last_used_at=nullable(dt)),
+    "CallbackServer": obj(community_id=int_, url=str_, events=arr(str_), status=enum("unconfirmed", "active", "failing"),
+                          last_error=str_, updated_at=dt),
     "Video": obj(id=uuid, owner_id=int_, title=str_, description=str_, status=enum("processing", "ready", "failed"),
                  **{"duration_sec?": int_, "width?": int_, "height?": int_, "poster_url?": str_, "hls_url?": str_},
                  qualities=arr(str_), created_at=dt),
@@ -107,6 +113,10 @@ def r(method, path, tag, summary, body=None, resp=None, code=200, auth=True, con
     R[(method, path)] = dict(tag=tag, summary=summary, body=body, resp=resp, code=code, auth=auth, content=content)
 
 A = "/api/v1"
+SCOPES = {"profile": "Профиль, друзья, поиск", "friends": "Заявки в друзья", "wall": "Публикации и комментарии",
+          "photos": "Загрузка фото", "messages": "Сообщения", "notifications": "Уведомления", "music": "Музыка",
+          "video": "Видео", "communities": "Сообщества", "stories": "Истории", "events": "Мероприятия",
+          "offline": "Токен без срока действия"}
 # --- служебные ---
 r("GET", "/health", "service", "Проверка живости", resp=obj(status=str_), auth=False)
 r("GET", "/.well-known/security.txt", "service", "security.txt (RFC 9116)", auth=False, resp="text")
@@ -281,6 +291,37 @@ r("DELETE", A + "/events/{id}", "events", "Удалить (организато�
 r("POST", A + "/events/{id}/rsvp", "events", "Пойду / Возможно", obj(status=enum("going", "maybe")), code=204)
 r("DELETE", A + "/events/{id}/rsvp", "events", "Не пойду", code=204)
 r("GET", A + "/events/{id}/attendees", "events", "Участники: ?status=going|maybe", resp=lst(S("UserCard")))
+# --- API для разработчиков ---
+authz = obj(response_type=enum("code"), client_id=str_, redirect_uri=str_, scope=str_, **{"state?": str_},
+            code_challenge=str_, code_challenge_method=enum("S256"), approve=bool_)
+form = lambda **f: {"application/x-www-form-urlencoded": {"schema": obj(**f)}}
+r("GET", A + "/oauth/authorize", "developers", "Страница согласия: что запрашивает приложение (те же параметры в query)",
+  resp=obj(app=obj(name=str_, client_id=str_, developer=str_), scopes=arr(obj(name=str_, description=str_)), redirect_uri=str_))
+r("POST", A + "/oauth/authorize", "developers", "Разрешить/отклонить доступ; ответ — куда перенаправить браузер", authz, obj(redirect_to=str_))
+r("POST", A + "/oauth/token", "developers", "Обмен кода на токен (PKCE обязателен; секрет — Basic или client_secret)",
+  resp=obj(access_token=str_, token_type=str_, scope=str_, user_id=int_, **{"expires_in?": int_}), auth=False,
+  content=form(grant_type=enum("authorization_code"), code=str_, redirect_uri=str_, client_id=str_, code_verifier=str_, **{"client_secret?": str_}))
+r("POST", A + "/oauth/revoke", "developers", "Отозвать токен (RFC 7009)", auth=False,
+  content=form(token=str_, client_id=str_, **{"client_secret?": str_}))
+r("GET", A + "/apps", "developers", "Мои приложения", resp=obj(items=arr(S("App"))))
+r("POST", A + "/apps", "developers", "Создать приложение (секрет показывается один раз)",
+  obj(name=str_, redirect_uris=arr(str_), **{"confidential?": bool_}), S("App"), 201)
+r("GET", A + "/apps/{id}", "developers", "Приложение", resp=S("App"))
+r("PATCH", A + "/apps/{id}", "developers", "Изменить приложение", obj(**{"name?": str_, "redirect_uris?": arr(str_)}), S("App"))
+r("DELETE", A + "/apps/{id}", "developers", "Удалить приложение (все его токены отзываются)", code=204)
+r("POST", A + "/apps/{id}/secret", "developers", "Новый секрет приложения", resp=obj(client_secret=str_))
+r("GET", A + "/users/me/authorized-apps", "developers", "Приложения с доступом к аккаунту", resp=obj(items=arr(S("AuthorizedApp"))))
+r("DELETE", A + "/users/me/authorized-apps/{id}", "developers", "Отозвать доступ приложения", code=204)
+r("GET", A + "/communities/{id}/bot/tokens", "developers", "Токены бота сообщества (админ)", resp=obj(bot_user_id=nullable(int_), items=arr(S("BotToken"))))
+r("POST", A + "/communities/{id}/bot/tokens", "developers", "Новый токен бота: scopes из messages, wall, photos",
+  obj(**{"name?": str_}, scopes=arr(str_)), obj(id=int_, token=str_, scopes=arr(str_), bot_user_id=int_), 201)
+r("DELETE", A + "/communities/{id}/bot/tokens/{tid}", "developers", "Отозвать токен бота", code=204)
+r("GET", A + "/communities/{id}/callback", "developers", "Callback-сервер и последние доставки",
+  resp=obj(server=S("CallbackServer"), confirmation_code=str_, recent=arr({"type": "object"})))
+r("PUT", A + "/communities/{id}/callback", "developers", "Задать Callback-сервер: message_new, wall_post_new, wall_reply_new, group_join, group_leave",
+  obj(url=str_, events=arr(str_), **{"secret?": str_}), obj(status=str_, confirmation_code=str_, **{"secret?": str_}, next=str_))
+r("POST", A + "/communities/{id}/callback/confirm", "developers", "Проверить сервер событием confirmation", resp=obj(status=str_))
+r("DELETE", A + "/communities/{id}/callback", "developers", "Отключить Callback API", code=204)
 
 
 def build(routes_file=None):
@@ -288,7 +329,7 @@ def build(routes_file=None):
     for (method, path), d in sorted(R.items(), key=lambda x: (x[0][1], x[0][0])):
         # числовые id, кроме /mod/{type}/{id}: там бывает и UUID трека или видео
         params = [{"name": n, "in": "path", "required": True,
-                   "schema": int_ if n in ("id", "userID", "uid") and "{type}" not in path else str_}
+                   "schema": int_ if n in ("id", "userID", "uid", "tid") and "/tracks/" not in path and "{type}" not in path else str_}
                   for n in re.findall(r"{(\w+)}", path)]
         op = {"tags": [d["tag"]], "summary": d["summary"], "operationId": (method.lower() + re.sub(r"[^a-zA-Z0-9]+", "_", path)).strip("_")}
         if params:
@@ -314,7 +355,7 @@ def build(routes_file=None):
         paths.setdefault(path, {})[method.lower()] = op
     return {
         "openapi": "3.0.3",
-        "info": {"title": "Socialnet API", "version": "4.0",
+        "info": {"title": "Socialnet API", "version": "5.0",
                  "description": "Соцсеть в духе ВКонтакте. Авторизация: `Authorization: Bearer <access_token>` "
                                 "из /auth/login; refresh-токен — в HttpOnly-cookie. Ошибки — схема Error."},
         "servers": [{"url": "/"}],
@@ -324,9 +365,15 @@ def build(routes_file=None):
             ("messages", "Личные сообщения и WebSocket"), ("notifications", "Уведомления и push"),
             ("media", "Фото"), ("music", "Музыка и плейлисты"), ("video", "Видео"),
             ("stories", "Истории"), ("events", "Мероприятия"), ("communities", "Сообщества"), ("wallet", "Монеты, подарки"), ("search", "Поиск"),
+            ("developers", "OAuth-приложения, боты сообществ, Callback API"),
             ("moderation", "Жалобы, модерация, администрирование"), ("service", "Служебное")]],
         "security": [{"bearer": []}],
-        "components": {"securitySchemes": {"bearer": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}},
+        "components": {"securitySchemes": {
+                           "bearer": {"type": "http", "scheme": "bearer",
+                                      "description": "JWT из /auth/login или токен приложения/бота snt_…"},
+                           "oauth": {"type": "oauth2", "flows": {"authorizationCode": {
+                               "authorizationUrl": "/oauth/authorize", "tokenUrl": "/api/v1/oauth/token",
+                               "scopes": {k: v for k, v in SCOPES.items()}}}}},
                        "schemas": schemas},
         "paths": paths,
     }

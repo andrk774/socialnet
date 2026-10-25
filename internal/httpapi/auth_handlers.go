@@ -18,6 +18,9 @@ const refreshCookie = "refresh_token"
 
 var usernameRe = regexp.MustCompile(`^[A-Za-z0-9_]{3,32}$`)
 
+// botNameRe — имена bot<id> зарезервированы за ботами сообществ.
+var botNameRe = regexp.MustCompile(`(?i)^bot[0-9]+$`)
+
 type registerRequest struct {
 	Email     string `json:"email"`
 	Username  string `json:"username"`
@@ -56,6 +59,8 @@ func (req *registerRequest) validate() map[string]string {
 	req.Username = strings.TrimSpace(req.Username)
 	if !usernameRe.MatchString(req.Username) {
 		errs["username"] = "3-32 characters: latin letters, digits, underscore"
+	} else if botNameRe.MatchString(req.Username) {
+		errs["username"] = "this username is reserved"
 	}
 
 	if !validPassword(req.Password) {
@@ -129,6 +134,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if user.PasswordHash == store.BotPasswordHash { // бот: входа по паролю нет
+		auth.VerifyDummy(req.Password)
+		writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+		return
+	}
 	ok, err := auth.VerifyPassword(req.Password, user.PasswordHash)
 	if err != nil {
 		s.internalError(w, r, err)

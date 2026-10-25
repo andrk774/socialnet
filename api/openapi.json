@@ -2,7 +2,7 @@
  "openapi": "3.0.3",
  "info": {
   "title": "Socialnet API",
-  "version": "4.0",
+  "version": "5.0",
   "description": "Соцсеть в духе ВКонтакте. Авторизация: `Authorization: Bearer <access_token>` из /auth/login; refresh-токен — в HttpOnly-cookie. Ошибки — схема Error."
  },
  "servers": [
@@ -68,6 +68,10 @@
    "description": "Поиск"
   },
   {
+   "name": "developers",
+   "description": "OAuth-приложения, боты сообществ, Callback API"
+  },
+  {
    "name": "moderation",
    "description": "Жалобы, модерация, администрирование"
   },
@@ -86,7 +90,30 @@
    "bearer": {
     "type": "http",
     "scheme": "bearer",
-    "bearerFormat": "JWT"
+    "description": "JWT из /auth/login или токен приложения/бота snt_…"
+   },
+   "oauth": {
+    "type": "oauth2",
+    "flows": {
+     "authorizationCode": {
+      "authorizationUrl": "/oauth/authorize",
+      "tokenUrl": "/api/v1/oauth/token",
+      "scopes": {
+       "profile": "Профиль, друзья, поиск",
+       "friends": "Заявки в друзья",
+       "wall": "Публикации и комментарии",
+       "photos": "Загрузка фото",
+       "messages": "Сообщения",
+       "notifications": "Уведомления",
+       "music": "Музыка",
+       "video": "Видео",
+       "communities": "Сообщества",
+       "stories": "Истории",
+       "events": "Мероприятия",
+       "offline": "Токен без срока действия"
+      }
+     }
+    }
    }
   },
   "schemas": {
@@ -1540,6 +1567,159 @@
      "created_at"
     ]
    },
+   "App": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "owner_id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "name": {
+      "type": "string"
+     },
+     "client_id": {
+      "type": "string"
+     },
+     "confidential": {
+      "type": "boolean"
+     },
+     "redirect_uris": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "client_secret": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    },
+    "required": [
+     "id",
+     "owner_id",
+     "name",
+     "client_id",
+     "confidential",
+     "redirect_uris",
+     "created_at"
+    ]
+   },
+   "AuthorizedApp": {
+    "type": "object",
+    "properties": {
+     "app_id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "name": {
+      "type": "string"
+     },
+     "scopes": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "granted_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "last_used_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+     }
+    },
+    "required": [
+     "app_id",
+     "name",
+     "scopes",
+     "granted_at",
+     "last_used_at"
+    ]
+   },
+   "BotToken": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "name": {
+      "type": "string"
+     },
+     "scopes": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "last_used_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "scopes",
+     "created_at",
+     "last_used_at"
+    ]
+   },
+   "CallbackServer": {
+    "type": "object",
+    "properties": {
+     "community_id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "url": {
+      "type": "string"
+     },
+     "events": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "unconfirmed",
+       "active",
+       "failing"
+      ]
+     },
+     "last_error": {
+      "type": "string"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    },
+    "required": [
+     "community_id",
+     "url",
+     "events",
+     "status",
+     "last_error",
+     "updated_at"
+    ]
+   },
    "Video": {
     "type": "object",
     "properties": {
@@ -1849,6 +2029,291 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/TxResult"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/apps": {
+   "get": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Мои приложения",
+    "operationId": "get_api_v1_apps",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/App"
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Создать приложение (секрет показывается один раз)",
+    "operationId": "post_api_v1_apps",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "redirect_uris": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "confidential": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "name",
+         "redirect_uris"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/App"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/apps/{id}": {
+   "delete": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Удалить приложение (все его токены отзываются)",
+    "operationId": "delete_api_v1_apps_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Приложение",
+    "operationId": "get_api_v1_apps_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/App"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Изменить приложение",
+    "operationId": "patch_api_v1_apps_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "redirect_uris": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/App"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/apps/{id}/secret": {
+   "post": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Новый секрет приложения",
+    "operationId": "post_api_v1_apps_id_secret",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "client_secret": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "client_secret"
+         ]
         }
        }
       }
@@ -2695,6 +3160,429 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/Community"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/communities/{id}/bot/tokens": {
+   "get": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Токены бота сообщества (админ)",
+    "operationId": "get_api_v1_communities_id_bot_tokens",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "bot_user_id": {
+           "type": "integer",
+           "format": "int64",
+           "nullable": true
+          },
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/BotToken"
+           }
+          }
+         },
+         "required": [
+          "bot_user_id",
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Новый токен бота: scopes из messages, wall, photos",
+    "operationId": "post_api_v1_communities_id_bot_tokens",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "scopes": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        },
+        "required": [
+         "scopes"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "token": {
+           "type": "string"
+          },
+          "scopes": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "bot_user_id": {
+           "type": "integer",
+           "format": "int64"
+          }
+         },
+         "required": [
+          "id",
+          "token",
+          "scopes",
+          "bot_user_id"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/communities/{id}/bot/tokens/{tid}": {
+   "delete": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Отозвать токен бота",
+    "operationId": "delete_api_v1_communities_id_bot_tokens_tid",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     },
+     {
+      "name": "tid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/communities/{id}/callback": {
+   "delete": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Отключить Callback API",
+    "operationId": "delete_api_v1_communities_id_callback",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Callback-сервер и последние доставки",
+    "operationId": "get_api_v1_communities_id_callback",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "server": {
+           "$ref": "#/components/schemas/CallbackServer"
+          },
+          "confirmation_code": {
+           "type": "string"
+          },
+          "recent": {
+           "type": "array",
+           "items": {
+            "type": "object"
+           }
+          }
+         },
+         "required": [
+          "server",
+          "confirmation_code",
+          "recent"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Задать Callback-сервер: message_new, wall_post_new, wall_reply_new, group_join, group_leave",
+    "operationId": "put_api_v1_communities_id_callback",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "url": {
+          "type": "string"
+         },
+         "events": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "secret": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "url",
+         "events"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "status": {
+           "type": "string"
+          },
+          "confirmation_code": {
+           "type": "string"
+          },
+          "secret": {
+           "type": "string"
+          },
+          "next": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "status",
+          "confirmation_code",
+          "next"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/communities/{id}/callback/confirm": {
+   "post": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Проверить сервер событием confirmation",
+    "operationId": "post_api_v1_communities_id_callback_confirm",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "status": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "status"
+         ]
         }
        }
       }
@@ -5177,6 +6065,319 @@
     }
    }
   },
+  "/api/v1/oauth/authorize": {
+   "get": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Страница согласия: что запрашивает приложение (те же параметры в query)",
+    "operationId": "get_api_v1_oauth_authorize",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "app": {
+           "type": "object",
+           "properties": {
+            "name": {
+             "type": "string"
+            },
+            "client_id": {
+             "type": "string"
+            },
+            "developer": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "name",
+            "client_id",
+            "developer"
+           ]
+          },
+          "scopes": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "name": {
+              "type": "string"
+             },
+             "description": {
+              "type": "string"
+             }
+            },
+            "required": [
+             "name",
+             "description"
+            ]
+           }
+          },
+          "redirect_uri": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "app",
+          "scopes",
+          "redirect_uri"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Разрешить/отклонить доступ; ответ — куда перенаправить браузер",
+    "operationId": "post_api_v1_oauth_authorize",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "response_type": {
+          "type": "string",
+          "enum": [
+           "code"
+          ]
+         },
+         "client_id": {
+          "type": "string"
+         },
+         "redirect_uri": {
+          "type": "string"
+         },
+         "scope": {
+          "type": "string"
+         },
+         "state": {
+          "type": "string"
+         },
+         "code_challenge": {
+          "type": "string"
+         },
+         "code_challenge_method": {
+          "type": "string",
+          "enum": [
+           "S256"
+          ]
+         },
+         "approve": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "response_type",
+         "client_id",
+         "redirect_uri",
+         "scope",
+         "code_challenge",
+         "code_challenge_method",
+         "approve"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "redirect_to": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "redirect_to"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/oauth/revoke": {
+   "post": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Отозвать токен (RFC 7009)",
+    "operationId": "post_api_v1_oauth_revoke",
+    "security": [],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/x-www-form-urlencoded": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "token": {
+          "type": "string"
+         },
+         "client_id": {
+          "type": "string"
+         },
+         "client_secret": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "token",
+         "client_id"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/oauth/token": {
+   "post": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Обмен кода на токен (PKCE обязателен; секрет — Basic или client_secret)",
+    "operationId": "post_api_v1_oauth_token",
+    "security": [],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/x-www-form-urlencoded": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "grant_type": {
+          "type": "string",
+          "enum": [
+           "authorization_code"
+          ]
+         },
+         "code": {
+          "type": "string"
+         },
+         "redirect_uri": {
+          "type": "string"
+         },
+         "client_id": {
+          "type": "string"
+         },
+         "code_verifier": {
+          "type": "string"
+         },
+         "client_secret": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "grant_type",
+         "code",
+         "redirect_uri",
+         "client_id",
+         "code_verifier"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "access_token": {
+           "type": "string"
+          },
+          "token_type": {
+           "type": "string"
+          },
+          "scope": {
+           "type": "string"
+          },
+          "user_id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "expires_in": {
+           "type": "integer",
+           "format": "int64"
+          }
+         },
+         "required": [
+          "access_token",
+          "token_type",
+          "scope",
+          "user_id"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/openapi.json": {
    "get": {
     "tags": [
@@ -5451,8 +6652,7 @@
       "in": "path",
       "required": true,
       "schema": {
-       "type": "integer",
-       "format": "int64"
+       "type": "string"
       }
      },
      {
@@ -7381,6 +8581,83 @@
         }
        }
       }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/users/me/authorized-apps": {
+   "get": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Приложения с доступом к аккаунту",
+    "operationId": "get_api_v1_users_me_authorized_apps",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/AuthorizedApp"
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/users/me/authorized-apps/{id}": {
+   "delete": {
+    "tags": [
+     "developers"
+    ],
+    "summary": "Отозвать доступ приложения",
+    "operationId": "delete_api_v1_users_me_authorized_apps_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
      },
      "default": {
       "description": "Ошибка",

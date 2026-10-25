@@ -58,6 +58,11 @@ func (s *Server) handleCreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Бот публикует только на стене своего сообщества.
+	if bot := viewerFrom(r.Context()).Bot; bot != 0 && (req.CommunityID == nil || *req.CommunityID != bot) {
+		writeError(w, http.StatusForbidden, "forbidden", "bots can only post to their own community")
+		return
+	}
 	// Публиковать от имени сообщества могут редакторы и выше.
 	if req.CommunityID != nil {
 		role, err := s.store.CommunityRole(r.Context(), *req.CommunityID, me)
@@ -91,6 +96,9 @@ func (s *Server) handleCreatePost(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.internalError(w, r, err)
 		return
+	}
+	if req.CommunityID != nil {
+		s.emit(r.Context(), *req.CommunityID, "wall_post_new", post)
 	}
 	writeJSON(w, http.StatusCreated, post)
 }
@@ -332,6 +340,10 @@ func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	me := userIDFrom(r.Context())
+	if bot := viewerFrom(r.Context()).Bot; bot != 0 && (post.Community == nil || post.Community.ID != bot) {
+		writeError(w, http.StatusForbidden, "forbidden", "bots can only comment in their own community")
+		return
+	}
 
 	// Ответ: комментарий должен быть из этого же поста (иначе можно было бы
 	// «привязать» ответ к чужой закрытой ветке). Ветка — одноуровневая.
@@ -367,7 +379,12 @@ func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request) {
 	}
 	s.notifyMentions(r.Context(), req.Text, me, post.ID, &cid)
 
-	writeJSON(w, http.StatusCreated, map[string]any{"id": id, "post_id": post.ID, "parent_id": parentID, "text": req.Text})
+	out := map[string]any{"id": id, "post_id": post.ID, "parent_id": parentID, "reply_to_id": req.ReplyToID,
+		"text": req.Text, "author_id": me}
+	if post.Community != nil {
+		s.emit(r.Context(), post.Community.ID, "wall_reply_new", out)
+	}
+	writeJSON(w, http.StatusCreated, out)
 }
 
 // Удалить комментарий может его автор, автор поста или админ сообщества.

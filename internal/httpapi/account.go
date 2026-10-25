@@ -160,6 +160,10 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Сброс пароля — повод выкинуть все сеансы: возможно, аккаунт был взломан.
+	if err := s.store.RevokeUserOAuthTokens(r.Context(), userID); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	if err := s.store.RevokeAllSessions(r.Context(), userID); err != nil {
 		s.internalError(w, r, err)
 		return
@@ -191,7 +195,11 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	if !s.setPassword(w, r, v.ID, req.NewPassword) {
 		return
 	}
-	// остальные устройства выходят, текущее остаётся
+	// остальные устройства и сторонние приложения выходят, текущее остаётся
+	if err := s.store.RevokeUserOAuthTokens(r.Context(), v.ID); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	if err := s.store.RevokeOtherSessions(r.Context(), v.ID, v.SID); err != nil {
 		s.internalError(w, r, err)
 		return

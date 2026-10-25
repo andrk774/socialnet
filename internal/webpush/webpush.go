@@ -22,14 +22,14 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+
+	"socialnet/internal/safehttp"
 )
 
 var (
@@ -231,29 +231,7 @@ func allowAnyPort(allowed []string) bool {
 
 // SafeClient — HTTP-клиент, который не подключается к внутренним адресам,
 // даже если DNS push-сервиса вдруг укажет туда (защита от DNS rebinding).
-func SafeClient() *http.Client {
-	dialer := &net.Dialer{
-		Timeout: 10 * time.Second,
-		Control: func(_, address string, _ syscall.RawConn) error {
-			host, _, err := net.SplitHostPort(address)
-			if err != nil {
-				return err
-			}
-			ip := net.ParseIP(host)
-			if ip == nil || ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
-				ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast() {
-				return fmt.Errorf("refusing to connect to internal address %s", host)
-			}
-			return nil
-		},
-	}
-	return &http.Client{
-		Timeout:   15 * time.Second,
-		Transport: &http.Transport{DialContext: dialer.DialContext, TLSHandshakeTimeout: 10 * time.Second},
-		// редиректы не нужны и опасны: могут увести на внутренний адрес
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-	}
-}
+func SafeClient() *http.Client { return safehttp.Client(15 * time.Second) }
 
 // ---------- отправка ----------
 
