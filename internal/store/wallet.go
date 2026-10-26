@@ -12,6 +12,8 @@ var (
 	ErrInsufficientFunds = errors.New("insufficient funds")
 	ErrIdempotencyReuse  = errors.New("idempotency key reused with different parameters")
 	ErrAlreadyClaimed    = errors.New("already claimed")
+	// ErrWalletDebt — по возврату платежа остался долг: тратить монеты нельзя, пока он не погашен.
+	ErrWalletDebt = errors.New("wallet has unpaid refund debt")
 )
 
 // Account — владелец счёта.
@@ -117,6 +119,17 @@ func transferTx(ctx context.Context, tx pgx.Tx, t Transfer) (*TxRecord, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	settling := t.Kind == "refund" || t.Kind == "debt"
+	if fromKind == "user" && !settling {
+		var debt int64
+		err := tx.QueryRow(ctx, `SELECT amount FROM wallet_debts WHERE user_id = $1`, t.From.Owner).Scan(&debt)
+		if err == nil {
+			return nil, ErrWalletDebt
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, err
+		}
+	}
 	if fromKind != "system" && fromBalance < t.Amount {
 		return nil, ErrInsufficientFunds
 	}
@@ -141,7 +154,70 @@ func transferTx(ctx context.Context, tx pgx.Tx, t Transfer) (*TxRecord, error) {
 		INSERT INTO wallet_transactions (kind, from_account, to_account, amount, memo, initiator_id, idempotency_key)
 		VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at`,
 		t.Kind, from, to, t.Amount, t.Memo, initiator, key).Scan(&r.ID, &r.CreatedAt)
-	return r, err
+	if err != nil {
+		return nil, err
+	}
+	if t.To.Kind == "user" && !settling {
+		if err := collectDebt(ctx, tx, to, t.To.Owner); err != nil {
+			return nil, err
+		}
+	}
+	return r, nil
+}
+
+// collectDebt: поступившие монеты сначала гасят долг по возврату платежа.
+// Счёт получателя уже заблокирован вызывающей транзакцией.
+func collectDebt(ctx context.Context, tx pgx.Tx, account, user int64) error {
+	var debt, balance int64
+	err := tx.QueryRow(ctx, `SELECT amount FROM wallet_debts WHERE user_id = $1 FOR UPDATE`, user).Scan(&debt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if err := tx.QueryRow(ctx, `SELECT balance FROM accounts WHERE id = $1 FOR UPDATE`, account).Scan(&balance); err != nil {
+		return err
+	}
+	n := min(debt, balance)
+	if n <= 0 {
+		return nil
+	}
+	if _, err := debit(ctx, tx, account, n, "debt", "Погашение долга за возврат платежа"); err != nil {
+		return err
+	}
+	if n == debt {
+		_, err = tx.Exec(ctx, `DELETE FROM wallet_debts WHERE user_id = $1`, user)
+	} else {
+		_, err = tx.Exec(ctx, `UPDATE wallet_debts SET amount = amount - $2, updated_at = now() WHERE user_id = $1`, user, n)
+	}
+	return err
+}
+
+// debit списывает n монет со счёта в пользу системы (счёт уже заблокирован).
+func debit(ctx context.Context, tx pgx.Tx, account, n int64, kind, memo string) (int64, error) {
+	sys, err := accountID(ctx, tx, SystemAccount)
+	if err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE accounts SET balance = balance - $2 WHERE id = $1`, account, n); err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE accounts SET balance = balance + $2 WHERE id = $1`, sys, n); err != nil {
+		return 0, err
+	}
+	var id int64
+	err = tx.QueryRow(ctx, `
+		INSERT INTO wallet_transactions (kind, from_account, to_account, amount, memo)
+		VALUES ($1, $2, $3, $4, $5) RETURNING id`, kind, account, sys, n, memo).Scan(&id)
+	return id, err
+}
+
+// Debt — непогашенный долг пользователя (0 — нет).
+func (s *Store) Debt(ctx context.Context, user int64) (int64, error) {
+	var d int64
+	err := s.pool.QueryRow(ctx, `SELECT COALESCE((SELECT amount FROM wallet_debts WHERE user_id = $1), 0)`, user).Scan(&d)
+	return d, err
 }
 
 // inTx выполняет fn в транзакции.

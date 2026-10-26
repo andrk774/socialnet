@@ -175,6 +175,22 @@ func (c *Client) GetPayment(ctx context.Context, id string) (*Payment, error) {
 	return p, c.do(ctx, http.MethodGet, "/payments/"+id, "", nil, p)
 }
 
+// Refund — возврат (создаётся в личном кабинете ЮKassa или через её API).
+type Refund struct {
+	ID        string `json:"id"`
+	PaymentID string `json:"payment_id"`
+	Status    string `json:"status"` // pending | succeeded | canceled
+	Amount    Amount `json:"amount"`
+}
+
+func (c *Client) GetRefund(ctx context.Context, id string) (*Refund, error) {
+	if id == "" || strings.ContainsAny(id, "/?#%") {
+		return nil, errors.New("bad refund id")
+	}
+	r := &Refund{}
+	return r, c.do(ctx, http.MethodGet, "/refunds/"+id, "", nil, r)
+}
+
 // NotificationNets — адреса, с которых ЮKassa шлёт уведомления
 // (https://yookassa.ru/developers/using-api/webhooks).
 var NotificationNets = func() []netip.Prefix {

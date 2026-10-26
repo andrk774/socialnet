@@ -99,7 +99,7 @@ func TestBackupWithRestoreCheck(t *testing.T) {
 		if err != nil {
 			t.Fatalf("backup %d: %v", i, err)
 		}
-		if !res.RestoreOK || !res.Encrypted || res.Tables < 30 || !strings.HasPrefix(res.Migration, "0008") {
+		if !res.RestoreOK || !res.Encrypted || res.Tables < 30 || res.Migration != latestMigration(t) {
 			t.Fatalf("result: %+v", res)
 		}
 		names = append(names, res.Name)
@@ -151,4 +151,13 @@ func TestReplaceDB(t *testing.T) {
 	if got := replaceDB("postgres://u:p@h:5432/socialnet?sslmode=disable", "socialnet", "x"); got != "postgres://u:p@h:5432/x?sslmode=disable" {
 		t.Fatal(got)
 	}
+}
+
+// latestMigration — имя последней миграции в репозитории (без .sql).
+func latestMigration(t *testing.T) string {
+	files, err := filepath.Glob("../db/migrations/*.sql")
+	if err != nil || len(files) == 0 {
+		t.Fatal("no migrations found")
+	}
+	return strings.TrimSuffix(filepath.Base(files[len(files)-1]), ".sql")
 }

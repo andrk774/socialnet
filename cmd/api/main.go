@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -36,6 +37,28 @@ func main() {
 }
 
 func run(log *slog.Logger) error {
+	// Проверка живости для Docker HEALTHCHECK без curl/wget в образе:
+	// `api probe http://127.0.0.1:8080/health`
+	if len(os.Args) == 3 && os.Args[1] == "probe" {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, os.Args[2], nil)
+		if err != nil {
+			return err
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("probe: %d", resp.StatusCode)
+		}
+		_, _ = os.Stdout.Write(body)
+		return nil
+	}
+
 	// Ключи для Web Push: `api gen-vapid`, вывод положить в .env
 	if len(os.Args) == 2 && os.Args[1] == "gen-vapid" {
 		pub, priv, err := webpush.GenerateVAPID()
@@ -92,6 +115,17 @@ func run(log *slog.Logger) error {
 			return err
 		}
 		log.Info("restored", "file", os.Args[2])
+		return nil
+	}
+
+	// Собрать MP4 для видео, обработанных до его появления: `api backfill-mp4`.
+	// Задачи выполнит воркер.
+	if len(os.Args) == 2 && os.Args[1] == "backfill-mp4" {
+		n, err := store.New(pool).EnqueueMP4Backfill(ctx)
+		if err != nil {
+			return err
+		}
+		log.Info("mp4 jobs queued", "count", n)
 		return nil
 	}
 

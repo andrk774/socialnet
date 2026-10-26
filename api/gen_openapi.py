@@ -49,7 +49,7 @@ schemas = {
     "MFARequired": obj(mfa_required=bool_, mfa_token=str_),
     "Photo": obj(id=uuid, url=str_, thumb_url=str_),
     "PostTrack": obj(id=uuid, title=str_, artist=str_, duration_sec=int_, url=str_),
-    "PostVideo": obj(id=uuid, title=str_, duration_sec=int_, poster_url=str_, hls_url=str_),
+    "PostVideo": obj(id=uuid, title=str_, duration_sec=int_, poster_url=str_, hls_url=str_, **{"mp4_url?": str_}),
     "Post": obj(id=int_, author=S("UserCard"), **{"community?": obj(id=int_, slug=str_, name=str_)}, text=str_,
                 photos=arr(S("Photo")), tracks=arr(S("PostTrack")), videos=arr(S("PostVideo")),
                 likes_count=int_, comments_count=int_, liked_by_me=bool_,
@@ -100,7 +100,7 @@ schemas = {
     "CallbackServer": obj(community_id=int_, url=str_, events=arr(str_), status=enum("unconfirmed", "active", "failing"),
                           last_error=str_, updated_at=dt),
     "Video": obj(id=uuid, owner_id=int_, title=str_, description=str_, status=enum("processing", "ready", "failed"),
-                 **{"duration_sec?": int_, "width?": int_, "height?": int_, "poster_url?": str_, "hls_url?": str_},
+                 **{"duration_sec?": int_, "width?": int_, "height?": int_, "poster_url?": str_, "hls_url?": str_, "mp4_url?": str_},
                  qualities=arr(str_), created_at=dt),
 }
 
@@ -220,7 +220,7 @@ r("DELETE", A + "/communities/{id}/members/{userID}", "communities", "Исклю
 r("GET", A + "/communities/{id}/posts", "communities", "Стена сообщества", resp=lst(S("Post")))
 r("GET", A + "/search", "search", "Поиск: ?q=…&type=users|communities|tracks", resp=obj(items=arr({})))
 # --- кошелёк ---
-r("GET", A + "/wallet", "wallet", "Баланс и история", resp=obj(balance=int_, transactions=lst(S("Tx"))))
+r("GET", A + "/wallet", "wallet", "Баланс и история", resp=obj(balance=int_, debt=int_, transactions=lst(S("Tx"))))
 r("POST", A + "/wallet/transfer", "wallet", "Перевод", obj(to_user_id=int_, **money), S("TxResult"), 201)
 r("POST", A + "/wallet/daily-bonus", "wallet", "Ежедневный бонус", resp=S("TxResult"), code=201)
 r("GET", A + "/gifts/catalog", "wallet", "Каталог подарков", resp=obj(items=arr(obj(id=int_, name=str_, price=int_))))
@@ -303,12 +303,13 @@ r("POST", A + "/admin/alerts/{id}/ack", "moderation", "Отметить трев
 
 # --- покупка монет ---
 pay = obj(id=uuid, package_id=str_, coins=int_, amount_kopecks=int_, currency=str_,
-          status=enum("created", "pending", "succeeded", "canceled", "error"), **{"confirmation_url?": str_}, created_at=dt)
+          status=enum("created", "pending", "succeeded", "canceled", "error", "refunded", "partially_refunded"),
+          **{"confirmation_url?": str_}, created_at=dt)
 r("GET", A + "/wallet/packages", "wallet", "Пакеты монет и цены", resp=obj(enabled=bool_, items=arr(obj(id=str_, coins=int_, price_kopecks=int_, price=str_))))
 r("POST", A + "/wallet/purchases", "wallet", "Купить монеты: вернёт confirmation_url страницы оплаты ЮKassa", obj(package_id=str_), pay, 201)
 r("GET", A + "/wallet/purchases", "wallet", "Мои покупки", resp=obj(items=arr(pay)))
 r("GET", A + "/wallet/purchases/{pid}", "wallet", "Статус покупки (сверяется с ЮKassa)", resp=pay)
-r("POST", A + "/payments/yookassa", "wallet", "Уведомления ЮKassa (только с её адресов; статус перепроверяется через API)",
+r("POST", A + "/payments/yookassa", "wallet", "Уведомления ЮKassa: payment.*, refund.succeeded (только с её адресов; всё перепроверяется через API)",
   obj(type=str_, event=str_, object={"type": "object"}), auth=False)
 
 # --- API для разработчиков ---

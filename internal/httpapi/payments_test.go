@@ -11,12 +11,14 @@ import (
 	"sync"
 	"testing"
 
+	"socialnet/internal/store"
 	"socialnet/internal/yookassa"
 )
 
 // fakeYooKassa — имитация API ЮKassa v3 с идемпотентностью по Idempotence-Key.
 type fakeYooKassa struct {
 	mu       sync.Mutex
+	refunds  map[string]*yookassa.Refund
 	payments map[string]*yookassa.Payment
 	byKey    map[string]string
 	requests []yookassa.CreateRequest
@@ -54,6 +56,14 @@ func (f *fakeYooKassa) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Confirmation: &yookassa.Confirmation{Type: "redirect", ConfirmationURL: "https://yoomoney.ru/checkout/payments/v2/contract?orderId=" + id}}
 		f.payments[id], f.byKey[key] = p, id
 		_ = json.NewEncoder(w).Encode(p)
+	case r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/refunds/"):
+		ref, ok := f.refunds[strings.TrimPrefix(r.URL.Path, "/refunds/")]
+		if !ok {
+			w.WriteHeader(404)
+			_, _ = w.Write([]byte(`{"type":"error","code":"not_found"}`))
+			return
+		}
+		_ = json.NewEncoder(w).Encode(ref)
 	case r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/payments/"):
 		p, ok := f.payments[strings.TrimPrefix(r.URL.Path, "/payments/")]
 		if !ok {
@@ -203,5 +213,116 @@ func TestBuyCoinsYooKassa(t *testing.T) {
 	hist := items(anna.req("GET", p("/wallet"), nil, 200)["transactions"].(map[string]any))
 	if len(hist) != 2 || hist[0].(map[string]any)["kind"] != "purchase" {
 		t.Fatalf("history: %v", hist)
+	}
+}
+
+func (f *fakeYooKassa) refund(id, paymentID, value, status string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.refunds == nil {
+		f.refunds = map[string]*yookassa.Refund{}
+	}
+	f.refunds[id] = &yookassa.Refund{ID: id, PaymentID: paymentID, Status: status, Amount: yookassa.Amount{Value: value, Currency: "RUB"}}
+}
+
+func TestYooKassaRefunds(t *testing.T) {
+	ts, srv, _ := setupFull(t, 1000)
+	anna, bob := register(t, ts, "anna"), register(t, ts, "bob")
+	fake := &fakeYooKassa{payments: map[string]*yookassa.Payment{}, byKey: map[string]string{}}
+	mock := httptest.NewServer(fake)
+	defer mock.Close()
+	srv.yookassa = yookassa.New(mock.URL, "shop", "secret")
+	srv.cfg.YooKassaCheckIP = false
+	srv.walletLimiter = newIPRateLimiter(1000, 1000)
+	ctx := t.Context()
+	srv.store.Pool().Exec(ctx, `UPDATE users SET email_verified_at = now()`) //nolint:errcheck
+	wallet := func(u *tuser) (float64, float64) {
+		w := u.req("GET", p("/wallet"), nil, 200)
+		return w["balance"].(float64), w["debt"].(float64)
+	}
+	transfer := func(from, to *tuser, amount int, key string, want int) {
+		t.Helper()
+		from.req("POST", p("/wallet/transfer"), map[string]any{"to_user_id": to.ID, "amount": amount, "idempotency_key": key}, want)
+	}
+
+	pay := anna.req("POST", p("/wallet/purchases"), map[string]any{"package_id": "coins_550"}, 201)
+	payID := fake.byKey[pay["id"].(string)]
+	fake.set(payID, "succeeded")
+	webhook(t, ts, "payment.succeeded", payID)
+	if b, _ := wallet(anna); b != 550 {
+		t.Fatalf("after purchase: %v", b)
+	}
+
+	// половина суммы — половина монет; повтор уведомления ничего не меняет
+	fake.refund("rf-1", payID, "249.50", "succeeded")
+	for i := 0; i < 2; i++ {
+		if code := webhook(t, ts, "refund.succeeded", "rf-1"); code != 200 {
+			t.Fatalf("refund webhook: %d", code)
+		}
+	}
+	if b, d := wallet(anna); b != 275 || d != 0 {
+		t.Fatalf("after partial refund: balance %v debt %v", b, d)
+	}
+	if got := anna.req("GET", p("/wallet/purchases/%s", pay["id"]), nil, 200); got["status"] != "partially_refunded" {
+		t.Fatalf("payment status: %v", got["status"])
+	}
+	// возврат, который ЮKassa ещё не провела, — не списываем
+	fake.refund("rf-pending", payID, "100.00", "pending")
+	webhook(t, ts, "refund.succeeded", "rf-pending")
+	if b, _ := wallet(anna); b != 275 {
+		t.Fatalf("pending refund applied: %v", b)
+	}
+
+	// Анна тратит монеты, затем возвращает остаток денег: не хватает — долг
+	transfer(anna, bob, 200, "t1", 201)
+	fake.refund("rf-2", payID, "249.50", "succeeded")
+	webhook(t, ts, "refund.succeeded", "rf-2")
+	if b, d := wallet(anna); b != 0 || d != 200 {
+		t.Fatalf("after full refund: balance %v debt %v", b, d)
+	}
+	if got := anna.req("GET", p("/wallet/purchases/%s", pay["id"]), nil, 200); got["status"] != "refunded" {
+		t.Fatalf("payment status: %v", got["status"])
+	}
+	// возврат сверх суммы платежа — ошибка в логе, монеты не трогаем
+	srv.log = slog.New(slog.DiscardHandler)
+	fake.refund("rf-3", payID, "10.00", "succeeded")
+	webhook(t, ts, "refund.succeeded", "rf-3")
+	srv.log = slog.New(&failOnError{t: t})
+
+	// пока долг не погашен, тратить нельзя; поступления гасят долг
+	srv.store.Transfer(ctx, store.Transfer{Kind: "mint", From: store.SystemAccount, To: store.UserAccount(bob.ID), Amount: 1000}) //nolint:errcheck
+	transfer(bob, anna, 150, "t2", 201)
+	if b, d := wallet(anna); b != 0 || d != 50 {
+		t.Fatalf("after incoming 150: balance %v debt %v", b, d)
+	}
+	transfer(anna, bob, 1, "t3", 409)
+	transfer(bob, anna, 80, "t4", 201)
+	if b, d := wallet(anna); b != 30 || d != 0 {
+		t.Fatalf("debt repaid: balance %v debt %v", b, d)
+	}
+	transfer(anna, bob, 10, "t5", 201)
+
+	// гонка: один и тот же возврат приходит десять раз одновременно
+	pay2 := bob.req("POST", p("/wallet/purchases"), map[string]any{"package_id": "coins_100"}, 201)
+	pay2ID := fake.byKey[pay2["id"].(string)]
+	fake.set(pay2ID, "succeeded")
+	webhook(t, ts, "payment.succeeded", pay2ID)
+	before, _ := wallet(bob)
+	fake.refund("rf-race", pay2ID, "99.00", "succeeded")
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() { defer wg.Done(); webhook(t, ts, "refund.succeeded", "rf-race") }()
+	}
+	wg.Wait()
+	if after, _ := wallet(bob); after != before-100 {
+		t.Fatalf("concurrent refund: %v → %v", before, after)
+	}
+	kinds := map[string]bool{}
+	for _, x := range items(anna.req("GET", p("/wallet?limit=50"), nil, 200)["transactions"].(map[string]any)) {
+		kinds[x.(map[string]any)["kind"].(string)] = true
+	}
+	if !kinds["refund"] || !kinds["debt"] {
+		t.Fatalf("history kinds: %v", kinds)
 	}
 }

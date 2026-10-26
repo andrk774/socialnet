@@ -1,4 +1,4 @@
-.PHONY: web vendor-preact e2e up down logs build test test-db psql fmt lint openapi fuzz
+.PHONY: smoke web vendor-preact e2e up down logs build test test-db psql fmt lint openapi fuzz
 
 up:            ## собрать и запустить всё в Docker
 	docker compose up -d --build
@@ -51,3 +51,8 @@ vendor-preact:
 # Сквозной тест в Chromium (нужны node и playwright)
 e2e:
 	go test -count=1 -run TestFrontendE2E ./internal/httpapi/
+
+# Весь стек в Docker + сквозная проверка (регистрация, видео, копия, метрики, изоляция)
+smoke:
+	docker compose up -d --build --wait
+	python3 deploy/smoke.py

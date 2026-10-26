@@ -249,6 +249,80 @@ func TranscodeHLS(ctx context.Context, in, format, dir string, srcHeight int, ma
 	return made, os.WriteFile(filepath.Join(dir, "master.m3u8"), []byte(m.String()), 0o600)
 }
 
+// RemuxMP4 склеивает сегменты готового качества в один MP4 без перекодирования
+// (-c copy: секунды работы). Нужен браузерам без встроенного HLS (Chrome и
+// Firefox на компьютере). faststart — индекс в начале файла, видео начинает
+// играть до полной загрузки. Вход — наш собственный плейлист, не файл
+// пользователя, поэтому разбирать HLS здесь безопасно.
+func RemuxMP4(ctx context.Context, dir, rendition string) error {
+	if !fileRe.MatchString(rendition + ".m3u8") {
+		return ErrNotFound
+	}
+	args := append(baseArgs(), "-nostdin", "-y",
+		"-f", "hls", "-i", "file:"+filepath.Join(dir, rendition+".m3u8"),
+		"-map", "0", "-c", "copy", "-bsf:a", "aac_adtstoasc", "-movflags", "+faststart",
+		"-f", "mp4", filepath.Join(dir, rendition+".mp4"))
+	_, err := run(ctx, 10*time.Minute, "ffmpeg", args...)
+	return err
+}
+
+// Fetch кладёт файл обработанного медиа в dst: с диска или из S3.
+func (s *Store) Fetch(ctx context.Context, kind, id, name, dst string) error {
+	if s.Remote == nil {
+		src, err := s.Path(kind, id, name)
+		if err != nil {
+			return err
+		}
+		data, err := os.ReadFile(src) //nolint:gosec // путь из белого списка
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(dst, data, 0o600)
+	}
+	key, err := s.Key(kind, id, name)
+	if err != nil {
+		return err
+	}
+	obj, err := s.Remote.Get(ctx, key, "")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = obj.Body.Close() }()
+	f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600) //nolint:gosec // dst — наш временный файл
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(f, obj.Body); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
+}
+
+// PutFile выкладывает один файл (с диска dir) рядом с уже обработанными.
+func (s *Store) PutFile(ctx context.Context, kind, id, name, srcDir string) error {
+	src := filepath.Join(srcDir, name)
+	if s.Remote == nil {
+		dst, err := s.Path(kind, id, name)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
+			return err
+		}
+		return os.Rename(src, dst)
+	}
+	key, err := s.Key(kind, id, name)
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(src) //nolint:gosec // наш временный файл
+	if err != nil {
+		return err
+	}
+	return s.Remote.Put(ctx, key, data, contentTypes[filepath.Ext(name)])
+}
+
 func bitrate(s string) int {
 	n, _ := strconv.Atoi(strings.TrimSuffix(s, "k"))
 	return n
@@ -272,7 +346,7 @@ func Poster(ctx context.Context, in, format, out string, seconds float64) error 
 
 var (
 	idRe   = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	fileRe = regexp.MustCompile(`^(audio\.mp3|voice\.mp3|master\.m3u8|poster\.jpg|(360p|720p)\.m3u8|(360p|720p)_[0-9]{4}\.ts)$`)
+	fileRe = regexp.MustCompile(`^(audio\.mp3|voice\.mp3|master\.m3u8|poster\.jpg|(360p|720p)\.(m3u8|mp4)|(360p|720p)_[0-9]{4}\.ts)$`)
 )
 
 // Store хранит обработанные файлы: <root>/<kind>/<id[:2]>/<id>/<имя>.
@@ -340,7 +414,7 @@ func (s *Store) Key(kind, id, name string) (string, error) {
 }
 
 var contentTypes = map[string]string{".mp3": "audio/mpeg", ".m3u8": "application/vnd.apple.mpegurl",
-	".ts": "video/mp2t", ".jpg": "image/jpeg"}
+	".ts": "video/mp2t", ".jpg": "image/jpeg", ".mp4": "video/mp4"}
 
 // Commit выгружает обработанные файлы в S3 (если оно настроено).
 func (s *Store) Commit(ctx context.Context, kind, id string) error {

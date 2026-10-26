@@ -13,9 +13,11 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
 FROM alpine:3.21
 RUN apk add --no-cache ffmpeg ca-certificates postgresql17-client \
     && adduser -D -H -u 65532 app \
-    && mkdir -p /data/media \
-    && chown -R 65532:65532 /data
+    && mkdir -p /data/media /backups \
+    && chown -R 65532:65532 /data /backups
 COPY --from=build /out/api /api
+# pg_dump/pg_restore 17 в Alpine лежат здесь
+ENV PATH=/usr/libexec/postgresql17:$PATH
 USER 65532:65532
 EXPOSE 8080
 ENTRYPOINT ["/api"]

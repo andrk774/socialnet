@@ -143,10 +143,10 @@ export function CommunityPage({ slug }: { slug: string }) {
 
 interface Tx { id: number; kind: string; direction: "in" | "out"; amount: number; counterparty: { name: string }; memo: string; created_at: string }
 interface Pack { id: string; coins: number; price: string }
-const txKind: Record<string, string> = { transfer: "Перевод", gift: "Подарок", donation: "Пожертвование", reward: "Бонус", mint: "Начисление", purchase: "Покупка", payout: "Вывод" };
+const txKind: Record<string, string> = { transfer: "Перевод", gift: "Подарок", donation: "Пожертвование", reward: "Бонус", mint: "Начисление", purchase: "Покупка", payout: "Вывод", refund: "Возврат платежа", debt: "Погашение долга" };
 
 export function WalletPage() {
-  const w = useLoad(() => get<{ balance: number; transactions: Page<Tx> }>("/wallet"), []);
+  const w = useLoad(() => get<{ balance: number; debt: number; transactions: Page<Tx> }>("/wallet"), []);
   const packs = useLoad(() => get<{ enabled: boolean; items: Pack[] }>("/wallet/packages"), []);
   const [error, setError] = useState<unknown>(null);
   const [status, setStatus] = useState("");
@@ -179,6 +179,12 @@ export function WalletPage() {
     <section>
       <h1>Кошелёк</h1>
       {w.data && <p class="balance"><strong>{w.data.balance.toLocaleString("ru")}</strong> монет</p>}
+      {w.data && w.data.debt > 0 && (
+        <p class="banner" role="status">
+          За возвращённую покупку осталось погасить {w.data.debt} монет — они уже были потрачены.
+          Пока долг не погашен, переводы и подарки недоступны; новые монеты сначала идут в счёт долга.
+        </p>
+      )}
       {status && <p class="note" role="status">{status}</p>}
       <ErrorLine error={error} />
       <div class="row"><button class="ghost" onClick={bonus}>Забрать ежедневный бонус</button></div>

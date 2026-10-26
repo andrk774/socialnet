@@ -226,8 +226,17 @@ func (s *Server) handleYooKassaWebhook(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "not a notification")
 		return
 	}
+	if n.Event == "refund.succeeded" {
+		if err := s.applyRefund(r.Context(), n.Object.ID); err != nil {
+			s.log.Warn("yookassa refund", "err", err, "refund", n.Object.ID)
+			writeError(w, http.StatusBadGateway, "retry", "temporary error")
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	if !strings.HasPrefix(n.Event, "payment.") {
-		w.WriteHeader(http.StatusOK) // возвраты и прочее пока не обрабатываем
+		w.WriteHeader(http.StatusOK) // прочие события нам не нужны
 		return
 	}
 	p, err := s.store.PaymentByProviderID(r.Context(), n.Object.ID)
@@ -246,4 +255,39 @@ func (s *Server) handleYooKassaWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// applyRefund: содержимому уведомления не верим — берём возврат из API ЮKassa
+// и сверяем с нашим платежом. Чужой платёж — тихо игнорируем (200).
+func (s *Server) applyRefund(ctx context.Context, refundID string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	ref, err := s.yookassa.GetRefund(ctx, refundID)
+	if err != nil {
+		return err
+	}
+	if ref.ID != refundID || ref.Status != "succeeded" || ref.Amount.Currency != "RUB" {
+		return nil // не завершён или не тот — дождёмся настоящего уведомления
+	}
+	kop, err := yookassa.ParseKopecks(ref.Amount.Value)
+	if err != nil {
+		return err
+	}
+	res, err := s.store.ApplyRefund(ctx, ref.ID, ref.PaymentID, kop)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil
+	}
+	if errors.Is(err, store.ErrRefundMismatch) {
+		s.log.Error("refund does not match payment", "refund", ref.ID, "payment", ref.PaymentID, "amount", ref.Amount.Value)
+		return nil // повторы не помогут — разбирать вручную
+	}
+	if err != nil {
+		return err
+	}
+	if !res.Replayed {
+		s.m.business.Inc("payment_refunded")
+		s.log.Info("payment refunded", "payment", res.PaymentID, "user_id", res.UserID, "coins", res.Coins, "debt", res.Debt)
+		s.hub.Publish(res.UserID, "payment", map[string]any{"id": res.PaymentID, "status": "refunded", "coins": res.Coins})
+	}
+	return nil
 }

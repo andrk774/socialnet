@@ -21,23 +21,28 @@ type Video struct {
 	Qualities   []string   `json:"qualities"`
 	PosterURL   string     `json:"poster_url,omitempty"`
 	HLSURL      string     `json:"hls_url,omitempty"`
+	MP4URL      string     `json:"mp4_url,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	ReadyAt     *time.Time `json:"ready_at,omitempty"`
 }
 
-const videoCols = `id::text, owner_id, title, description, status, duration_sec, width, height, renditions, created_at, ready_at`
+const videoCols = `id::text, owner_id, title, description, status, duration_sec, width, height, renditions, created_at, ready_at, mp4`
 
 func scanVideos(rows pgx.Rows) ([]Video, error) {
 	defer rows.Close()
 	out := []Video{}
 	for rows.Next() {
 		var v Video
+		var mp4 *string
 		if err := rows.Scan(&v.ID, &v.OwnerID, &v.Title, &v.Description, &v.Status, &v.DurationSec,
-			&v.Width, &v.Height, &v.Qualities, &v.CreatedAt, &v.ReadyAt); err != nil {
+			&v.Width, &v.Height, &v.Qualities, &v.CreatedAt, &v.ReadyAt, &mp4); err != nil {
 			return nil, err
 		}
 		if v.Status == "ready" {
 			v.PosterURL, v.HLSURL = VideoURL(v.ID, "poster.jpg"), VideoURL(v.ID, "master.m3u8")
+			if mp4 != nil {
+				v.MP4URL = VideoURL(v.ID, *mp4+".mp4")
+			}
 		}
 		out = append(out, v)
 	}
@@ -111,12 +116,13 @@ func (s *Store) DeleteVideo(ctx context.Context, id string, owner int64) error {
 	return nil
 }
 
-func (s *Store) VideoReady(ctx context.Context, id string, seconds, w, h int, qualities []string) (int64, error) {
+// VideoReady: mp4 — качество, для которого собран MP4 ("" — не собран).
+func (s *Store) VideoReady(ctx context.Context, id string, seconds, w, h int, qualities []string, mp4 string) (int64, error) {
 	var owner int64
 	err := s.pool.QueryRow(ctx, `
 		UPDATE videos SET status = 'ready', duration_sec = $2, width = $3, height = $4,
-		                  renditions = $5, ready_at = now(), error = ''
-		WHERE id = $1::uuid AND status = 'processing' RETURNING owner_id`, id, seconds, w, h, qualities).Scan(&owner)
+		                  renditions = $5, ready_at = now(), error = '', mp4 = NULLIF($6, '')
+		WHERE id = $1::uuid AND status = 'processing' RETURNING owner_id`, id, seconds, w, h, qualities, mp4).Scan(&owner)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return 0, ErrNotFound // видео удалили, пока оно обрабатывалось
 	}
@@ -178,5 +184,23 @@ func (s *Store) RequeueStale(ctx context.Context, after time.Duration) (int64, e
 	tag, err := s.pool.Exec(ctx, `
 		UPDATE jobs SET status = 'queued', locked_at = NULL
 		WHERE status = 'running' AND locked_at < now() - $1::interval`, after)
+	return tag.RowsAffected(), err
+}
+
+func (s *Store) SetVideoMP4(ctx context.Context, id, rendition string) error {
+	_, err := s.pool.Exec(ctx, `UPDATE videos SET mp4 = $2 WHERE id = $1::uuid AND status = 'ready'`, id, rendition)
+	return err
+}
+
+// EnqueueMP4Backfill ставит в очередь сборку MP4 для видео, обработанных до
+// появления MP4. Повторный вызов не дублирует задачи.
+func (s *Store) EnqueueMP4Backfill(ctx context.Context) (int64, error) {
+	tag, err := s.pool.Exec(ctx, `
+		INSERT INTO jobs (kind, payload)
+		SELECT 'video_mp4', jsonb_build_object('video_id', v.id::text, 'rendition', v.renditions[array_length(v.renditions, 1)])
+		FROM videos v
+		WHERE v.status = 'ready' AND v.mp4 IS NULL AND array_length(v.renditions, 1) > 0
+		  AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.kind = 'video_mp4' AND j.status IN ('queued', 'running')
+		                  AND j.payload->>'video_id' = v.id::text)`)
 	return tag.RowsAffected(), err
 }

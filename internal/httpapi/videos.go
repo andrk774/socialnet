@@ -242,6 +242,8 @@ func (s *Server) handleServeVideo(w http.ResponseWriter, r *http.Request) {
 		ctype = "application/vnd.apple.mpegurl"
 	case strings.HasSuffix(file, ".ts"):
 		ctype = "video/mp2t"
+	case strings.HasSuffix(file, ".mp4"):
+		ctype = "video/mp4"
 	case file == "poster.jpg":
 		ctype = "image/jpeg"
 	default:

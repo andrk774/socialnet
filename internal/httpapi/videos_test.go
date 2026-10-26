@@ -4,11 +4,50 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"socialnet/internal/av"
 	"socialnet/internal/worker"
 )
+
+// checkMP4: MP4 отдаётся с Range и это настоящее видео со звуком нужной длины.
+func checkMP4(t *testing.T, base string, v map[string]any, vid string) {
+	t.Helper()
+	if v["mp4_url"] != "/video/"+vid+"/720p.mp4" {
+		t.Fatalf("mp4_url: %v", v["mp4_url"])
+	}
+	req, _ := http.NewRequest("GET", base+v["mp4_url"].(string), nil)
+	req.Header.Set("Range", "bytes=0-99")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 206 || resp.Header.Get("Content-Type") != "video/mp4" {
+		t.Fatalf("mp4 range: %d %s", resp.StatusCode, resp.Header.Get("Content-Type"))
+	}
+	resp, err = http.Get(base + v["mp4_url"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	f := filepath.Join(t.TempDir(), "v.mp4")
+	if err := os.WriteFile(f, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	probe, err := av.ProbeFile(t.Context(), f)
+	if err != nil || probe.Video() == nil || probe.Audio() == nil || probe.Seconds < 2.5 || probe.Seconds > 3.5 || probe.Video().Height != 720 {
+		t.Fatalf("mp4 probe: %+v %v", probe, err)
+	}
+	// faststart: индекс (moov) до данных (mdat), видео начинает играть сразу
+	if moov, mdat := strings.Index(string(data[:4096]), "moov"), strings.Index(string(data), "mdat"); moov < 0 || moov > mdat {
+		t.Fatalf("moov at %d, mdat at %d", moov, mdat)
+	}
+}
 
 func TestVideo(t *testing.T) {
 	needFFmpeg(t)
@@ -71,6 +110,8 @@ func TestVideo(t *testing.T) {
 	if resp, _ := get(v["poster_url"].(string)); resp.StatusCode != 200 || resp.Header.Get("Content-Type") != "image/jpeg" {
 		t.Fatal("poster")
 	}
+	checkMP4(t, ts.URL, v, vid)
+
 	for _, bad := range []string{"../../../etc/passwd", "secret.txt", "360p_0000.ts.bak"} {
 		if resp, _ := get("/video/" + vid + "/" + bad); resp.StatusCode != 404 {
 			t.Fatalf("served %s", bad)
@@ -84,9 +125,30 @@ func TestVideo(t *testing.T) {
 
 	// в пост, правка, видимость
 	post := bob.req("POST", p("/posts"), map[string]any{"text": "смотрите", "video_ids": []string{vid}}, 201)
-	if vs := post["videos"].([]any); len(vs) != 1 || vs[0].(map[string]any)["hls_url"] == nil {
+	if vs := post["videos"].([]any); len(vs) != 1 || vs[0].(map[string]any)["hls_url"] == nil ||
+		vs[0].(map[string]any)["mp4_url"] != "/video/"+vid+"/720p.mp4" {
 		t.Fatalf("post videos: %v", post)
 	}
+	// видео, обработанное до появления MP4: команда backfill-mp4 досоздаёт его из сегментов
+	mp4Path, _ := srv.avStore.Path("videos", vid, "720p.mp4")
+	if err := os.Remove(mp4Path); err != nil {
+		t.Fatal(err)
+	}
+	srv.store.Pool().Exec(t.Context(), `UPDATE videos SET mp4 = NULL`) //nolint:errcheck
+	if v := anna.req("GET", p("/videos/%s", vid), nil, 200); v["mp4_url"] != nil {
+		t.Fatalf("mp4_url without file: %v", v)
+	}
+	if n, err := srv.store.EnqueueMP4Backfill(t.Context()); err != nil || n != 1 {
+		t.Fatalf("backfill queued %d %v", n, err)
+	}
+	if n, _ := srv.store.EnqueueMP4Backfill(t.Context()); n != 0 {
+		t.Fatal("backfill job duplicated")
+	}
+	if did, err := wk.ProcessOne(t.Context()); !did || err != nil {
+		t.Fatalf("backfill worker: %v %v", did, err)
+	}
+	checkMP4(t, ts.URL, anna.req("GET", p("/videos/%s", vid), nil, 200), vid)
+
 	bob.req("PATCH", p("/videos/%s", vid), map[string]any{"title": "моё"}, 403)
 	anna.req("PATCH", p("/videos/%s", vid), map[string]any{"title": "Закат"}, 200)
 	if n := len(bob.req("GET", p("/users/%d/videos", anna.ID), nil, 200)["items"].([]any)); n != 1 {

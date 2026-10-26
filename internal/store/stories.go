@@ -52,7 +52,7 @@ func (s *Store) CreateStory(ctx context.Context, author int64, mediaID, videoID 
 }
 
 const storySelect = `
-	SELECT st.id, st.author_id, st.media_id::text, st.video_id::text, v.title, COALESCE(v.duration_sec, 0),
+	SELECT st.id, st.author_id, st.media_id::text, st.video_id::text, v.title, COALESCE(v.duration_sec, 0), v.mp4,
 	       st.caption, st.created_at, st.expires_at,
 	       EXISTS (SELECT 1 FROM story_views sv WHERE sv.story_id = st.id AND sv.viewer_id = $1),
 	       CASE WHEN st.author_id = $1 THEN (SELECT count(*) FROM story_views sv WHERE sv.story_id = st.id) END,
@@ -76,11 +76,12 @@ func (s *Store) queryStories(ctx context.Context, sql string, args ...any) ([]St
 			mediaID, vid *string
 			vTitle       *string
 			vDur         int
+			vMP4         *string
 			views        *int
 			author       UserCard
 			avatar       *string
 		)
-		if err := rows.Scan(&st.ID, &st.AuthorID, &mediaID, &vid, &vTitle, &vDur, &st.Caption, &st.CreatedAt,
+		if err := rows.Scan(&st.ID, &st.AuthorID, &mediaID, &vid, &vTitle, &vDur, &vMP4, &st.Caption, &st.CreatedAt,
 			&st.ExpiresAt, &st.Seen, &views, &author.ID, &author.Username, &author.FirstName, &author.LastName, &avatar); err != nil {
 			return nil, err
 		}
@@ -92,6 +93,9 @@ func (s *Store) queryStories(ctx context.Context, sql string, args ...any) ([]St
 			st.Video = &PostVideo{ID: *vid, DurationSec: vDur, PosterURL: VideoURL(*vid, "poster.jpg"), HLSURL: VideoURL(*vid, "master.m3u8")}
 			if vTitle != nil {
 				st.Video.Title = *vTitle
+			}
+			if vMP4 != nil {
+				st.Video.MP4URL = VideoURL(*vid, *vMP4+".mp4")
 			}
 		}
 		i, ok := idx[author.ID]

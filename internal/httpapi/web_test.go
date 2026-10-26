@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"context"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -9,6 +11,9 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"socialnet/internal/av"
+	"socialnet/internal/worker"
 )
 
 func TestFrontendServing(t *testing.T) {
@@ -60,17 +65,32 @@ func TestFrontendE2E(t *testing.T) {
 	if exec.Command(node, "-e", "require('playwright')").Run() != nil {
 		t.Skip("playwright not installed")
 	}
-	ts := setup(t, 1000)
+	ts, srv, _ := setupFull(t, 1000)
+	srv.uploadLimiter = newIPRateLimiter(100, 100)
+	// видео для проверки плеера: воркер обрабатывает очередь в фоне
+	var clip string
+	if av.Available() {
+		data := genMedia(t, "clip.mp4", "-f", "lavfi", "-i", "testsrc=size=1280x720:rate=24:duration=4",
+			"-f", "lavfi", "-i", "sine=duration=4", "-shortest", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac")
+		clip = filepath.Join(t.TempDir(), "clip.mp4")
+		if err := os.WriteFile(clip, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+		go (&worker.Worker{Store: srv.store, AV: srv.avStore, Log: slog.New(&failOnError{t: t})}).Run(ctx)
+	}
 	_, file, _, _ := runtime.Caller(0)
 	script := filepath.Join(filepath.Dir(file), "../../web/e2e/smoke.mjs")
 	shots := os.Getenv("E2E_SCREENSHOTS")
 	if shots == "" {
 		shots = t.TempDir()
 	}
-	cmd := exec.Command(node, script, ts.URL, shots)
+	cmd := exec.Command(node, script, ts.URL, shots, clip)
 	cmd.Env = append(os.Environ(), "NODE_PATH="+os.Getenv("NODE_PATH"))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("e2e: %v\n%s", err, out)
 	}
+	t.Logf("%s", out)
 }

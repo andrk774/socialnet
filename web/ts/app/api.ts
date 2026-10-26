@@ -8,7 +8,7 @@ export interface Self extends UserCard {
 }
 export interface Photo { id: string; url: string; thumb_url: string }
 export interface PostTrack { id: string; title: string; artist: string; duration_sec: number; url: string }
-export interface PostVideo { id: string; title: string; duration_sec: number; poster_url: string; hls_url: string }
+export interface PostVideo { id: string; title: string; duration_sec: number; poster_url: string; hls_url: string; mp4_url?: string }
 export type Reaction = "like" | "love" | "haha" | "wow" | "sad" | "angry";
 export interface Post {
   id: number; author: UserCard; community?: { id: number; slug: string; name: string }; text: string;

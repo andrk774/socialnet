@@ -124,3 +124,97 @@ func (s *Store) SettlePayment(ctx context.Context, id, status string) (credited 
 	})
 	return credited, err
 }
+
+// RefundResult — что сделал возврат.
+type RefundResult struct {
+	PaymentID string
+	UserID    int64
+	Coins     int64 // положено списать за этот возврат
+	Debited   int64 // списано сразу
+	Debt      int64 // ушло в долг (монеты уже потрачены)
+	Replayed  bool  // этот возврат уже был обработан
+}
+
+var ErrRefundMismatch = errors.New("refund does not match payment")
+
+// ApplyRefund списывает монеты за возврат (данные уже проверены у ЮKassa).
+// Монеты — пропорционально возвращённой сумме, с округлением вверх: частичный
+// возврат не должен оставлять «бесплатные» монеты. Повтор того же возврата
+// ничего не меняет.
+func (s *Store) ApplyRefund(ctx context.Context, providerRefundID, providerPaymentID string, kopecks int64) (*RefundResult, error) {
+	res := &RefundResult{}
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
+		var status string
+		var coins, amount, refunded int64
+		err := tx.QueryRow(ctx, `
+			SELECT id::text, user_id, status, coins, amount_kopecks, refunded_kopecks FROM payments
+			WHERE provider_payment_id = $1 FOR UPDATE`, providerPaymentID).
+			Scan(&res.PaymentID, &res.UserID, &status, &coins, &amount, &refunded)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM payment_refunds WHERE provider_refund_id = $1)`,
+			providerRefundID).Scan(&exists); err != nil {
+			return err
+		}
+		if exists {
+			res.Replayed = true
+			return nil
+		}
+		if status != "succeeded" && status != "partially_refunded" {
+			return ErrRefundMismatch
+		}
+		total := refunded + kopecks
+		if kopecks <= 0 || total > amount {
+			return ErrRefundMismatch
+		}
+		var already int64
+		if err := tx.QueryRow(ctx, `SELECT COALESCE(sum(coins), 0) FROM payment_refunds WHERE payment_id = $1::uuid`,
+			res.PaymentID).Scan(&already); err != nil {
+			return err
+		}
+		due := (coins*total+amount-1)/amount - already // ceil(coins*total/amount) минус уже списанное
+		res.Coins = max(due, 0)
+
+		acc, err := accountID(ctx, tx, UserAccount(res.UserID))
+		if err != nil {
+			return err
+		}
+		var balance int64
+		if err := tx.QueryRow(ctx, `SELECT balance FROM accounts WHERE id = $1 FOR UPDATE`, acc).Scan(&balance); err != nil {
+			return err
+		}
+		res.Debited = min(res.Coins, balance)
+		res.Debt = res.Coins - res.Debited
+		if res.Debited > 0 {
+			if _, err := debit(ctx, tx, acc, res.Debited, "refund", "Возврат платежа"); err != nil {
+				return err
+			}
+		}
+		if res.Debt > 0 {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO wallet_debts (user_id, amount) VALUES ($1, $2)
+				ON CONFLICT (user_id) DO UPDATE SET amount = wallet_debts.amount + EXCLUDED.amount, updated_at = now()`,
+				res.UserID, res.Debt); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO payment_refunds (provider_refund_id, payment_id, amount_kopecks, coins, debited)
+			VALUES ($1, $2::uuid, $3, $4, $5)`, providerRefundID, res.PaymentID, kopecks, res.Coins, res.Debited); err != nil {
+			return err
+		}
+		newStatus := "partially_refunded"
+		if total == amount {
+			newStatus = "refunded"
+		}
+		_, err = tx.Exec(ctx, `UPDATE payments SET refunded_kopecks = $2, status = $3, updated_at = now() WHERE id = $1::uuid`,
+			res.PaymentID, total, newStatus)
+		return err
+	})
+	return res, err
+}

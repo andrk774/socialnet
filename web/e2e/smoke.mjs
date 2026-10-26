@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 const { chromium } = createRequire(import.meta.url)("playwright");
 import assert from "node:assert/strict";
 
-const [base, shots] = process.argv.slice(2);
+const [base, shots, clip] = process.argv.slice(2);
 process.on("unhandledRejection", async (e) => {
   for (const ctx of browser.contexts()) for (const [i, p] of ctx.pages().entries()) await p.screenshot({ path: `${shots}/failure-${i}.png`, fullPage: true }).catch(() => {});
   console.error(e); process.exit(1);
@@ -94,6 +94,64 @@ await anna.page.getByText("это устройство").waitFor();
 await anna.page.goto(base + "/u/anna");
 await anna.page.getByRole("heading", { name: "Анна" }).waitFor();
 await anna.page.screenshot({ path: `${shots}/05-profile.png`, fullPage: true });
+
+// видео: загрузка через API от имени Анны, обработка воркером, воспроизведение
+if (clip) {
+  const fs = await import("node:fs");
+  const bytes = fs.readFileSync(clip).toString("base64");
+  const vid = await anna.page.evaluate(async (b64) => {
+    const { access_token } = await (await fetch("/api/v1/auth/refresh", { method: "POST" })).json();
+    const fd = new FormData();
+    fd.append("file", new Blob([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], { type: "video/mp4" }), "Ильмень.mp4");
+    const v = await (await fetch("/api/v1/videos", { method: "POST", headers: { Authorization: `Bearer ${access_token}` }, body: fd })).json();
+    for (let i = 0; i < 100; i++) {
+      const r = await (await fetch(`/api/v1/videos/${v.id}`, { headers: { Authorization: `Bearer ${access_token}` } })).json();
+      if (r.status === "ready") break;
+      await new Promise((res) => setTimeout(res, 300));
+    }
+    await fetch("/api/v1/posts", { method: "POST", headers: { Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "Видео с Ильменя", video_ids: [v.id] }) });
+    return v.id;
+  }, bytes);
+  console.log("uploaded video", vid);
+
+  // играет ли видео в браузере: hls=false — браузер без встроенного HLS
+  async function plays(hls) {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+    if (!hls) await ctx.addInitScript(() => {
+      const orig = HTMLMediaElement.prototype.canPlayType;
+      HTMLMediaElement.prototype.canPlayType = function (t) { return /mpegurl/i.test(t) ? "" : orig.call(this, t); };
+    });
+    const p = await ctx.newPage();
+    p.on("pageerror", (e) => problems.push(`video(${hls}): ${e.message}`));
+    await p.goto(base + "/");
+    await p.getByLabel("Почта").fill("anna@example.com");
+    await p.getByLabel("Пароль").fill("password-anna");
+    await p.getByRole("button", { name: "Войти" }).click();
+    await p.getByPlaceholder("Что у вас нового?").waitFor();
+    await p.goto(base + "/u/anna");
+    const video = p.locator("figure.video video").first();
+    await video.waitFor({ timeout: 10000 }).catch(async (e) => {
+      await p.screenshot({ path: `${shots}/failure-video-${hls}.png`, fullPage: true });
+      throw e;
+    });
+    const sources = await video.locator("source").evaluateAll((els) => els.map((e) => e.getAttribute("type")));
+    const played = await video.evaluate(async (v) => {
+      v.muted = true;
+      await v.play();
+      await new Promise((res) => setTimeout(res, 1500));
+      return { t: v.currentTime, src: v.currentSrc, err: v.error && v.error.code };
+    });
+    await ctx.close();
+    return { sources, ...played };
+  }
+  const noHls = await plays(false);
+  assert.deepEqual(noHls.sources, ["video/mp4"], "without HLS only MP4 source is offered");
+  assert.ok(noHls.t > 0.5 && noHls.src.endsWith(`/video/${vid}/720p.mp4`), `MP4 did not play: ${JSON.stringify(noHls)}`);
+  const withHls = await plays(true);
+  assert.ok(withHls.t > 0.5 && withHls.src.endsWith("master.m3u8"), `HLS did not play: ${JSON.stringify(withHls)}`);
+  console.log("video ok", JSON.stringify({ noHls, withHls }));
+}
 
 // телефон
 const phone = await anna.ctx.browser().newContext({ viewport: { width: 390, height: 844 }, locale: "ru-RU" });
