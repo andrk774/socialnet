@@ -264,8 +264,16 @@ await mp.getByLabel("Почта").fill("bob@example.com");
 await mp.getByLabel("Пароль").fill("password-bob");
 await mp.getByRole("button", { name: "Войти" }).click();
 await mp.getByPlaceholder("Что у вас нового?").waitFor();
-const overflow = await mp.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
-assert.equal(overflow, false, "horizontal scroll on phone");
+// что вылезает за экран: так причина видна сразу, даже если шрифты на машине другие
+const wide = async (page) => page.evaluate(() => [...document.querySelectorAll("body *")]
+  .filter((el) => el.getBoundingClientRect().right > innerWidth + 1 && getComputedStyle(el).position !== "fixed")
+  .slice(0, 8).map((el) => `${el.tagName.toLowerCase()}.${el.className} → ${Math.round(el.getBoundingClientRect().right)}px`));
+for (const width of [390, 320]) { // 320 — самые узкие телефоны и запас на более широкие шрифты
+  await mp.setViewportSize({ width, height: 844 });
+  const overflow = await mp.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
+  assert.equal(overflow, false, `horizontal scroll on a ${width}px phone: ${(await wide(mp)).join("; ")}`);
+}
+await mp.setViewportSize({ width: 390, height: 844 });
 await mp.screenshot({ path: `${shots}/06-phone.png`, fullPage: true });
 
 // тёмная тема

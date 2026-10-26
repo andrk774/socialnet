@@ -116,7 +116,7 @@ fieldset { border: 0; padding: 0; margin: 0; }
 .composer, .post { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-m); padding: 1rem; margin-bottom: 1rem; }
 .composer textarea { border: 0; padding: 0; resize: vertical; min-height: 2.5rem; }
 .composer textarea:focus { box-shadow: none; }
-.composer-bar { display: flex; justify-content: space-between; gap: .5rem; border-top: 1px solid var(--line); padding-top: .75rem; margin-top: .5rem; }
+.composer-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; border-top: 1px solid var(--line); padding-top: .75rem; margin-top: .5rem; }
 .composer-photos { list-style: none; display: flex; gap: .5rem; padding: 0; margin: .5rem 0; flex-wrap: wrap; }
 .composer-photos li { position: relative; }
 .composer-photos img { width: 80px; height: 80px; object-fit: cover; border-radius: var(--radius-s); display: block; }
@@ -261,8 +261,8 @@ button.poll-choice:hover { border-color: var(--malachite); }
 @media (prefers-reduced-motion: no-preference) { .poll-bar { transition: width .4s ease; } }
 
 /* ---------- редактор записи ---------- */
-.composer-tools { display: flex; gap: .35rem; flex-wrap: wrap; align-items: center; }
-.composer-tools select { width: auto; padding: .4rem .5rem; }
+.composer-tools { display: flex; gap: .35rem; flex-wrap: wrap; align-items: center; flex: 1 1 14rem; min-width: 0; }
+.composer-tools select { width: auto; max-width: 100%; padding: .4rem .5rem; }
 .ghost[aria-pressed="true"] { background: var(--tint); border-color: var(--malachite); color: var(--malachite); }
 .row.tight { margin: .25rem 0; gap: .5rem; }
 .row.tight input:not([type]), .row.tight input[type="datetime-local"] { width: auto; flex: 1; min-width: 12rem; }
@@ -311,6 +311,6 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0 .25rem 0 0;
 .route-grid { stroke: var(--line); stroke-width: 1; }
 .route-axis { font-size: 11px; fill: var(--ink-2); font-variant-numeric: tabular-nums; }
 .route-note { margin: .25rem 0 0; }
-.track-pick { display: inline-flex; gap: .25rem; align-items: center; }
+.track-pick { display: inline-flex; flex-wrap: wrap; gap: .25rem; align-items: center; max-width: 100%; }
 .track-pick select { width: auto; padding: .4rem .35rem; font-size: var(--step--1); }
 @media (max-width: 520px) { .route-graphics { grid-template-columns: 1fr; } }
