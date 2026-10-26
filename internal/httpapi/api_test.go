@@ -122,6 +122,7 @@ func TestAuthFlow(t *testing.T) {
 	reg := map[string]any{
 		"email": "Ivan@Example.com", "username": "ivan_p",
 		"password": "s3cret-pass", "first_name": "Иван", "last_name": "Петров",
+		"age_confirmed": true, "accept_terms": true, "pd_consent": true,
 	}
 
 	code, body := c.do("POST", "/api/v1/auth/register", "", reg)
@@ -138,11 +139,11 @@ func TestAuthFlow(t *testing.T) {
 	access := body["access_token"].(string)
 
 	// Повтор email (в другом регистре) и username
-	reg2 := map[string]any{"email": "IVAN@example.com", "username": "other", "password": "s3cret-pass"}
+	reg2 := map[string]any{"email": "IVAN@example.com", "username": "other", "password": "s3cret-pass", "age_confirmed": true, "accept_terms": true, "pd_consent": true}
 	if code, _ := c.do("POST", "/api/v1/auth/register", "", reg2); code != http.StatusConflict {
 		t.Fatalf("duplicate email: %d", code)
 	}
-	reg3 := map[string]any{"email": "x@example.com", "username": "IVAN_P", "password": "s3cret-pass"}
+	reg3 := map[string]any{"email": "x@example.com", "username": "IVAN_P", "password": "s3cret-pass", "age_confirmed": true, "accept_terms": true, "pd_consent": true}
 	if code, _ := c.do("POST", "/api/v1/auth/register", "", reg3); code != http.StatusConflict {
 		t.Fatalf("duplicate username: %d", code)
 	}
@@ -152,8 +153,8 @@ func TestAuthFlow(t *testing.T) {
 	if code != http.StatusUnprocessableEntity {
 		t.Fatalf("validation: %d", code)
 	}
-	if f := body["error"].(map[string]any)["fields"].(map[string]any); len(f) != 3 {
-		t.Fatalf("expected 3 field errors, got %v", f)
+	if f := body["error"].(map[string]any)["fields"].(map[string]any); len(f) != 6 {
+		t.Fatalf("expected 6 field errors (3 fields + 3 consents), got %v", f)
 	}
 
 	// Лишнее поле (mass assignment) отвергается

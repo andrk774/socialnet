@@ -72,6 +72,7 @@ func validUUID(s string) bool { return uuidRe.MatchString(s) }
 // selfView — свой профиль, со всеми настройками.
 type selfView struct {
 	ID               int64       `json:"id"`
+	ConsentRequired  bool        `json:"consent_required"` // принять новую редакцию документов
 	Email            string      `json:"email"`
 	EmailVerified    bool        `json:"email_verified"`
 	Username         string      `json:"username"`

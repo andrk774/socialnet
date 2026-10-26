@@ -155,6 +155,9 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 	if cfg.TileURL != "" {
 		srv.tiles = newTileProxy(filepath.Join(cfg.MediaDir, "tile-cache"))
 	}
+	if cfg.CookieSecure && (cfg.LegalOperator == "" || cfg.LegalINN == "" || cfg.LegalAddress == "") {
+		log.Warn("legal documents show placeholders: set LEGAL_OPERATOR, LEGAL_INN, LEGAL_ADDRESS and LEGAL_EMAIL before launch")
+	}
 	srv.initMetrics()
 	srv.static = loadStatic()
 	return srv, nil
@@ -179,6 +182,7 @@ func (s *Server) Router() http.Handler {
 	s.root = r
 
 	r.Get("/.well-known/security.txt", s.handleSecurityTxt)
+	r.Get("/legal/{doc}", s.handleLegalPage)
 	r.Get("/api/v1/openapi.json", s.handleOpenAPI)
 	if !s.cfg.DocsDisabled {
 		r.Handle("/docs/*", docsHandler())
@@ -229,6 +233,9 @@ func (s *Server) Router() http.Handler {
 				// профиль и приватность
 				r.Get("/users/me", s.handleMe)
 				r.Patch("/users/me", s.handleUpdateMe)
+				r.Delete("/users/me", s.handleDeleteAccount)
+				r.Get("/users/me/consents", s.handleConsents)
+				r.Post("/users/me/consents", s.handleAcceptConsents)
 				r.Patch("/users/me/privacy", s.handleUpdatePrivacy)
 				r.Get("/users/by-username/{username}", s.handleGetUserByUsername)
 				r.Get("/users/{id}", s.handleGetUser)
@@ -471,6 +478,7 @@ func (s *Server) Router() http.Handler {
 
 			// что включено на сервере (карта и т. п.) — без входа
 			r.Get("/client-config", s.handleClientConfig)
+			r.Get("/legal", s.handleLegal)
 
 			// приём сообщений об уязвимостях — без входа в аккаунт
 			r.Post("/security/vulnerability-reports", s.handleVulnReport)

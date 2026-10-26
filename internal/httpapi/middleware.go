@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"golang.org/x/time/rate"
 
+	"socialnet/internal/legal"
 	"socialnet/internal/store"
 )
 
@@ -28,6 +29,8 @@ type viewer struct {
 	API    bool     // запрос с токеном приложения или бота
 	Scopes []string // права токена API
 	Bot    int64    // сообщество, если это бот
+
+	NeedsConsent bool // не приняты действующие юридические документы
 }
 
 func viewerFrom(ctx context.Context) viewer {
@@ -58,7 +61,7 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "invalid or expired token")
 			return
 		}
-		role, banned, sessionOK, err := s.store.AuthInfo(r.Context(), id, sid)
+		role, banned, sessionOK, legalRev, err := s.store.AuthInfo(r.Context(), id, sid)
 		if errors.Is(err, store.ErrNotFound) {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "user no longer exists")
 			return
@@ -80,8 +83,9 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 		if err := s.store.TouchLastSeen(r.Context(), id); err != nil {
 			s.log.Warn("touch last seen", "err", err)
 		}
-		ctx := context.WithValue(r.Context(), viewerKey, viewer{ID: id, Role: role, SID: sid})
-		next.ServeHTTP(w, r.WithContext(ctx))
+		ctx := context.WithValue(r.Context(), viewerKey, viewer{ID: id, Role: role, SID: sid,
+			NeedsConsent: legalRev < legal.Revision})
+		consentGate(next).ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 

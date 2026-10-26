@@ -17,7 +17,9 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toSelf(user))
+	v := toSelf(user)
+	v.ConsentRequired = viewerFrom(r.Context()).NeedsConsent
+	writeJSON(w, http.StatusOK, v)
 }
 
 type profileRequest struct {

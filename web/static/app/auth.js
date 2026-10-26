@@ -1,11 +1,13 @@
 import { h } from "../vendor/preact/index.js";
 import { useState } from "../vendor/preact/hooks.js";
 import { login, register, verify2FA } from "./api.js";
+import { ConsentChecks, noConsents } from "./legal.js";
 import { ErrorLine } from "./ui.js";
 export function AuthPage() {
     const [mode, setMode] = useState("login");
     const [mfa, setMfa] = useState(null);
     const [f, setF] = useState({ email: "", password: "", username: "", first_name: "", last_name: "", code: "" });
+    const [consents, setConsents] = useState(noConsents);
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(false);
     const field = (k) => ({ value: f[k], onInput: (e) => setF({ ...f, [k]: e.target.value }) });
@@ -22,7 +24,7 @@ export function AuthPage() {
                     setMfa(r.mfa_token);
             }
             else
-                await register({ email: f.email, password: f.password, username: f.username, first_name: f.first_name, last_name: f.last_name });
+                await register({ email: f.email, password: f.password, username: f.username, first_name: f.first_name, last_name: f.last_name, ...consents });
         }
         catch (err) {
             setError(err);
@@ -55,10 +57,15 @@ export function AuthPage() {
                     h("input", { ...field("email"), type: "email", autoComplete: "email", required: true })),
                 h("label", null,
                     "\u041F\u0430\u0440\u043E\u043B\u044C",
-                    h("input", { ...field("password"), type: "password", autoComplete: mode === "login" ? "current-password" : "new-password", minLength: 8, maxLength: 128, required: true })))),
+                    h("input", { ...field("password"), type: "password", autoComplete: mode === "login" ? "current-password" : "new-password", minLength: 8, maxLength: 128, required: true })),
+                mode === "register" && h(ConsentChecks, { value: consents, onChange: setConsents }))),
             h(ErrorLine, { error: error }),
             h("button", { class: "primary wide", disabled: busy }, mfa ? "Подтвердить" : mode === "login" ? "Войти" : "Создать аккаунт")),
         !mfa && (h("p", { class: "auth-switch" },
             mode === "login" ? "Ещё нет аккаунта? " : "Уже есть аккаунт? ",
-            h("button", { class: "link", onClick: () => { setMode(mode === "login" ? "register" : "login"); setError(null); } }, mode === "login" ? "Зарегистрироваться" : "Войти")))));
+            h("button", { class: "link", onClick: () => { setMode(mode === "login" ? "register" : "login"); setError(null); } }, mode === "login" ? "Зарегистрироваться" : "Войти"))),
+        h("p", { class: "legal-links muted" },
+            h("a", { href: "/legal/terms" }, "\u0421\u043E\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435"),
+            " \u00B7 ",
+            h("a", { href: "/legal/privacy" }, "\u041F\u0435\u0440\u0441\u043E\u043D\u0430\u043B\u044C\u043D\u044B\u0435 \u0434\u0430\u043D\u043D\u044B\u0435"))));
 }

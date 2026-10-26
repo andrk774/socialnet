@@ -37,7 +37,7 @@ schemas = {
                    profile_visibility=enum("everyone", "friends", "only_me"),
                    friends_visibility=enum("everyone", "friends", "only_me"),
                    message_privacy=enum("everyone", "friends", "nobody"), searchable=bool_),
-    "Self": obj(id=int_, email=str_, email_verified=bool_, username=str_, first_name=str_, last_name=str_,
+    "Self": obj(id=int_, consent_required=bool_, email=str_, email_verified=bool_, username=str_, first_name=str_, last_name=str_,
                 status_text=str_, city=str_, about=str_, avatar_url=nullable(str_), role=enum("user", "moderator", "admin"),
                 two_factor_enabled=bool_, privacy=S("Privacy"), created_at=dt),
     "Presence": obj(user_id=int_, **{"online?": bool_, "last_seen?": dt,
@@ -142,11 +142,23 @@ SCOPES = {"profile": "Профиль, друзья, поиск", "friends": "З�
 r("GET", "/health", "service", "Проверка живости", resp=obj(status=str_), auth=False)
 r("GET", "/.well-known/security.txt", "service", "security.txt (RFC 9116)", auth=False, resp="text")
 r("GET", A + "/openapi.json", "service", "Эта спецификация", auth=False, resp="json")
+legal_doc = obj(key=enum("terms", "privacy", "consent"), title=str_, version=str_, url=str_)
+r("GET", A + "/legal", "service", "Юридические документы и текущая редакция", auth=False, resp=obj(revision=int_, documents=arr(legal_doc)))
+r("GET", "/legal/{doc}", "service", "Документ HTML-страницей: terms, privacy, consent", auth=False, resp="text")
+r("GET", A + "/users/me/consents", "auth", "Принятые документы, журнал согласий; required — нужно принять новую редакцию",
+  resp=obj(required=bool_, revision=int_, accepted_revision=int_, documents=arr(legal_doc),
+           log=arr(obj(document=str_, version=str_, action=enum("accept", "revoke"), created_at=dt))))
+r("POST", A + "/users/me/consents", "auth", "Принять действующую редакцию (до этого изменения запрещены: 428 consent_required)",
+  obj(age_confirmed=bool_, accept_terms=bool_, pd_consent=bool_), code=204)
+r("DELETE", A + "/users/me", "auth", "Удалить аккаунт и отозвать согласие на обработку ПДн: публикации удаляются, аккаунт обезличивается",
+  obj(password=str_), code=204)
 r("GET", A + "/client-config", "service", "Что включено на сервере (карта: адрес тайлов, атрибуция, максимальный масштаб)", auth=False,
   resp=obj(map=obj(enabled=bool_, tiles=str_, attribution=str_, max_zoom=int_)))
 r("GET", "/tiles/{z}/{x}/{y}", "service", "Тайл карты через кеширующий прокси ({y} с суффиксом .png); 404 — карта выключена или неверные координаты", auth=False, resp="binary")
 # --- аккаунт ---
-r("POST", A + "/auth/register", "auth", "Регистрация", obj(email=str_, username=str_, password=str_, **{"first_name?": str_, "last_name?": str_}), S("Auth"), 201, auth=False)
+r("POST", A + "/auth/register", "auth", "Регистрация (18+; три отдельные отметки: возраст, соглашение и политика, согласие на обработку ПДн)",
+  obj(email=str_, username=str_, password=str_, age_confirmed=bool_, accept_terms=bool_, pd_consent=bool_,
+      **{"first_name?": str_, "last_name?": str_}), S("Auth"), 201, auth=False)
 r("POST", A + "/auth/login", "auth", "Вход (шаг 1). При 2FA вернёт mfa_token", obj(email=str_, password=str_), {"oneOf": [S("Auth"), S("MFARequired")]}, auth=False)
 r("POST", A + "/auth/2fa/verify", "auth", "Вход (шаг 2): код 2FA или резервный код", obj(mfa_token=str_, **{"code?": str_, "backup_code?": str_}), S("Auth"), auth=False)
 r("POST", A + "/auth/refresh", "auth", "Новый access-токен по refresh-cookie", resp=S("Auth"), auth=False)

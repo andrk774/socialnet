@@ -270,7 +270,8 @@ func TestBotsAndCallbackAPI(t *testing.T) {
 	// имена bot<id> зарезервированы
 	newClient(t, ts.URL).do("POST", "/api/v1/auth/register", "", nil)
 	if code, _ := newClient(t, ts.URL).do("POST", "/api/v1/auth/register", "", map[string]any{
-		"email": "b@example.com", "username": "Bot1", "password": "password-123"}); code != 422 {
+		"email": "b@example.com", "username": "Bot1", "password": "password-123",
+		"age_confirmed": true, "accept_terms": true, "pd_consent": true}); code != 422 {
 		t.Fatalf("reserved bot name: %d", code)
 	}
 

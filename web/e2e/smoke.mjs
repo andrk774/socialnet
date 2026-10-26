@@ -28,12 +28,29 @@ async function newUser(name, viewport = { width: 1280, height: 860 }) {
   await page.getByLabel("Имя пользователя").fill(name);
   await page.getByLabel("Почта").fill(`${name}@example.com`);
   await page.getByLabel("Пароль").fill(`password-${name}`);
+  // без отметок форма не отправляется: каждая обязательна и отдельна
+  await page.getByRole("button", { name: "Создать аккаунт" }).click();
+  assert.equal(await page.getByPlaceholder("Что у вас нового?").count(), 0, "registered without consents");
+  await page.getByLabel("Мне исполнилось 18 лет").check();
+  await page.getByLabel(/Принимаю пользовательское соглашение/).check();
+  await page.getByLabel(/Даю согласие на обработку/).check();
+  if (name === "anna") await page.screenshot({ path: `${shots}/00-register.png`, fullPage: true });
   await page.getByRole("button", { name: "Создать аккаунт" }).click();
   await page.getByPlaceholder("Что у вас нового?").waitFor();
   return { ctx, page };
 }
 
 const anna = await newUser("anna");
+
+// документы открываются без входа, без скриптов
+{
+  const legal = await anna.ctx.newPage();
+  await legal.goto(base + "/legal/privacy");
+  await legal.getByRole("heading", { name: "Политика обработки персональных данных" }).waitFor();
+  await legal.getByText("152-ФЗ").first().waitFor();
+  await legal.screenshot({ path: `${shots}/01-privacy.png`, fullPage: false });
+  await legal.close();
+}
 await anna.page.screenshot({ path: `${shots}/01-feed-empty.png`, fullPage: true });
 
 // публикация с хэштегом, упоминанием и ссылкой

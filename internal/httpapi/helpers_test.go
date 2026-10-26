@@ -21,6 +21,7 @@ func register(t *testing.T, ts *httptest.Server, username string) *tuser {
 	code, body := c.do("POST", "/api/v1/auth/register", "", map[string]any{
 		"email": username + "@example.com", "username": username,
 		"password": "password-" + username, "first_name": username,
+		"age_confirmed": true, "accept_terms": true, "pd_consent": true,
 	})
 	if code != http.StatusCreated {
 		t.Fatalf("register %s: %d %v", username, code, body)

@@ -244,6 +244,9 @@
       "type": "integer",
       "format": "int64"
      },
+     "consent_required": {
+      "type": "boolean"
+     },
      "email": {
       "type": "string"
      },
@@ -293,6 +296,7 @@
     },
     "required": [
      "id",
+     "consent_required",
      "email",
      "email_verified",
      "username",
@@ -3933,7 +3937,7 @@
     "tags": [
      "auth"
     ],
-    "summary": "Регистрация",
+    "summary": "Регистрация (18+; три отдельные отметки: возраст, соглашение и политика, согласие на обработку ПДн)",
     "operationId": "post_api_v1_auth_register",
     "security": [],
     "requestBody": {
@@ -3952,6 +3956,15 @@
          "password": {
           "type": "string"
          },
+         "age_confirmed": {
+          "type": "boolean"
+         },
+         "accept_terms": {
+          "type": "boolean"
+         },
+         "pd_consent": {
+          "type": "boolean"
+         },
          "first_name": {
           "type": "string"
          },
@@ -3962,7 +3975,10 @@
         "required": [
          "email",
          "username",
-         "password"
+         "password",
+         "age_confirmed",
+         "accept_terms",
+         "pd_consent"
         ]
        }
       }
@@ -7924,6 +7940,79 @@
     }
    }
   },
+  "/api/v1/legal": {
+   "get": {
+    "tags": [
+     "service"
+    ],
+    "summary": "Юридические документы и текущая редакция",
+    "operationId": "get_api_v1_legal",
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "revision": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "documents": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "key": {
+              "type": "string",
+              "enum": [
+               "terms",
+               "privacy",
+               "consent"
+              ]
+             },
+             "title": {
+              "type": "string"
+             },
+             "version": {
+              "type": "string"
+             },
+             "url": {
+              "type": "string"
+             }
+            },
+            "required": [
+             "key",
+             "title",
+             "version",
+             "url"
+            ]
+           }
+          }
+         },
+         "required": [
+          "revision",
+          "documents"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/media": {
    "post": {
     "tags": [
@@ -11561,6 +11650,46 @@
    }
   },
   "/api/v1/users/me": {
+   "delete": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Удалить аккаунт и отозвать согласие на обработку ПДн: публикации удаляются, аккаунт обезличивается",
+    "operationId": "delete_api_v1_users_me",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "password": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "password"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
    "get": {
     "tags": [
      "users"
@@ -11996,6 +12125,167 @@
         }
        }
       }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/users/me/consents": {
+   "get": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Принятые документы, журнал согласий; required — нужно принять новую редакцию",
+    "operationId": "get_api_v1_users_me_consents",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "required": {
+           "type": "boolean"
+          },
+          "revision": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "accepted_revision": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "documents": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "key": {
+              "type": "string",
+              "enum": [
+               "terms",
+               "privacy",
+               "consent"
+              ]
+             },
+             "title": {
+              "type": "string"
+             },
+             "version": {
+              "type": "string"
+             },
+             "url": {
+              "type": "string"
+             }
+            },
+            "required": [
+             "key",
+             "title",
+             "version",
+             "url"
+            ]
+           }
+          },
+          "log": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "document": {
+              "type": "string"
+             },
+             "version": {
+              "type": "string"
+             },
+             "action": {
+              "type": "string",
+              "enum": [
+               "accept",
+               "revoke"
+              ]
+             },
+             "created_at": {
+              "type": "string",
+              "format": "date-time"
+             }
+            },
+            "required": [
+             "document",
+             "version",
+             "action",
+             "created_at"
+            ]
+           }
+          }
+         },
+         "required": [
+          "required",
+          "revision",
+          "accepted_revision",
+          "documents",
+          "log"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Принять действующую редакцию (до этого изменения запрещены: 428 consent_required)",
+    "operationId": "post_api_v1_users_me_consents",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "age_confirmed": {
+          "type": "boolean"
+         },
+         "accept_terms": {
+          "type": "boolean"
+         },
+         "pd_consent": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "age_confirmed",
+         "accept_terms",
+         "pd_consent"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "204": {
+      "description": "Успешно"
      },
      "default": {
       "description": "Ошибка",
@@ -14039,6 +14329,48 @@
          "required": [
           "status"
          ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/legal/{doc}": {
+   "get": {
+    "tags": [
+     "service"
+    ],
+    "summary": "Документ HTML-страницей: terms, privacy, consent",
+    "operationId": "get_legal_doc",
+    "parameters": [
+     {
+      "name": "doc",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "Текст",
+      "content": {
+       "text/plain": {
+        "schema": {
+         "type": "string"
         }
        }
       }

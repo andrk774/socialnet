@@ -75,7 +75,7 @@ def multipart(field, filename, content, ctype):
 def register(name):
     code, body, _ = http("POST", "/api/v1/auth/register", {
         "email": f"{name}{RUN}@example.com", "username": f"{name}{RUN}", "password": f"password-{name}-{RUN}",
-        "first_name": name.capitalize()})
+        "first_name": name.capitalize(), "age_confirmed": True, "accept_terms": True, "pd_consent": True})
     if not check(code == 201, f"register {name}: {code} {body}"):
         sys.exit(1)
     return body["access_token"], body["user"]["id"]
