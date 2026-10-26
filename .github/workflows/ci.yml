@@ -81,7 +81,15 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/socialnet_test?sslmode=disable
           E2E_SCREENSHOTS: ${{ runner.temp }}/shots
-        run: mkdir -p "$E2E_SCREENSHOTS" && go test -count=1 -run 'TestFrontend' ./internal/httpapi/
+        run: |
+          mkdir -p "$E2E_SCREENSHOTS"
+          set -o pipefail
+          go test -count=1 -run 'TestFrontend' ./internal/httpapi/ 2>&1 | tee e2e.log
+      - if: failure()
+        name: Причина сбоя e2e — в аннотации
+        run: |
+          grep -v '^\s*at ' e2e.log | grep -iE 'error|fail|assert|expected|actual|timeout|waiting for|e2e:' | head -30 |
+            while IFS= read -r line; do echo "::error title=e2e::$line"; done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
