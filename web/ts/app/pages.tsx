@@ -130,6 +130,7 @@ export function CommunityPage({ slug }: { slug: string }) {
         <p class="muted">{com.members_count} участников{com.visibility === "closed" ? ", закрытое" : ""}</p>
         {com.description && <p>{com.description}</p>}
         {com.my_role !== "owner" && <button class={com.my_role ? "ghost" : "primary"} onClick={toggle}>{com.my_role ? "Выйти" : com.visibility === "closed" ? "Подать заявку" : "Вступить"}</button>}
+        {canPost && <a class="ghost-link" href={`/scheduled?community=${com.id}`}>Отложенные записи сообщества</a>}
         {msg && <p class="note">{msg}</p>}
         <ErrorLine error={error} />
       </header>

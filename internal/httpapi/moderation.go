@@ -18,7 +18,7 @@ func (s *Server) handleCreateReport(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		TargetType string `json:"target_type"`
 		TargetID   int64  `json:"target_id"`
-		TargetUUID string `json:"target_uuid"` // для track и video
+		TargetUUID string `json:"target_uuid"` // для track, video и document
 		Reason     string `json:"reason"`
 	}
 	if !decodeJSON(w, r, &req) {
@@ -26,12 +26,12 @@ func (s *Server) handleCreateReport(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Reason = strings.TrimSpace(req.Reason)
 	errs := map[string]string{}
-	oneOf(errs, "target_type", &req.TargetType, "post", "comment", "user", "community", "track", "video")
+	oneOf(errs, "target_type", &req.TargetType, "post", "comment", "user", "community", "track", "video", "document")
 	var targetUUID *string
-	if req.TargetType == "track" || req.TargetType == "video" {
+	if req.TargetType == "track" || req.TargetType == "video" || req.TargetType == "document" {
 		u := strings.ToLower(req.TargetUUID)
 		if !validUUID(u) {
-			errs["target_uuid"] = "required for tracks and videos"
+			errs["target_uuid"] = "required for tracks, videos and documents"
 		}
 		targetUUID, req.TargetID = &u, 0
 	}
@@ -46,6 +46,15 @@ func (s *Server) handleCreateReport(w http.ResponseWriter, r *http.Request) {
 	// жаловаться можно только на то, что видишь
 	if req.TargetType == "post" {
 		if _, err := s.store.PostForViewer(r.Context(), me, req.TargetID); err != nil {
+			writeError(w, http.StatusNotFound, "not_found", "target not found")
+			return
+		}
+	}
+	if req.TargetType == "document" { // документ — только тот, к которому есть доступ
+		if ok, err := s.store.DocumentAccess(r.Context(), me, *targetUUID); err != nil {
+			s.internalError(w, r, err)
+			return
+		} else if !ok {
 			writeError(w, http.StatusNotFound, "not_found", "target not found")
 			return
 		}
@@ -275,7 +284,7 @@ func (s *Server) handleSetHidden(hidden bool) http.HandlerFunc {
 			action = "unhide"
 		}
 		// треки и видео: id — UUID, снятие с блок-листом
-		if typ := map[string]string{"tracks": "track", "videos": "video"}[chi.URLParam(r, "type")]; typ != "" {
+		if typ := map[string]string{"tracks": "track", "videos": "video", "documents": "document"}[chi.URLParam(r, "type")]; typ != "" {
 			uid := strings.ToLower(chi.URLParam(r, "id"))
 			if !validUUID(uid) {
 				writeError(w, http.StatusNotFound, "not_found", "not found")

@@ -250,6 +250,24 @@ func (s *Server) Router() http.Handler {
 				r.Get("/users/{id}/posts", s.handleWall)
 				r.Get("/feed", s.handleFeed)
 				r.Get("/hashtags/{tag}/posts", s.handleHashtag)
+				r.Get("/posts/{id}/audience", s.handlePostAudience)
+				r.Post("/posts/{id}/poll/votes", s.handleVote)
+				r.Delete("/posts/{id}/poll/votes", s.handleRetractVote)
+				r.Get("/posts/{id}/poll/options/{oid}/voters", s.handlePollVoters)
+				r.Get("/scheduled-posts", s.handleScheduledList)
+				r.Patch("/scheduled-posts/{sid}", s.handleReschedule)
+				r.Delete("/scheduled-posts/{sid}", s.handleCancelScheduled)
+
+				// закладки
+				r.Get("/bookmarks", s.handleBookmarks)
+				r.Put("/bookmarks/{kind}/{target}", s.handleAddBookmark)
+				r.Delete("/bookmarks/{kind}/{target}", s.handleRemoveBookmark)
+
+				// документы
+				r.Get("/documents", s.handleMyDocuments)
+				r.Patch("/documents/{did}", s.handleRenameDocument)
+				r.Delete("/documents/{did}", s.handleDeleteDocument)
+				r.Get("/documents/{did}/download", s.handleDownloadDocument)
 
 				// уведомления
 				r.Get("/notifications", s.handleNotifications)
@@ -405,6 +423,11 @@ func (s *Server) Router() http.Handler {
 				r.Route("/admin", func(r chi.Router) {
 					r.Use(requireRole("admin"))
 					r.Use(s.audit)
+					r.Get("/stats", s.handleAdminStats)
+					r.Get("/users", s.handleAdminUsers)
+					r.Get("/users/{id}", s.handleAdminUser)
+					r.Post("/users/{id}/password-reset", s.handleAdminPasswordReset)
+					r.Post("/users/{id}/revoke-sessions", s.handleAdminRevokeSessions)
 					r.Get("/audit", s.handleAuditLog)
 					r.Get("/audit/verify", s.handleAuditVerify)
 					r.Get("/alerts", s.handleAlerts)
@@ -434,6 +457,10 @@ func (s *Server) Router() http.Handler {
 	r.With(deadlines(60*time.Minute), s.requireAuth).Post("/api/v1/videos", s.handleUploadVideo)
 	// HLS: плейлисты, сегменты, превью.
 	r.With(deadlines(10*time.Minute)).Get("/video/{vid}/{file}", s.handleServeVideo)
+
+	// Документы: до 50 МБ.
+	r.With(deadlines(10*time.Minute), middleware.Timeout(9*time.Minute), s.requireAuth).
+		Post("/api/v1/documents", s.handleUploadDocument)
 
 	// Голосовые сообщения: до 5 МБ.
 	r.With(deadlines(5*time.Minute), middleware.Timeout(4*time.Minute), s.requireAuth).

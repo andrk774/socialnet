@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"socialnet/internal/av"
 	"socialnet/internal/worker"
@@ -80,6 +81,19 @@ func TestFrontendE2E(t *testing.T) {
 		t.Cleanup(cancel)
 		go (&worker.Worker{Store: srv.store, AV: srv.avStore, Log: slog.New(&failOnError{t: t})}).Run(ctx)
 	}
+	// Анна — администратор: роль читается из базы на каждом запросе,
+	// поэтому достаточно выставить её, как только Анна зарегистрируется.
+	adminCtx, stopAdmin := context.WithCancel(context.Background())
+	t.Cleanup(stopAdmin)
+	go func() {
+		for adminCtx.Err() == nil {
+			tag, err := srv.store.Pool().Exec(adminCtx, `UPDATE users SET role = 'admin' WHERE username = 'anna' AND role = 'user'`)
+			if err == nil && tag.RowsAffected() > 0 {
+				return
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+	}()
 	_, file, _, _ := runtime.Caller(0)
 	script := filepath.Join(filepath.Dir(file), "../../web/e2e/smoke.mjs")
 	shots := os.Getenv("E2E_SCREENSHOTS")
@@ -87,7 +101,8 @@ func TestFrontendE2E(t *testing.T) {
 		shots = t.TempDir()
 	}
 	cmd := exec.Command(node, script, ts.URL, shots, clip)
-	cmd.Env = append(os.Environ(), "NODE_PATH="+os.Getenv("NODE_PATH"))
+	// LANG: без UTF-8-локали Chromium в Linux заменяет кириллическое имя скачиваемого файла на «download»
+	cmd.Env = append(os.Environ(), "NODE_PATH="+os.Getenv("NODE_PATH"), "LANG=C.UTF-8")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("e2e: %v\n%s", err, out)

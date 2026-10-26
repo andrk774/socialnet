@@ -123,6 +123,7 @@ export function CommunityPage({ slug }) {
                 com.visibility === "closed" ? ", закрытое" : ""),
             com.description && h("p", null, com.description),
             com.my_role !== "owner" && h("button", { class: com.my_role ? "ghost" : "primary", onClick: toggle }, com.my_role ? "Выйти" : com.visibility === "closed" ? "Подать заявку" : "Вступить"),
+            canPost && h("a", { class: "ghost-link", href: `/scheduled?community=${com.id}` }, "\u041E\u0442\u043B\u043E\u0436\u0435\u043D\u043D\u044B\u0435 \u0437\u0430\u043F\u0438\u0441\u0438 \u0441\u043E\u043E\u0431\u0449\u0435\u0441\u0442\u0432\u0430"),
             msg && h("p", { class: "note" }, msg),
             h(ErrorLine, { error: error })),
         h(PostList, { path: `/communities/${com.id}/posts`, empty: com.visibility === "closed" && !com.my_role ? "Записи видят только участники." : "Записей пока нет.", header: (add) => (canPost ? h(Composer, { communityId: com.id, onPosted: add }) : null) })));

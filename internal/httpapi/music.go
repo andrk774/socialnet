@@ -222,7 +222,7 @@ func (s *Server) serveRemoteAV(w http.ResponseWriter, r *http.Request, kind, id,
 		http.NotFound(w, r)
 		return
 	}
-	if s.cfg.MediaCDNURL != "" && kind != "voices" {
+	if s.cfg.MediaCDNURL != "" && kind != "voices" && kind != "docs" { // личное — только через нас
 		w.Header().Set("Cache-Control", "public, max-age=300")
 		http.Redirect(w, r, s.cfg.MediaCDNURL+"/"+key, http.StatusFound)
 		return

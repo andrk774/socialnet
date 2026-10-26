@@ -10,16 +10,32 @@ export interface Photo { id: string; url: string; thumb_url: string }
 export interface PostTrack { id: string; title: string; artist: string; duration_sec: number; url: string }
 export interface PostVideo { id: string; title: string; duration_sec: number; poster_url: string; hls_url: string; mp4_url?: string }
 export type Reaction = "like" | "love" | "haha" | "wow" | "sad" | "angry";
+export type Audience = "everyone" | "friends" | "only_me" | "list";
+export interface PostDocument { id: string; title: string; ext: string; size: number; url: string }
+export interface Doc extends PostDocument { owner_id: number; created_at: string }
+export interface PollOption { id: number; text: string; votes: number | null }
+export interface Poll {
+  id: number; question: string; multiple: boolean; anonymous: boolean; closes_at: string | null; closed: boolean;
+  voters_count: number; results_hidden: boolean; my_votes: number[]; options: PollOption[];
+}
 export interface Post {
   id: number; author: UserCard; community?: { id: number; slug: string; name: string }; text: string;
-  photos: Photo[]; tracks: PostTrack[]; videos: PostVideo[]; likes_count: number; comments_count: number;
+  photos: Photo[]; tracks: PostTrack[]; videos: PostVideo[]; documents: PostDocument[]; poll: Poll | null;
+  audience: Audience; bookmarked: boolean; likes_count: number; comments_count: number;
   my_reaction: Reaction | null; reactions: Partial<Record<Reaction, number>>; created_at: string;
+}
+export interface Scheduled {
+  id: number; author_id: number; community_id?: number; publish_at: string; status: "pending" | "published" | "failed" | "canceled";
+  error?: string; payload: { text?: string; poll?: { question: string }; photo_ids?: string[]; document_ids?: string[] }; created_at: string;
 }
 export interface Comment {
   id: number; post_id: number; parent_id?: number; reply_to?: UserCard; replies_count: number;
   author: UserCard; text: string; created_at: string;
 }
-export interface Attachment { kind: "photo" | "track" | "voice"; id: string; url: string; thumb_url?: string; title?: string; artist?: string; duration_sec?: number }
+export interface Attachment {
+  kind: "photo" | "track" | "voice" | "document"; id: string; url: string; thumb_url?: string; title?: string;
+  artist?: string; duration_sec?: number; ext?: string; size?: number;
+}
 export interface Message { id: number; conversation_id: number; sender_id: number; kind: "text" | "service"; body?: string; encrypted: boolean; attachments: Attachment[]; created_at: string }
 export interface Conversation { id: number; kind: "direct" | "group"; title?: string; members_count?: number; peer?: UserCard; last_message: Message; unread: number }
 export interface Page<T> { items: T[]; next_cursor: number | null }
@@ -45,7 +61,9 @@ function setToken(t: string | null) {
 }
 
 async function parse(res: Response): Promise<unknown> {
-  if (res.status === 204) return null;
+  // тело читаем всегда, даже пустое: иначе Chromium считает запрос незавершённым
+  // и обрывает его при переходе на другую страницу
+  if (res.status === 204) { await res.arrayBuffer().catch(() => null); return null; }
   const type = res.headers.get("Content-Type") ?? "";
   return type.includes("application/json") ? res.json() : res.text();
 }
@@ -90,6 +108,8 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
 export const get = <T>(path: string) => api<T>("GET", path);
 export const post = <T = unknown>(path: string, body?: unknown) => api<T>("POST", path, body);
 export const del = <T = unknown>(path: string) => api<T>("DELETE", path);
+export const patch = <T = unknown>(path: string, body?: unknown) => api<T>("PATCH", path, body);
+export const put = <T = unknown>(path: string, body?: unknown) => api<T>("PUT", path, body);
 
 export async function login(email: string, password: string): Promise<{ mfa_token?: string }> {
   const r = await api<{ access_token?: string; mfa_required?: boolean; mfa_token?: string }>("POST", "/auth/login", { email, password });
@@ -128,4 +148,20 @@ export async function fetchBlob(path: string, retry = true): Promise<Blob> {
   if (res.status === 401 && retry && (await refresh())) return fetchBlob(path, false);
   if (!res.ok) throw new ApiError(res.status, "http_" + res.status, res.statusText);
   return res.blob();
+}
+
+// saveFile — скачать документ: он закрыт токеном, поэтому не простой ссылкой.
+export async function saveFile(path: string, name: string) {
+  const url = URL.createObjectURL(await fetchBlob(path));
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => a.remove(), 0);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+export function fileSize(n: number): string {
+  if (n < 1024) return `${n} Б`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} КБ`;
+  return `${(n / 1024 / 1024).toFixed(1).replace(".", ",")} МБ`;
 }

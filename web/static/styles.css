@@ -233,3 +233,62 @@ fieldset { border: 0; padding: 0; margin: 0; }
 .tab.on { color: var(--malachite); border-bottom-color: var(--malachite); font-weight: 600; }
 .banner { border-left: 4px solid var(--band); background: var(--tint); padding: .75rem 1rem; border-radius: 0 var(--radius-s) var(--radius-s) 0; margin-bottom: 1.25rem; }
 .banner p { margin: 0 0 .5rem; }
+
+/* ---------- документы ---------- */
+.doc-list { list-style: none; padding: 0; margin: .5rem 0; display: grid; gap: .35rem; }
+.doc { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.doc-ext { flex: 0 0 auto; min-width: 2.6rem; padding: .3rem .35rem; border-radius: var(--radius-s); background: var(--tint);
+  color: var(--malachite); font-size: .6875rem; font-weight: 700; text-transform: uppercase; text-align: center; letter-spacing: .03em; }
+.doc-name { font-size: var(--step-0); text-align: left; overflow-wrap: anywhere; }
+.file-btn { display: inline-block; cursor: pointer; margin-bottom: 1rem; }
+.file-btn:focus-within { outline: 3px solid var(--band); outline-offset: 2px; }
+
+/* ---------- опросы ---------- */
+.poll, .poll-edit, .audience-pick { border: 1px solid var(--line); border-radius: var(--radius-m); padding: .75rem 1rem; margin: .75rem 0; }
+.poll legend, .poll-edit legend, .audience-pick legend { font-weight: 600; padding: 0 .35rem; }
+.poll-edit { display: grid; gap: .5rem; }
+.audience-pick { display: flex; flex-wrap: wrap; gap: .25rem 1rem; }
+.poll-options { list-style: none; padding: 0; margin: .5rem 0; display: grid; gap: .4rem; }
+.poll-choice { display: block; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-s); padding: .5rem .75rem; color: var(--ink); }
+button.poll-choice:hover { border-color: var(--malachite); }
+.poll-result { position: relative; display: flex; justify-content: space-between; gap: .5rem; padding: .45rem .75rem;
+  border-radius: var(--radius-s); background: var(--paper); overflow: hidden; }
+.poll-bar { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--band) 28%, transparent); }
+.poll-result.mine .poll-bar { background: color-mix(in srgb, var(--malachite) 30%, transparent); }
+.poll-text, .poll-pct { position: relative; }
+.poll-pct { font-variant-numeric: tabular-nums; font-weight: 600; }
+@media (prefers-reduced-motion: no-preference) { .poll-bar { transition: width .4s ease; } }
+
+/* ---------- редактор записи ---------- */
+.composer-tools { display: flex; gap: .35rem; flex-wrap: wrap; align-items: center; }
+.composer-tools select { width: auto; padding: .4rem .5rem; }
+.ghost[aria-pressed="true"] { background: var(--tint); border-color: var(--malachite); color: var(--malachite); }
+.row.tight { margin: .25rem 0; gap: .5rem; }
+.row.tight input:not([type]), .row.tight input[type="datetime-local"] { width: auto; flex: 1; min-width: 12rem; }
+input[type="checkbox"], input[type="radio"] { width: auto; margin: 0 .25rem 0 0; vertical-align: middle; }
+.chip-select { width: auto; border-radius: 999px; padding: .2rem .6rem; font-size: var(--step--1); color: var(--ink-2); background: var(--paper); border-color: transparent; }
+.ghost-link { display: inline-block; margin: .25rem 0 .5rem; font-size: var(--step--1); }
+.scheduled { align-items: flex-start; }
+
+/* ---------- админка ---------- */
+.tiles { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: .75rem; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-m); padding: .8rem 1rem; display: grid; gap: .15rem; font-size: var(--step--1); color: var(--ink-2); }
+.tile-value { font-size: var(--step-2); font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tile.attn { border-color: var(--garnet); }
+.tile.attn .tile-value { color: var(--garnet); }
+.pill { display: inline-block; margin-left: .35rem; padding: 0 .45rem; border-radius: 999px; background: var(--tint); color: var(--ink-2); font-size: .75rem; line-height: 1.4rem; }
+.pill.bad, .pill.sev-high { background: var(--garnet); color: #fff; }
+.pill.sev-medium { background: color-mix(in srgb, var(--garnet) 25%, var(--surface)); color: var(--ink); }
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: .5rem 1.5rem; margin: 1rem 0; }
+.facts dt { font-size: var(--step--1); color: var(--ink-2); }
+.facts dd { margin: 0; font-weight: 600; }
+.ghost.danger { color: var(--garnet); border-color: color-mix(in srgb, var(--garnet) 45%, var(--line)); }
+.admin-users td { vertical-align: top; }
+.admin form.row input[type="search"] { flex: 1; width: auto; min-width: 14rem; }
+.admin form.row select { width: auto; }
+.reports li, .admin .plain-list li { align-items: flex-start; }
+.admin code { font-size: .75rem; overflow-wrap: anywhere; }
+@media (max-width: 760px) { .admin-users th:nth-child(4), .admin-users td:nth-child(4) { display: none; } }
+.admin .row select { width: auto; }
+.plain-list time { white-space: nowrap; }

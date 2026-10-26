@@ -1,6 +1,7 @@
 import { h } from "../vendor/preact/index.js";
 import { useEffect, useRef, useState } from "../vendor/preact/hooks.js";
-import { fetchBlob, fullName, get, post } from "./api.js";
+import { fetchBlob, fullName, get, post, upload } from "./api.js";
+import { DocList } from "./posts.js";
 import { on, sendTyping } from "./realtime.js";
 import { navigate } from "./router.js";
 import { me } from "./session.js";
@@ -32,7 +33,7 @@ function preview(m) {
         return "Зашифрованное сообщение";
     if (m.body)
         return m.body;
-    return m.attachments.map((a) => ({ photo: "Фото", track: "Трек", voice: "Голосовое" })[a.kind]).join(", ");
+    return m.attachments.map((a) => ({ photo: "Фото", track: "Трек", voice: "Голосовое", document: "Документ" })[a.kind]).join(", ");
 }
 // /im/u/:id — открыть (или создать) личный диалог с пользователем
 export function DirectPage({ userId }) {
@@ -65,6 +66,8 @@ export function ChatPage({ id }) {
     const [typing, setTyping] = useState(false);
     const end = useRef(null);
     const lastTyping = useRef(0);
+    const docInput = useRef(null);
+    const [doc, setDoc] = useState(null);
     useEffect(() => {
         setMsgs(null);
         get(`/conversations/${id}/messages?limit=50`).then((r) => setMsgs(r.items.slice().reverse()), setError);
@@ -98,8 +101,9 @@ export function ChatPage({ id }) {
         e.preventDefault();
         setError(null);
         try {
-            const m = await post(`/conversations/${id}/messages`, { body: text });
+            const m = await post(`/conversations/${id}/messages`, { body: text, ...(doc ? { attachments: [{ kind: "document", id: doc.id }] } : {}) });
             setText("");
+            setDoc(null);
             setMsgs((xs) => (xs && !xs.some((x) => x.id === m.id) ? [...xs, m] : xs));
         }
         catch (err) {
@@ -130,13 +134,34 @@ export function ChatPage({ id }) {
                         a.title,
                         " ",
                         h("audio", { controls: true, preload: "none", src: a.url })) :
-                        h(VoiceNote, { key: a.id, url: a.url, seconds: a.duration_sec ?? 0 }))),
+                        a.kind === "document" ? h(DocList, { key: a.id, docs: [{ id: a.id, title: a.title ?? "Документ", ext: a.ext ?? "", size: a.size ?? 0, url: a.url }] }) :
+                            h(VoiceNote, { key: a.id, url: a.url, seconds: a.duration_sec ?? 0 }))),
                 h(Time, { iso: m.created_at }))))),
             typing && h("p", { class: "muted typing" }, "\u043F\u0435\u0447\u0430\u0442\u0430\u0435\u0442\u2026"),
             h("div", { ref: end })),
+        doc && h("p", { class: "muted" },
+            "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442: ",
+            doc.title,
+            ".",
+            doc.ext,
+            " ",
+            h("button", { class: "link", onClick: () => setDoc(null) }, "\u0443\u0431\u0440\u0430\u0442\u044C")),
         h("form", { class: "chat-form", onSubmit: send },
+            h("input", { ref: docInput, type: "file", hidden: true, onChange: async (e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                        setError(null);
+                        try {
+                            setDoc(await upload("/documents", f));
+                        }
+                        catch (err) {
+                            setError(err);
+                        }
+                    }
+                } }),
+            h("button", { type: "button", class: "icon-btn", "aria-label": "\u041F\u0440\u0438\u043A\u0440\u0435\u043F\u0438\u0442\u044C \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442", onClick: () => docInput.current?.click() }, "\uD83D\uDCCE"),
             h("input", { value: text, onInput: input, placeholder: "\u0421\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435", "aria-label": "\u0421\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435", maxLength: 4000 }),
-            h("button", { class: "primary", disabled: !text.trim() }, "\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C"))));
+            h("button", { class: "primary", disabled: !text.trim() && !doc }, "\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C"))));
 }
 // Голосовые закрыты токеном — их нельзя дать <audio> по ссылке, грузим через fetch.
 function VoiceNote({ url, seconds }) {
