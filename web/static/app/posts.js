@@ -218,33 +218,46 @@ export function PostView({ initial, onDelete }) {
     const [open, setOpen] = useState(false);
     const [picking, setPicking] = useState(false);
     const mine = me()?.id === p.author.id;
-    async function react(r) {
+    const [error, setError] = useState(null);
+    // любое действие с записью: ошибка показывается под записью, а состояние
+    // меняется только после ответа сервера — интерфейс не врёт о несохранённом
+    const act = async (fn) => {
+        setError(null);
+        try {
+            await fn();
+        }
+        catch (e) {
+            setError(e);
+        }
+    };
+    const react = (r) => act(async () => {
         setPicking(false);
         const res = r === null || r === p.my_reaction
             ? await api("DELETE", `/posts/${p.id}/reactions`)
             : await post(`/posts/${p.id}/reactions`, { reaction: r });
         setP(await get(`/posts/${p.id}`).catch(() => ({ ...p, likes_count: res.likes_count })));
-    }
-    async function remove() {
+    });
+    const remove = () => act(async () => {
         if (!confirm("Удалить запись?"))
             return;
         await del(`/posts/${p.id}`);
         onDelete?.();
-    }
-    async function bookmark() {
+    });
+    const bookmark = () => act(async () => {
         if (p.bookmarked)
             await del(`/bookmarks/post/${p.id}`);
         else
             await put(`/bookmarks/post/${p.id}`);
         setP({ ...p, bookmarked: !p.bookmarked });
-    }
-    async function changeAudience(a) {
+    });
+    const changeAudience = (a, select) => act(async () => {
+        select.value = p.audience; // пока сервер не подтвердил, показываем сохранённое значение
         if (a === "list") {
             alert("Выбрать отдельных друзей можно при создании записи.");
             return;
         }
         setP(await patch(`/posts/${p.id}`, { audience: a }));
-    }
+    });
     const top = Object.entries(p.reactions).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
     const mineR = reactions.find(([r]) => r === p.my_reaction);
     return (h("article", { class: "post", "aria-labelledby": `post-${p.id}-author` },
@@ -286,7 +299,8 @@ export function PostView({ initial, onDelete }) {
                 "\u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438",
                 p.comments_count > 0 ? ` ${p.comments_count}` : ""),
             h("button", { class: p.bookmarked ? "chip active" : "chip", "aria-pressed": p.bookmarked, onClick: bookmark }, p.bookmarked ? "В закладках" : "В закладки"),
-            mine && !p.community && (h("select", { class: "chip-select", "aria-label": "\u041A\u0442\u043E \u0432\u0438\u0434\u0438\u0442 \u0437\u0430\u043F\u0438\u0441\u044C", value: p.audience, onChange: (e) => changeAudience(e.target.value) }, Object.keys(audienceLabel).filter((a) => a !== "list" || p.audience === "list").map((a) => h("option", { key: a, value: a }, audienceLabel[a]))))),
+            mine && !p.community && (h("select", { class: "chip-select", "aria-label": "\u041A\u0442\u043E \u0432\u0438\u0434\u0438\u0442 \u0437\u0430\u043F\u0438\u0441\u044C", value: p.audience, onChange: (e) => { const el = e.target; changeAudience(el.value, el); } }, Object.keys(audienceLabel).filter((a) => a !== "list" || p.audience === "list").map((a) => h("option", { key: a, value: a }, audienceLabel[a]))))),
+        h(ErrorLine, { error: error }),
         open && h(Comments, { post: p, onCount: (n) => setP({ ...p, comments_count: n }) })));
 }
 export function Video({ src, mp4, poster, title }) {

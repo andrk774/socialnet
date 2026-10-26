@@ -403,58 +403,70 @@ func (s *Server) PublishDue(ctx context.Context) (int, error) {
 	}
 	published := 0
 	for _, sp := range due {
-		fail := func(msg string) {
-			if err := s.store.FailScheduled(ctx, sp.ID, msg); err != nil {
-				s.log.Error("scheduled fail", "err", err, "id", sp.ID)
+		ok, err := s.publishScheduled(ctx, sp)
+		if err != nil {
+			if ctx.Err() != nil {
+				return published, ctx.Err()
 			}
-		}
-		var req createPostRequest
-		if err := json.Unmarshal(sp.Payload, &req); err != nil {
-			fail("broken payload")
+			// Сбой одной записи не должен останавливать очередь: она первая по
+			// времени и иначе блокировала бы все следующие. Запись остаётся
+			// в ожидании и будет повторена на следующем проходе.
+			s.log.Error("scheduled post", "err", err, "id", sp.ID)
 			continue
 		}
-		author, err := s.store.UserByID(ctx, sp.AuthorID)
-		if err != nil {
-			return published, err
-		}
-		if author.BannedAt != nil {
-			fail("author is banned")
-			continue
-		}
-		var bot int64
-		if c, err := s.store.BotCommunity(ctx, sp.AuthorID); err != nil {
-			return published, err
-		} else if c != nil {
-			bot = *c
-		}
-		status, _, msg, err := s.postPermission(ctx, sp.AuthorID, bot, req.CommunityID)
-		if err != nil {
-			return published, err
-		}
-		if status != 0 {
-			fail(msg)
-			continue
-		}
-		if errs := req.validate(sp.PublishAt); len(errs) > 0 {
-			fail("invalid post")
-			continue
-		}
-		id := sp.ID
-		_, err = s.publishPost(ctx, sp.AuthorID, req, &id)
-		switch {
-		case errors.Is(err, store.ErrNotPending):
-			// опубликовал другой экземпляр API или пост отменили
-		case errors.Is(err, store.ErrBadMedia):
-			fail("an attachment was deleted")
-		case errors.Is(err, store.ErrNotFriends):
-			fail("someone in the audience is no longer a friend")
-		case err != nil:
-			return published, err
-		default:
+		if ok {
 			published++
 		}
 	}
 	return published, nil
+}
+
+// publishScheduled публикует одну запись. ok=false без ошибки — запись
+// отмечена неудавшейся (права, вложения) или её уже опубликовали.
+func (s *Server) publishScheduled(ctx context.Context, sp store.ScheduledPost) (bool, error) {
+	fail := func(msg string) (bool, error) {
+		return false, s.store.FailScheduled(ctx, sp.ID, msg)
+	}
+	var req createPostRequest
+	if err := json.Unmarshal(sp.Payload, &req); err != nil {
+		return fail("broken payload")
+	}
+	author, err := s.store.UserByID(ctx, sp.AuthorID)
+	if err != nil {
+		return false, err
+	}
+	if author.BannedAt != nil {
+		return fail("author is banned")
+	}
+	var bot int64
+	if c, err := s.store.BotCommunity(ctx, sp.AuthorID); err != nil {
+		return false, err
+	} else if c != nil {
+		bot = *c
+	}
+	status, _, msg, err := s.postPermission(ctx, sp.AuthorID, bot, req.CommunityID)
+	if err != nil {
+		return false, err
+	}
+	if status != 0 {
+		return fail(msg)
+	}
+	if errs := req.validate(sp.PublishAt); len(errs) > 0 {
+		return fail("invalid post")
+	}
+	id := sp.ID
+	_, err = s.publishPost(ctx, sp.AuthorID, req, &id)
+	switch {
+	case errors.Is(err, store.ErrNotPending):
+		return false, nil // опубликовал другой экземпляр API или запись отменили
+	case errors.Is(err, store.ErrBadMedia):
+		return fail("an attachment was deleted")
+	case errors.Is(err, store.ErrNotFriends):
+		return fail("someone in the audience is no longer a friend")
+	case err != nil:
+		return false, err
+	}
+	return true, nil
 }
 
 func (s *Server) runScheduler(ctx context.Context) {

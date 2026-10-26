@@ -238,30 +238,39 @@ export function PostView({ initial, onDelete }: { initial: Post; onDelete?: () =
   const [picking, setPicking] = useState(false);
   const mine = me()?.id === p.author.id;
 
-  async function react(r: Reaction | null) {
+  const [error, setError] = useState<unknown>(null);
+  // любое действие с записью: ошибка показывается под записью, а состояние
+  // меняется только после ответа сервера — интерфейс не врёт о несохранённом
+  const act = async (fn: () => Promise<void>) => {
+    setError(null);
+    try { await fn(); } catch (e) { setError(e); }
+  };
+
+  const react = (r: Reaction | null) => act(async () => {
     setPicking(false);
     const res = r === null || r === p.my_reaction
       ? await api<{ likes_count: number }>("DELETE", `/posts/${p.id}/reactions`)
       : await post<{ likes_count: number }>(`/posts/${p.id}/reactions`, { reaction: r });
     setP(await get<Post>(`/posts/${p.id}`).catch(() => ({ ...p, likes_count: res.likes_count })));
-  }
+  });
 
-  async function remove() {
+  const remove = () => act(async () => {
     if (!confirm("Удалить запись?")) return;
     await del(`/posts/${p.id}`);
     onDelete?.();
-  }
+  });
 
-  async function bookmark() {
+  const bookmark = () => act(async () => {
     if (p.bookmarked) await del(`/bookmarks/post/${p.id}`);
     else await put(`/bookmarks/post/${p.id}`);
     setP({ ...p, bookmarked: !p.bookmarked });
-  }
+  });
 
-  async function changeAudience(a: Audience) {
+  const changeAudience = (a: Audience, select: HTMLSelectElement) => act(async () => {
+    select.value = p.audience; // пока сервер не подтвердил, показываем сохранённое значение
     if (a === "list") { alert("Выбрать отдельных друзей можно при создании записи."); return; }
     setP(await patch<Post>(`/posts/${p.id}`, { audience: a }));
-  }
+  });
 
   const top = (Object.entries(p.reactions) as [Reaction, number][]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
   const mineR = reactions.find(([r]) => r === p.my_reaction);
@@ -313,11 +322,12 @@ export function PostView({ initial, onDelete }: { initial: Post; onDelete?: () =
           {p.bookmarked ? "В закладках" : "В закладки"}
         </button>
         {mine && !p.community && (
-          <select class="chip-select" aria-label="Кто видит запись" value={p.audience} onChange={(e) => changeAudience((e.target as HTMLSelectElement).value as Audience)}>
+          <select class="chip-select" aria-label="Кто видит запись" value={p.audience} onChange={(e) => { const el = e.target as HTMLSelectElement; changeAudience(el.value as Audience, el); }}>
             {(Object.keys(audienceLabel) as Audience[]).filter((a) => a !== "list" || p.audience === "list").map((a) => <option key={a} value={a}>{audienceLabel[a]}</option>)}
           </select>
         )}
       </footer>
+      <ErrorLine error={error} />
       {open && <Comments post={p} onCount={(n) => setP({ ...p, comments_count: n })} />}
     </article>
   );

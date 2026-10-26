@@ -68,15 +68,21 @@ func (s *Store) Bookmarks(ctx context.Context, user int64, kind string, before i
 		c := marks[len(marks)-1].id
 		next = &c
 	}
+	// id приводятся к типу столбца, чтобы поиск шёл по первичному ключу,
+	// а не перебором всей таблицы (сравнение id::text индекс не использует)
 	targets := make([]string, len(marks))
+	var postIDs []int64
 	for i, m := range marks {
 		targets[i] = m.target
+		if n, err := strconv.ParseInt(m.target, 10, 64); err == nil {
+			postIDs = append(postIDs, n)
+		}
 	}
 
 	out := []Bookmark{}
 	switch kind {
 	case "post":
-		posts, err := s.queryPosts(ctx, postSelect+` WHERE p.id::text = ANY($2::text[]) AND `+postVisible, user, targets)
+		posts, err := s.queryPosts(ctx, postSelect+` WHERE p.id = ANY($2::bigint[]) AND `+postVisible, user, postIDs)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -90,7 +96,7 @@ func (s *Store) Bookmarks(ctx context.Context, user int64, kind string, before i
 			}
 		}
 	case "video":
-		rows, err := s.pool.Query(ctx, `SELECT `+videoCols+` FROM videos WHERE id::text = ANY($1::text[]) AND status = 'ready'`, targets)
+		rows, err := s.pool.Query(ctx, `SELECT `+videoCols+` FROM videos WHERE id = ANY($1::uuid[]) AND status = 'ready'`, targets)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -108,7 +114,7 @@ func (s *Store) Bookmarks(ctx context.Context, user int64, kind string, before i
 			}
 		}
 	case "track":
-		tracks, err := s.queryTracks(ctx, false, trackSelect+` FROM tracks t WHERE t.id::text = ANY($2::text[]) AND t.removed_at IS NULL`, user, targets)
+		tracks, err := s.queryTracks(ctx, false, trackSelect+` FROM tracks t WHERE t.id = ANY($2::uuid[]) AND t.removed_at IS NULL`, user, targets)
 		if err != nil {
 			return nil, nil, err
 		}
