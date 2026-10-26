@@ -17,15 +17,19 @@ test:          ## юнит-тесты (без базы)
 
 # Интеграционные тесты против Postgres из docker compose.
 # ВНИМАНИЕ: тесты пересоздают таблицы, поэтому используется отдельная база socialnet_test.
-# tr -d '\r' — на случай, если .env сохранили в Windows с переводами строк CRLF.
-TEST_DB_URL = postgres://socialnet:$$(grep ^POSTGRES_PASSWORD= .env | cut -d= -f2- | tr -d '\r')@127.0.0.1:5432/socialnet_test?sslmode=disable
+# Пароль берётся из самого контейнера базы — ровно тот, с которым Postgres её создал.
+# Так не важно, как записан .env (кавычки, CRLF, пробелы, спецсимволы) и не задана ли
+# POSTGRES_PASSWORD ещё и в переменных окружения Windows. В адрес пароль не вставляется:
+# его читают из PGPASSWORD и pgx, и pg_dump, поэтому символы вроде @ / # % не ломают URL.
+TEST_DB_URL = postgres://socialnet@127.0.0.1:5432/socialnet_test?sslmode=disable
+TEST_DB_PASSWORD = $$(docker compose exec -T db printenv POSTGRES_PASSWORD | tr -d '\r\n')
 
 test-db-up:    ## поднять Postgres и создать тестовую базу
 	docker compose up -d --wait db
 	docker compose exec -T db psql -U socialnet -d socialnet -c 'CREATE DATABASE socialnet_test' 2>/dev/null || true
 
 test-db: test-db-up
-	TEST_DATABASE_URL="$(TEST_DB_URL)" go test -count=1 -p 1 ./...
+	PGPASSWORD="$(TEST_DB_PASSWORD)" TEST_DATABASE_URL="$(TEST_DB_URL)" go test -count=1 -p 1 ./...
 
 psql:          ## консоль базы
 	docker compose exec db psql -U socialnet -d socialnet
@@ -56,7 +60,7 @@ vendor-preact:
 # Сквозной тест в Chromium: нужны node и playwright (npm i -g playwright &&
 # npx playwright install chromium); ffmpeg необязателен — без него проверка видео пропускается
 e2e: test-db-up
-	TEST_DATABASE_URL="$(TEST_DB_URL)" NODE_PATH="$$(npm root -g)" \
+	PGPASSWORD="$(TEST_DB_PASSWORD)" TEST_DATABASE_URL="$(TEST_DB_URL)" NODE_PATH="$$(npm root -g)" \
 		go test -count=1 -v -run TestFrontendE2E ./internal/httpapi/
 
 # Весь стек в Docker + сквозная проверка (регистрация, видео, копия, метрики, изоляция)
