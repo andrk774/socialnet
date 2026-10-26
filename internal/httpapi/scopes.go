@@ -77,7 +77,7 @@ var scopeRoutes = map[string][]string{
 	},
 	"photos": {"POST /api/v1/media", "DELETE /api/v1/media/{id}"},
 	"messages": {
-		"POST /api/v1/users/{id}/messages", "GET /api/v1/conversations",
+		"POST /api/v1/users/{id}/messages", "GET /api/v1/conversations", "POST /api/v1/companions/{id}/reply",
 		"GET /api/v1/conversations/{id}/messages", "POST /api/v1/conversations/{id}/messages",
 		"POST /api/v1/conversations/{id}/read", "POST /api/v1/conversations/{id}/typing",
 		"POST /api/v1/chats", "PATCH /api/v1/conversations/{id}",
@@ -112,6 +112,8 @@ var scopeRoutes = map[string][]string{
 		"DELETE /api/v1/events/{id}", "POST /api/v1/events/{id}/rsvp", "DELETE /api/v1/events/{id}/rsvp",
 		"GET /api/v1/events/{id}/attendees", "DELETE /api/v1/events/{id}/attendees/{uid}",
 		"GET /api/v1/events/{id}/applications", "POST /api/v1/events/{id}/applications/{uid}", "GET /api/v1/hikes",
+		"POST /api/v1/companions", "GET /api/v1/companions", "GET /api/v1/companions/mine", "GET /api/v1/companions/{id}",
+		"PATCH /api/v1/companions/{id}", "DELETE /api/v1/companions/{id}",
 	},
 }
 

@@ -6,6 +6,7 @@ import { ChatPage, ConversationsPage, DirectPage } from "./messages.js";
 import { CommunitiesPage, CommunityPage, FeedPage, MusicPage, NotificationsPage, OAuthPage, PostPage, SearchPage, SettingsPage, TagPage, WalletPage } from "./pages.js";
 import { ProfilePage } from "./profile.js";
 import { EventPage, HikeForm, HikesPage } from "./hikes.js";
+import { CompanionsPage } from "./companions.js";
 import { AdminPage } from "./admin.js";
 import { BookmarksPage, DocumentsPage, ScheduledPage } from "./library.js";
 import { on, startRealtime, stopRealtime } from "./realtime.js";
@@ -26,6 +27,7 @@ function routes(path: string, onRead: () => void, myId: number): ComponentChildr
   if (match("/communities", path)) return <CommunitiesPage />;
   if (match("/hikes/new", path)) return <HikeForm />;
   if (match("/hikes", path)) return <HikesPage />;
+  if (match("/companions", path)) return <CompanionsPage />;
   if ((p = match("/events/:id", path))) return <EventPage id={+p.id} />;
   if ((p = match("/c/:slug", path))) return <CommunityPage slug={p.slug} />;
   if (match("/music", path)) return <MusicPage userId={myId} />;
@@ -41,7 +43,7 @@ function routes(path: string, onRead: () => void, myId: number): ComponentChildr
 }
 
 const nav: [string, string][] = [
-  ["/", "Лента"], ["/hikes", "Походы"], ["/im", "Сообщения"], ["/notifications", "Уведомления"],
+  ["/", "Лента"], ["/hikes", "Походы"], ["/companions", "Попутчики"], ["/im", "Сообщения"], ["/notifications", "Уведомления"],
   ["/communities", "Сообщества"], ["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"],
   ["/scheduled", "Отложенные"], ["/wallet", "Кошелёк"], ["/settings", "Безопасность"],
 ];

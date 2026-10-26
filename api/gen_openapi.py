@@ -85,6 +85,9 @@ schemas = {
                  meeting_point=str_, approval=bool_,
                  going_count=int_, maybe_count=int_, pending_count=int_, waitlist_count=int_,
                  my_status=nullable(enum("going", "maybe", "pending", "waitlist")), **{"my_waitlist_position?": int_}, created_at=dt),
+    "CompanionAd": obj(id=int_, author=S("UserCard"), region=str_, title=str_, body=str_,
+                       date_from={"type": "string", "format": "date"}, date_to={"type": "string", "format": "date"},
+                       difficulty=nullable(enum_int(1, 2, 3, 4, 5)), seats=int_, route_id=nullable(str_), closed=bool_, created_at=dt),
     "Application": obj(user=S("UserCard"), note=str_, created_at=dt),
     "Notification": obj(id=int_, type=str_, **{"actor?": S("UserCard"), "post_id?": int_, "comment_id?": int_, "event_id?": int_},
                         created_at=dt, read=bool_),
@@ -250,7 +253,7 @@ r("POST", A + "/media", "media", "Загрузить фото (JPEG/PNG/GIF до
 r("DELETE", A + "/media/{id}", "media", "Удалить фото", code=204)
 r("GET", "/media/{id}/{size}", "media", "Файл фото: size = full | thumb", auth=False, resp="binary")
 # --- безопасность / модерация ---
-r("POST", A + "/reports", "moderation", "Пожаловаться", obj(target_type=enum("post", "comment", "user", "community", "track", "video", "document", "route"), **{"target_id?": int_, "target_uuid?": uuid}, reason=str_), obj(id=int_, status=str_), 201)
+r("POST", A + "/reports", "moderation", "Пожаловаться", obj(target_type=enum("post", "comment", "user", "community", "track", "video", "document", "route", "companion"), **{"target_id?": int_, "target_uuid?": uuid}, reason=str_), obj(id=int_, status=str_), 201)
 r("GET", A + "/mod/reports", "moderation", "Очередь жалоб (модератор)", resp=lst(S("Report")))
 r("POST", A + "/mod/reports/{id}/resolve", "moderation", "Решение по жалобе", obj(action=enum("dismiss", "hide", "ban"), **{"note?": str_}), code=204)
 r("POST", A + "/mod/users/{id}/ban", "moderation", "Забанить", obj(**{"reason?": str_}), code=204)
@@ -354,6 +357,17 @@ r("DELETE", A + "/events/{id}/attendees/{uid}", "events", "Убрать учас
 r("GET", A + "/events/{id}/applications", "events", "Заявки на участие (организатор)", resp=obj(items=arr(S("Application"))))
 r("POST", A + "/events/{id}/applications/{uid}", "events", "Принять или отклонить заявку; принятый без мест встаёт в очередь",
   obj(approve=bool_), obj(status=enum("going", "waitlist", "rejected")))
+date_ = {"type": "string", "format": "date"}
+r("POST", A + "/companions", "events", "«Ищу попутчиков»: объявление (не больше 5 открытых)",
+  obj(region=str_, title=str_, date_from=date_, **{"date_to?": date_, "body?": str_, "difficulty?": nullable(enum_int(1, 2, 3, 4, 5)),
+                                                   "seats?": int_, "route_id?": nullable(str_)}), S("CompanionAd"), 201)
+r("GET", A + "/companions", "events", "Открытые объявления: ?region=&from=&to=&max_difficulty=", resp=obj(items=arr(S("CompanionAd"))))
+r("GET", A + "/companions/mine", "events", "Мои объявления", resp=obj(items=arr(S("CompanionAd"))))
+r("GET", A + "/companions/{id}", "events", "Объявление", resp=S("CompanionAd"))
+r("PATCH", A + "/companions/{id}", "events", "Закрыть (нашёл попутчиков) или открыть снова", obj(closed=bool_), S("CompanionAd"))
+r("DELETE", A + "/companions/{id}", "events", "Удалить", code=204)
+r("POST", A + "/companions/{id}/reply", "messages", "Откликнуться: личное сообщение автору (даже если он принимает сообщения только от друзей)",
+  obj(text=str_), S("Message"), 201)
 r("GET", A + "/hikes", "events", "Ближайшие походы: ?max_difficulty=1..5", resp=obj(items=arr(S("Event"))))
 # --- журнал аудита и тревоги ---
 audit = obj(id=int_, actor_id=int_, actor_role=str_, action=str_, target=str_, **{"details?": {"type": "object"}},

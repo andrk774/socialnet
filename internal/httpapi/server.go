@@ -404,6 +404,13 @@ func (s *Server) Router() http.Handler {
 				r.Get("/events/{id}/applications", s.handleApplications)
 				r.Post("/events/{id}/applications/{uid}", s.handleDecideApplication)
 				r.Get("/hikes", s.handleHikes)
+				r.Post("/companions", s.handleCreateCompanionAd)
+				r.Get("/companions", s.handleCompanionAds)
+				r.Get("/companions/mine", s.handleMyCompanionAds)
+				r.Get("/companions/{id}", s.handleGetCompanionAd)
+				r.Patch("/companions/{id}", s.handleCloseCompanionAd)
+				r.Delete("/companions/{id}", s.handleDeleteCompanionAd)
+				r.Post("/companions/{id}/reply", s.handleReplyCompanionAd)
 
 				// API для разработчиков: приложения, согласие, боты, Callback API
 				r.Get("/oauth/authorize", s.handleAuthorizeInfo)

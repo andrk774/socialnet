@@ -213,6 +213,36 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await bob.page.getByRole("link", { name: "принял(а) вашу заявку в поход" }).waitFor();
 }
 
+// попутчики: Борис ищет компанию, Анна находит объявление фильтром и откликается
+{
+  await bob.page.getByRole("link", { name: "Попутчики" }).click();
+  await bob.page.getByText("Объявлений не нашлось").waitFor();
+  await bob.page.getByText("Разместить объявление").click();
+  const d = new Date(Date.now() + 7 * 864e5);
+  const iso = (x) => new Date(x.getTime() - x.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+  await bob.page.getByLabel("Заголовок").fill("Ищу компанию на Откликной гребень");
+  await bob.page.getByLabel("Район", { exact: true }).last().fill("Таганай");
+  await bob.page.locator("details.create").getByLabel("С", { exact: true }).fill(iso(d));
+  await bob.page.getByLabel("Сколько человек ищу").fill("2");
+  await bob.page.getByRole("button", { name: "Разместить" }).click();
+  await bob.page.getByRole("heading", { name: "Мои объявления" }).waitFor();
+
+  await anna.page.getByRole("link", { name: "Попутчики" }).click();
+  await anna.page.locator("form.filters").getByLabel("Район").fill("иремель");
+  await anna.page.getByRole("button", { name: "Найти" }).click();
+  await anna.page.getByText("Объявлений не нашлось").waitFor();
+  await anna.page.locator("form.filters").getByLabel("Район").fill("таганай");
+  await anna.page.getByRole("button", { name: "Найти" }).click();
+  const ad = anna.page.locator("li.ad", { hasText: "Откликной гребень" });
+  await ad.getByRole("button", { name: "Откликнуться" }).click();
+  await ad.getByLabel("Сообщение автору").fill("Пойду, есть палатка");
+  await anna.page.screenshot({ path: `${shots}/15-companions.png`, fullPage: true });
+  await ad.getByRole("button", { name: "Отправить" }).click();
+  await ad.getByText("Отклик отправлен").waitFor();
+  await bob.page.goto(base + "/im");
+  await bob.page.getByText(/Отклик на объявление/).first().waitFor();
+}
+
 // отложенная запись
 await anna.page.goto(base + "/");
 await anna.page.getByPlaceholder("Что у вас нового?").fill("Это выйдет через час");
