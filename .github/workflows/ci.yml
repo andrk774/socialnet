@@ -2,8 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
+  workflow_dispatch: # запуск вручную: вкладка Actions → CI → Run workflow
+
+# Новый push в ту же ветку отменяет недоделанный прогон — минуты не тратятся
+# на проверку версии, которая уже устарела.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
