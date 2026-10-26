@@ -165,6 +165,7 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await anna.page.screenshot({ path: `${shots}/13-map.png`, fullPage: true });
   await card.getByRole("button", { name: "Во весь экран" }).click();
   await anna.page.locator(".route-map-full").waitFor();
+  await anna.page.waitForFunction(() => document.body.classList.contains("no-scroll"));
   await anna.page.keyboard.press("Escape");
   await anna.page.waitForFunction(() => !document.querySelector(".route-map-full") && !document.body.classList.contains("no-scroll"));
   const dl = anna.page.waitForEvent("download");

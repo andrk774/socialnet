@@ -54,6 +54,7 @@ jobs:
 
   web:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17-alpine
@@ -84,7 +85,7 @@ jobs:
         run: |
           mkdir -p "$E2E_SCREENSHOTS"
           set -o pipefail
-          go test -count=1 -run 'TestFrontend' ./internal/httpapi/ 2>&1 | tee e2e.log
+          go test -count=1 -timeout 8m -run 'TestFrontend' ./internal/httpapi/ 2>&1 | tee e2e.log
       - if: failure()
         name: Причина сбоя e2e — в аннотации
         run: |

@@ -2,7 +2,7 @@
 // рисуются в SVG без внешних запросов; карта — Leaflet с тайлами через прокси
 // нашего сервера, так что браузер посетителя к OSM не обращается.
 import { h } from "../vendor/preact/index.js";
-import { useEffect, useRef, useState } from "../vendor/preact/hooks.js";
+import { useEffect, useLayoutEffect, useRef, useState } from "../vendor/preact/hooks.js";
 import * as L from "../vendor/leaflet/leaflet-src.esm.js";
 import { get, Route, saveFile } from "./api.js";
 import { ErrorLine, Loading } from "./ui.js";
@@ -111,7 +111,8 @@ export function RouteMap({ route }: { route: Route }) {
     return () => { alive = false; m?.remove(); mapRef.current = null; };
   }, [detail]);
 
-  useEffect(() => {
+  // сразу после отрисовки, а не в следующем кадре: Esc работает с первого мгновения
+  useLayoutEffect(() => {
     mapRef.current?.invalidateSize();
     if (!full) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFull(false); };
