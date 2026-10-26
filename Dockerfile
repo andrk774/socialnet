@@ -11,7 +11,9 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
 # --- рантайм: Alpine с ffmpeg (музыка и видео) и клиентом PostgreSQL 17
 # (pg_dump/pg_restore для резервных копий), запуск не от root ---
 FROM alpine:3.21
-RUN apk add --no-cache ffmpeg ca-certificates postgresql17-client \
+# apk upgrade: исправления безопасности, вышедшие после сборки базового образа
+RUN apk upgrade --no-cache \
+    && apk add --no-cache ffmpeg ca-certificates postgresql17-client \
     && adduser -D -H -u 65532 app \
     && mkdir -p /data/media /backups \
     && chown -R 65532:65532 /data /backups

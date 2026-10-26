@@ -189,3 +189,13 @@ jobs:
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: "1"
+          # находки — ещё и в файл, чтобы показать их в аннотациях прогона
+          format: template
+          template: '{{- range . }}{{- $t := .Target }}{{- range .Vulnerabilities }}{{ .Severity }} {{ .VulnerabilityID }} {{ .PkgName }} {{ .InstalledVersion }} → {{ .FixedVersion }} ({{ $t }}){{ "\n" }}{{- end }}{{- end }}'
+          output: trivy.txt
+      - if: failure()
+        name: Находки Trivy — в аннотации
+        run: |
+          test -s trivy.txt || exit 0
+          cat trivy.txt
+          sort -u trivy.txt | head -40 | while IFS= read -r line; do echo "::error title=Trivy::$line"; done
