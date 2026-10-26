@@ -80,7 +80,10 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		writeFieldErrors(w, http.StatusUnprocessableEntity, "validation_failed", "invalid input", errs)
 		return
 	}
-	if !canMessage(target.MessagePrivacy, rel) {
+	if allowed, err := s.mayMessage(r.Context(), me, target.ID, target.MessagePrivacy, rel); err != nil {
+		s.internalError(w, r, err)
+		return
+	} else if !allowed {
 		writeError(w, http.StatusForbidden, "privacy", "this user does not accept messages from you")
 		return
 	}
@@ -136,12 +139,30 @@ func (s *Server) handleSendToConversation(w http.ResponseWriter, r *http.Request
 			s.internalError(w, r, err)
 			return
 		}
-		if peer.BannedAt != nil || !canMessage(peer.MessagePrivacy, rel) {
+		allowed, err := s.mayMessage(r.Context(), me, peer.ID, peer.MessagePrivacy, rel)
+		if err != nil {
+			s.internalError(w, r, err)
+			return
+		}
+		if peer.BannedAt != nil || !allowed {
 			writeError(w, http.StatusForbidden, "privacy", "this user does not accept messages from you")
 			return
 		}
 	}
 	s.deliver(w, r, conv, req)
+}
+
+// mayMessage: настройки приватности собеседника — или он сам написал мне
+// первым (например, откликнулся на объявление): тогда ответить можно всегда,
+// если нет блокировки.
+func (s *Server) mayMessage(ctx context.Context, me, peer int64, privacy string, rel store.Relationship) (bool, error) {
+	if rel.Blocked() {
+		return false, nil
+	}
+	if canMessage(privacy, rel) {
+		return true, nil
+	}
+	return s.store.UserWroteTo(ctx, peer, me)
 }
 
 // deliver сохраняет сообщение и рассылает его участникам.

@@ -58,6 +58,8 @@ func (s *Store) TargetAuthor(ctx context.Context, typ string, id int64) (int64, 
 		q = `SELECT id FROM users WHERE id = $1`
 	case "community":
 		q = `SELECT owner_id FROM communities WHERE id = $1`
+	case "companion":
+		q = `SELECT author_id FROM companion_ads WHERE id = $1 AND hidden_at IS NULL`
 	default:
 		return 0, ErrNotFound
 	}
@@ -176,6 +178,8 @@ func (s *Store) SetHidden(ctx context.Context, typ string, id int64, hidden bool
 		table = "comments"
 	case "community":
 		table = "communities"
+	case "companion":
+		table = "companion_ads"
 	default:
 		return ErrNotFound
 	}
