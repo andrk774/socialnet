@@ -27,6 +27,8 @@ const notifText = {
     like: "оценил(а) вашу запись", comment: "прокомментировал(а) запись", reply: "ответил(а) на комментарий",
     mention: "упомянул(а) вас", friend_request: "хочет добавить вас в друзья", friend_accept: "принял(а) заявку в друзья",
     gift: "отправил(а) вам подарок", transfer: "перевёл(а) вам монеты", donation: "поддержал(а) сообщество", join_request: "просит вступить в сообщество", video_ready: "Видео обработано и опубликовано",
+    hike_application: "подал(а) заявку в поход", hike_approved: "принял(а) вашу заявку в поход", hike_rejected: "отклонил(а) заявку в поход",
+    hike_removed: "убрал(а) вас из похода", event_seat: "Освободилось место — вы в походе",
 };
 export function NotificationsPage({ onRead }) {
     const list = useLoad(() => get("/notifications?limit=50"), []);
@@ -43,7 +45,7 @@ export function NotificationsPage({ onRead }) {
             h("span", null,
                 n.actor && h(UserLink, { user: n.actor }),
                 " ",
-                n.post_id ? h("a", { href: `/p/${n.post_id}` }, notifText[n.type] ?? n.type) : notifText[n.type] ?? n.type,
+                n.post_id ? h("a", { href: `/p/${n.post_id}` }, notifText[n.type] ?? n.type) : n.event_id ? h("a", { href: `/events/${n.event_id}` }, notifText[n.type] ?? n.type) : notifText[n.type] ?? n.type,
                 h("br", null),
                 h(Time, { iso: n.created_at })))))))));
 }

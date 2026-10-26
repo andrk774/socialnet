@@ -201,6 +201,8 @@ func (s *Store) RouteAccess(ctx context.Context, viewer int64, id string) (bool,
 		               JOIN posts p ON p.id = pr.post_id
 		               JOIN users a ON a.id = p.author_id
 		               LEFT JOIN communities c ON c.id = p.community_id
-		               WHERE pr.route_id = $2::uuid AND `+postVisible+`)`, viewer, id).Scan(&ok)
+		               WHERE pr.route_id = $2::uuid AND `+postVisible+`)
+		    OR EXISTS (SELECT 1 FROM events e LEFT JOIN communities c ON c.id = e.community_id
+		               WHERE e.route_id = $2::uuid AND `+eventVisible+`)`, viewer, id).Scan(&ok)
 	return ok, err
 }

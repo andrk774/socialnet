@@ -20,7 +20,8 @@ async function newUser(name, viewport = { width: 1280, height: 860 }) {
   // включая нарушения CSP («Refused to …»), считается ошибкой
   page.on("console", (m) => { if (m.type() === "error" && !m.text().startsWith("Failed to load resource")) problems.push(`${name}: console: ${m.text()}`); });
   page.on("pageerror", (e) => problems.push(`${name}: pageerror: ${e.message}`));
-  page.on("requestfailed", (r) => { if (!r.url().includes("/api/v1/ws")) problems.push(`${name}: failed ${r.method()} ${r.url()} ${r.failure()?.errorText}`); });
+  // тайлы, которые карта уже не показывает, Leaflet отменяет сам — это не ошибка
+  page.on("requestfailed", (r) => { if (!r.url().includes("/api/v1/ws") && !(r.url().includes("/tiles/") && r.failure()?.errorText === "net::ERR_ABORTED")) problems.push(`${name}: failed ${r.method()} ${r.url()} ${r.failure()?.errorText}`); });
   await page.goto(base + "/");
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
   await page.getByLabel("Имя", { exact: true }).fill(name === "anna" ? "Анна" : "Борис");
@@ -170,6 +171,45 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await card.getByRole("button", { name: "Скачать GPX" }).click();
   const gpxFile = await (await import("node:fs")).readFileSync(await (await dl).path(), "utf8");
   assert.ok(gpxFile.includes("<trkpt") && !gpxFile.includes("<time>") && !gpxFile.includes("Анна") && !gpxFile.includes("Garmin"), "downloaded GPX must be clean");
+}
+
+// поход: Анна собирает группу по заявкам, Борис просится, Анна принимает
+{
+  await anna.page.getByRole("link", { name: "Походы" }).click();
+  await anna.page.getByText("Ближайших походов нет").waitFor();
+  await anna.page.getByRole("link", { name: "Организовать поход" }).click();
+  await anna.page.getByLabel("Название").fill("Двуглавая сопка с ночёвкой");
+  const d = new Date(Date.now() + 5 * 864e5);
+  const local = (x) => new Date(x.getTime() - x.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
+  await anna.page.getByLabel("Начало").fill(local(d));
+  await anna.page.getByLabel("Сложность").selectOption({ label: "Средний" });
+  await anna.page.getByLabel("Мест (с организатором)").fill("2");
+  await anna.page.getByLabel("Место сбора").fill("Ж/д вокзал Златоуста, 7:00");
+  await anna.page.getByLabel("Маршрут").selectOption({ label: "Двуглавая сопка" });
+  await anna.page.getByLabel(/Снаряжение/).fill("Треккинговые ботинки\nДождевик\nКоврик и спальник");
+  await anna.page.getByLabel(/Участие по заявке/).check();
+  await anna.page.getByRole("button", { name: "Создать поход" }).click();
+  await anna.page.getByRole("heading", { name: "Двуглавая сопка с ночёвкой" }).waitFor();
+  await anna.page.getByText("1 из 2 · свободно 1").waitFor();
+  await anna.page.locator(".gear li", { hasText: "Коврик и спальник" }).waitFor();
+  await anna.page.locator("section.route").waitFor(); // маршрут похода
+  const hikeURL = anna.page.url();
+
+  await bob.page.goto(base + "/hikes");
+  await bob.page.getByRole("link", { name: "Двуглавая сопка с ночёвкой" }).click();
+  await bob.page.getByLabel(/Пара слов организатору/).fill("Был на Таганае трижды, есть палатка");
+  await bob.page.getByRole("button", { name: "Подать заявку" }).click();
+  await bob.page.getByText("Заявка на рассмотрении").waitFor();
+
+  await anna.page.goto(hikeURL);
+  const app = anna.page.locator(".applications li", { hasText: "есть палатка" });
+  await app.getByRole("button", { name: "Принять" }).click();
+  await anna.page.getByText("2 из 2 · мест нет").waitFor();
+  await anna.page.screenshot({ path: `${shots}/14-hike.png`, fullPage: true });
+  await bob.page.reload();
+  await bob.page.getByText("Вы идёте").waitFor();
+  await bob.page.goto(base + "/notifications");
+  await bob.page.getByRole("link", { name: "принял(а) вашу заявку в поход" }).waitFor();
 }
 
 // отложенная запись

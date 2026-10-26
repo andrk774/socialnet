@@ -80,9 +80,13 @@ schemas = {
                  caption=str_, created_at=dt, expires_at=dt, seen=bool_),
     "StoryGroup": obj(author=S("UserCard"), all_seen=bool_, stories=arr(S("Story"))),
     "Event": obj(id=int_, creator_id=int_, **{"community?": obj(id=int_, slug=str_, name=str_), "ends_at?": dt},
-                 title=str_, description=str_, place=str_, starts_at=dt, going_count=int_, maybe_count=int_,
-                 my_status=nullable(enum("going", "maybe")), created_at=dt),
-    "Notification": obj(id=int_, type=str_, **{"actor?": S("UserCard"), "post_id?": int_, "comment_id?": int_},
+                 kind=enum("event", "hike"), title=str_, description=str_, place=str_, starts_at=dt,
+                 difficulty=nullable(enum_int(1, 2, 3, 4, 5)), capacity=nullable(int_), gear=str_, route_id=nullable(str_),
+                 meeting_point=str_, approval=bool_,
+                 going_count=int_, maybe_count=int_, pending_count=int_, waitlist_count=int_,
+                 my_status=nullable(enum("going", "maybe", "pending", "waitlist")), **{"my_waitlist_position?": int_}, created_at=dt),
+    "Application": obj(user=S("UserCard"), note=str_, created_at=dt),
+    "Notification": obj(id=int_, type=str_, **{"actor?": S("UserCard"), "post_id?": int_, "comment_id?": int_, "event_id?": int_},
                         created_at=dt, read=bool_),
     "Message": obj(id=int_, conversation_id=int_, sender_id=int_, kind=enum("text", "service"),
                    **{"body?": str_, "ciphertext?": b64, "nonce?": b64},
@@ -334,15 +338,23 @@ r("POST", A + "/stories/{id}/view", "stories", "Отметить просмот�
 r("GET", A + "/stories/{id}/viewers", "stories", "Кто смотрел (автору)", resp=obj(items=arr(S("UserCard"))))
 r("DELETE", A + "/stories/{id}", "stories", "Удалить историю", code=204)
 # --- мероприятия ---
-ev = obj(**{"title?": str_, "description?": str_, "place?": str_, "starts_at?": dt, "ends_at?": dt, "community_id?": int_})
+ev = obj(**{"kind?": enum("event", "hike"), "title?": str_, "description?": str_, "place?": str_, "starts_at?": dt,
+            "ends_at?": nullable(dt), "community_id?": int_, "difficulty?": nullable(enum_int(1, 2, 3, 4, 5)),
+            "capacity?": nullable(int_), "gear?": str_, "route_id?": nullable(str_), "meeting_point?": str_, "approval?": bool_})
 r("POST", A + "/events", "events", "Создать мероприятие", ev, S("Event"), 201)
 r("GET", A + "/events", "events", "Мои предстоящие мероприятия", resp=obj(items=arr(S("Event"))))
 r("GET", A + "/events/{id}", "events", "Мероприятие", resp=S("Event"))
 r("PATCH", A + "/events/{id}", "events", "Изменить (организатор)", ev, S("Event"))
 r("DELETE", A + "/events/{id}", "events", "Удалить (организатор)", code=204)
-r("POST", A + "/events/{id}/rsvp", "events", "Пойду / Возможно", obj(status=enum("going", "maybe")), code=204)
-r("DELETE", A + "/events/{id}/rsvp", "events", "Не пойду", code=204)
-r("GET", A + "/events/{id}/attendees", "events", "Участники: ?status=going|maybe", resp=lst(S("UserCard")))
+r("POST", A + "/events/{id}/rsvp", "events", "Пойду / Возможно. Поход: место, лист ожидания (мест нет) или заявка организатору (approval); «возможно» нельзя",
+  obj(status=enum("going", "maybe"), **{"note?": str_}), obj(status=enum("going", "maybe", "pending", "waitlist")))
+r("DELETE", A + "/events/{id}/rsvp", "events", "Не пойду (место — первому в очереди)", code=204)
+r("GET", A + "/events/{id}/attendees", "events", "Участники: ?status=going|maybe|waitlist", resp=lst(S("UserCard")))
+r("DELETE", A + "/events/{id}/attendees/{uid}", "events", "Убрать участника (организатор)", code=204)
+r("GET", A + "/events/{id}/applications", "events", "Заявки на участие (организатор)", resp=obj(items=arr(S("Application"))))
+r("POST", A + "/events/{id}/applications/{uid}", "events", "Принять или отклонить заявку; принятый без мест встаёт в очередь",
+  obj(approve=bool_), obj(status=enum("going", "waitlist", "rejected")))
+r("GET", A + "/hikes", "events", "Ближайшие походы: ?max_difficulty=1..5", resp=obj(items=arr(S("Event"))))
 # --- журнал аудита и тревоги ---
 audit = obj(id=int_, actor_id=int_, actor_role=str_, action=str_, target=str_, **{"details?": {"type": "object"}},
             status=int_, ip=str_, user_agent=str_, request_id=str_, created_at=dt)

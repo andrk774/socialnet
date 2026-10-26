@@ -246,7 +246,7 @@ func TestClosedCommunityAndEvents(t *testing.T) {
 		t.Fatalf("event: %v", ev)
 	}
 	outsider.req("GET", p("/events/%d", eid), nil, 404)
-	owner.req("POST", p("/events/%d/rsvp", eid), map[string]any{"status": "maybe"}, 204)
+	owner.req("POST", p("/events/%d/rsvp", eid), map[string]any{"status": "maybe"}, 200)
 	if got := owner.req("GET", p("/events/%d", eid), nil, 200); got["maybe_count"].(float64) != 1 {
 		t.Fatalf("rsvp: %v", got)
 	}

@@ -1,4 +1,8 @@
 Leaflet 1.9.4
 https://github.com/Leaflet/Leaflet/releases/tag/v1.9.4 (dist/leaflet-src.esm.js, dist/leaflet.css)
-sha256 leaflet-src.esm.js 9298ef57aa4a7371cccd45885bcc33af0149f0650b85d385ab8fd7baba112efb
-sha256 leaflet.css a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6
+sha256 оригиналов (с CRLF):
+  leaflet-src.esm.js 9298ef57aa4a7371cccd45885bcc33af0149f0650b85d385ab8fd7baba112efb
+  leaflet.css        a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6
+sha256 в репозитории (переводы строк LF, содержимое не менялось):
+  leaflet-src.esm.js 365aa819cf7b96247057aa48b800bdb061e199a014bf7a5c5ce4ddb8a75f0e4a
+  leaflet.css        337bfca5cabd03b39815b2700febe2b3b7edf55921c59cd49f88ecb328212303
