@@ -50,10 +50,12 @@ type Server struct {
 	avStore *av.Store     // музыка и видео
 	avSem   chan struct{} // не больше N одновременных ffmpeg в API
 
-	root           *chi.Mux         // для поиска шаблона маршрута (права токенов API)
-	appLimiter     limiter          // запросы на токен приложения
-	botLimiter     limiter          // запросы на токен бота
-	callbackClient *http.Client     // Callback API: не ходит во внутреннюю сеть
+	root           *chi.Mux     // для поиска шаблона маршрута (права токенов API)
+	appLimiter     limiter      // запросы на токен приложения
+	botLimiter     limiter      // запросы на токен бота
+	callbackClient *http.Client // Callback API: не ходит во внутреннюю сеть
+	tiles          *tileProxy   // nil — карта выключена
+	tileLimiter    limiter
 	yookassa       *yookassa.Client // nil — покупка монет выключена
 	m              *serverMetrics
 	static         map[string]staticFile // встроенный фронтенд
@@ -135,6 +137,7 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 		mfaLimiter:  lim("mfa", 5.0/300, 5),   // 5 попыток за 5 минут
 		mailLimiter: lim("mail", 3.0/3600, 3), // 3 письма в час
 		vulnLimiter: lim("vuln", 5.0/3600, 5), // 5 отчётов в час с IP
+		tileLimiter: lim("tile", 20, 400),     // карта грузит десятки тайлов разом
 
 		vapid:      vapid,
 		pushClient: webpush.SafeClient(),
@@ -148,6 +151,9 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 		appLimiter:     lim("app", 5, 20),  // как у ВКонтакте: несколько запросов в секунду
 		botLimiter:     lim("bot", 20, 40), // ботам — больше
 		callbackClient: safehttp.Client(10 * time.Second),
+	}
+	if cfg.TileURL != "" {
+		srv.tiles = newTileProxy(filepath.Join(cfg.MediaDir, "tile-cache"))
 	}
 	srv.initMetrics()
 	srv.static = loadStatic()
@@ -452,6 +458,9 @@ func (s *Server) Router() http.Handler {
 			// уведомления ЮKassa — без входа; проверка по IP и через API
 			r.Post("/payments/yookassa", s.handleYooKassaWebhook)
 
+			// что включено на сервере (карта и т. п.) — без входа
+			r.Get("/client-config", s.handleClientConfig)
+
 			// приём сообщений об уязвимостях — без входа в аккаунт
 			r.Post("/security/vulnerability-reports", s.handleVulnReport)
 		})
@@ -475,6 +484,9 @@ func (s *Server) Router() http.Handler {
 	// GPX-треки: до 15 МБ, разбор в памяти потоком.
 	r.With(deadlines(5*time.Minute), middleware.Timeout(4*time.Minute), s.requireAuth).
 		Post("/api/v1/routes", s.handleUploadRoute)
+
+	// Тайлы карты через свой прокси с кешем (без входа: нужны и публичным страницам).
+	r.With(deadlines(30*time.Second)).Get("/tiles/{z}/{x}/{y}", s.handleTile)
 
 	// Голосовые сообщения: до 5 МБ.
 	r.With(deadlines(5*time.Minute), middleware.Timeout(4*time.Minute), s.requireAuth).

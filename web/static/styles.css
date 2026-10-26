@@ -311,6 +311,19 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0 .25rem 0 0;
 .route-grid { stroke: var(--line); stroke-width: 1; }
 .route-axis { font-size: 11px; fill: var(--ink-2); font-variant-numeric: tabular-nums; }
 .route-note { margin: .25rem 0 0; }
+.route-actions { display: inline-flex; flex-wrap: wrap; gap: .25rem 1rem; }
+.route-map-wrap { position: relative; isolation: isolate; margin: .5rem 0 .75rem; } /* слои Leaflet (z-index до 1000) не вылезают поверх шапки */
+.route-map { height: min(60vh, 420px); border-radius: var(--radius-s); background: var(--tint); z-index: 0; }
+.route-map-full { position: fixed; inset: 0; z-index: 50; margin: 0; background: var(--surface); }
+.route-map-full .route-map { height: 100%; border-radius: 0; }
+.map-full-toggle { position: absolute; top: .5rem; right: .5rem; z-index: 1001; padding: .35rem .7rem; font-size: var(--step--1); }
+body.no-scroll { overflow: hidden; }
+.leaflet-container .map-route { stroke: var(--malachite); }
+.leaflet-container .map-route-halo { stroke: #fff; stroke-opacity: .85; }
+.leaflet-container .map-start { fill: var(--malachite); stroke: #fff; }
+.leaflet-container .map-finish { fill: var(--garnet); stroke: #fff; }
+.leaflet-container .map-waypoint { fill: #fff; stroke: var(--ink); }
+.leaflet-container { font: inherit; }
 .track-pick { display: inline-flex; flex-wrap: wrap; gap: .25rem; align-items: center; max-width: 100%; }
 .track-pick select { width: auto; padding: .4rem .35rem; font-size: var(--step--1); }
 @media (max-width: 520px) { .route-graphics { grid-template-columns: 1fr; } }

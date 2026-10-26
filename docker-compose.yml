@@ -70,6 +70,10 @@ services:
       MEDIA_DIR: /data/media
       APP_URL: ${APP_URL:-http://localhost:3000}
       SECURITY_CONTACT: ${SECURITY_CONTACT:-security@localhost}
+      # Карта: тайлы идут через кеширующий прокси сервера. Пустой TILE_URL выключает карту.
+      TILE_URL: ${TILE_URL-https://tile.openstreetmap.org/{z}/{x}/{y}.png}
+      TILE_ATTRIBUTION: ${TILE_ATTRIBUTION:-© участники OpenStreetMap}
+      TILE_MAX_ZOOM: ${TILE_MAX_ZOOM:-17}
       TOTP_ENC_KEY: ${TOTP_ENC_KEY:-}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}

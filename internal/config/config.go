@@ -75,6 +75,12 @@ type Config struct {
 	// MEDIA_CDN_URL — CDN перед бакетом: публичные файлы отдаются редиректом туда.
 	MediaCDNURL string
 
+	// TILE_URL — источник тайлов карты, шаблон с {z} {x} {y}. Пусто — карта выключена.
+	// Тайлы идут через свой прокси с кешем: посетители не обращаются к чужому серверу.
+	TileURL         string
+	TileAttribution string
+	TileMaxZoom     int
+
 	// /metrics для Prometheus — на отдельном внутреннем адресе.
 	MetricsAddr  string // по умолчанию :9090; "off" — выключить
 	MetricsToken string // необязательный Bearer-токен
@@ -178,6 +184,24 @@ func Load() (Config, error) {
 		return c, errors.New("S3_BUCKET, S3_ACCESS_KEY and S3_SECRET_KEY are required with S3_ENDPOINT")
 	}
 	c.MediaCDNURL = strings.TrimRight(os.Getenv("MEDIA_CDN_URL"), "/")
+	// задана, но пустая (TILE_URL=) — карта выключена; не задана — OpenStreetMap
+	c.TileURL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+	if v, set := os.LookupEnv("TILE_URL"); set {
+		c.TileURL = strings.TrimSpace(v)
+	}
+	if c.TileURL != "" && (!strings.HasPrefix(c.TileURL, "https://") && !strings.HasPrefix(c.TileURL, "http://") ||
+		!strings.Contains(c.TileURL, "{z}") || !strings.Contains(c.TileURL, "{x}") || !strings.Contains(c.TileURL, "{y}")) {
+		return c, errors.New("TILE_URL must be an http(s) URL template with {z}, {x} and {y}")
+	}
+	c.TileAttribution = getenv("TILE_ATTRIBUTION", "© участники OpenStreetMap")
+	c.TileMaxZoom = 17
+	if v := os.Getenv("TILE_MAX_ZOOM"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 20 {
+			return c, errors.New("TILE_MAX_ZOOM must be 1-20")
+		}
+		c.TileMaxZoom = n
+	}
 	if c.BackupS3 && c.S3Endpoint == "" {
 		return c, errors.New("BACKUP_S3=true requires S3_ENDPOINT")
 	}

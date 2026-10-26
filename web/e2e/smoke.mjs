@@ -134,7 +134,7 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   const gpxText = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="Garmin"><metadata><author><name>Анна</name></author></metadata>`
     + `<trk><name>Двуглавая сопка</name><trkseg>`
     + pts.map(([lat, ele], i) => `<trkpt lat="${lat.toFixed(6)}" lon="60.1"><ele>${ele.toFixed(1)}</ele><time>${new Date(Date.UTC(2026, 6, 4, 6, 0, i * 10)).toISOString()}</time></trkpt>`).join("")
-    + `</trkseg></trk></gpx>`;
+    + `</trkseg></trk><wpt lat="55.06" lon="60.1"><name>&lt;img src=x onerror=alert(1)&gt;Родник</name></wpt></gpx>`;
   await anna.page.goto(base + "/");
   await anna.page.locator('.composer input[data-kind="gpx"]').setInputFiles({ name: "hike.gpx", mimeType: "application/gpx+xml", buffer: Buffer.from(gpxText) });
   await anna.page.locator(".composer .doc").getByText("Двуглавая сопка").waitFor();
@@ -148,6 +148,24 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   assert.equal(await card.locator("svg.route-sketch circle").count(), 2, "start and finish drawn");
   await card.getByText("Первые и последние 200 м скрыты").waitFor();
   await anna.page.screenshot({ path: `${shots}/12-route.png`, fullPage: true });
+
+  // карта: подробный трек, тайлы через наш прокси, имена точек — только текстом
+  await card.getByRole("button", { name: "Показать на карте" }).click();
+  const map = card.locator(".route-map");
+  await map.locator("path.map-route").waitFor({ state: "attached" }); // трек туда-обратно по меридиану: ширина 0
+  await map.locator("img.leaflet-tile-loaded").first().waitFor();
+  const tileSrc = await map.locator("img.leaflet-tile").first().getAttribute("src");
+  assert.ok(tileSrc.startsWith("/tiles/") || tileSrc.startsWith(base + "/tiles/"), `tiles go through the proxy: ${tileSrc}`);
+  await map.getByText("© тестовая карта").waitFor();
+  assert.equal(await map.locator(".leaflet-control-attribution a").count(), 0, "no default Leaflet prefix link");
+  await map.locator("path.map-waypoint").hover({ force: true });
+  await anna.page.locator(".leaflet-tooltip", { hasText: "Родник" }).waitFor();
+  assert.equal(await anna.page.locator(".leaflet-tooltip img").count(), 0, "waypoint name rendered as text");
+  await anna.page.screenshot({ path: `${shots}/13-map.png`, fullPage: true });
+  await card.getByRole("button", { name: "Во весь экран" }).click();
+  await anna.page.locator(".route-map-full").waitFor();
+  await anna.page.keyboard.press("Escape");
+  await anna.page.waitForFunction(() => !document.querySelector(".route-map-full") && !document.body.classList.contains("no-scroll"));
   const dl = anna.page.waitForEvent("download");
   await card.getByRole("button", { name: "Скачать GPX" }).click();
   const gpxFile = await (await import("node:fs")).readFileSync(await (await dl).path(), "utf8");

@@ -135,6 +135,9 @@ SCOPES = {"profile": "Профиль, друзья, поиск", "friends": "З�
 r("GET", "/health", "service", "Проверка живости", resp=obj(status=str_), auth=False)
 r("GET", "/.well-known/security.txt", "service", "security.txt (RFC 9116)", auth=False, resp="text")
 r("GET", A + "/openapi.json", "service", "Эта спецификация", auth=False, resp="json")
+r("GET", A + "/client-config", "service", "Что включено на сервере (карта: адрес тайлов, атрибуция, максимальный масштаб)", auth=False,
+  resp=obj(map=obj(enabled=bool_, tiles=str_, attribution=str_, max_zoom=int_)))
+r("GET", "/tiles/{z}/{x}/{y}", "service", "Тайл карты через кеширующий прокси ({y} с суффиксом .png); 404 — карта выключена или неверные координаты", auth=False, resp="binary")
 # --- аккаунт ---
 r("POST", A + "/auth/register", "auth", "Регистрация", obj(email=str_, username=str_, password=str_, **{"first_name?": str_, "last_name?": str_}), S("Auth"), 201, auth=False)
 r("POST", A + "/auth/login", "auth", "Вход (шаг 1). При 2FA вернёт mfa_token", obj(email=str_, password=str_), {"oneOf": [S("Auth"), S("MFARequired")]}, auth=False)
