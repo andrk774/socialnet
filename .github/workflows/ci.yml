@@ -31,8 +31,8 @@ jobs:
         image: redis:7.4-alpine
         ports: ["6379:6379"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: ffmpeg (музыка и видео)
@@ -64,11 +64,11 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       - run: |
@@ -92,7 +92,7 @@ jobs:
   compose:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: .env для проверки
         run: |
           cat > .env <<EOF
@@ -103,28 +103,38 @@ jobs:
           BACKUP_ENC_KEY=$(openssl rand -hex 32)
           COOKIE_SECURE=false
           EOF
-      - run: docker compose up -d --build --wait
+      - run: docker compose up -d --build --wait --wait-timeout 300
       - run: python3 deploy/smoke.py
       - if: failure()
-        run: docker compose logs --tail 200
-      - run: docker compose down -v
+        name: Причина сбоя — в аннотации (видны в сводке прогона без открытия логов)
+        run: |
+          docker compose ps -a
+          docker compose logs --tail 200
+          note() { printf '::error title=%s::%s\n' "$1" "$(printf '%s' "$2" | tail -c 3500 | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')"; }
+          note "compose ps" "$(docker compose ps -a 2>&1)"
+          for svc in $(docker compose config --services); do
+            st=$(docker compose ps -a --format '{{.State}} {{.Health}}' "$svc" 2>/dev/null | head -1)
+            case "$st" in "running healthy"|"running ") ;; *) note "$svc: $st" "$(docker compose logs --no-color --tail 40 "$svc" 2>&1)";; esac
+          done
+      - if: always()
+        run: docker compose down -v
 
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
         with:
-          version: v2.5.0
+          version: v2.15.0
 
   security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: govulncheck — известные уязвимости в зависимостях
@@ -151,8 +161,8 @@ jobs:
           - { pkg: ./internal/backup, fn: FuzzDecrypt }
           - { pkg: ./internal/yookassa, fn: FuzzParseKopecks }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: ${{ matrix.target.fn }}
@@ -162,12 +172,17 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test, lint]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Сборка образа
         run: docker build -t socialnet:ci .
       - name: Trivy — уязвимости в образе
-        uses: aquasecurity/trivy-action@0.33.1
+        # Сторонние действия — только по полному хэшу коммита: в марте 2026
+        # теги trivy-action перезаписали на код, кравший секреты CI
+        # (GHSA-69fq-xp46-6x23). Хэш ниже — v0.35.0, единственная непострадавшая
+        # версия; Trivy — из проверенного диапазона 0.69.2–0.69.3.
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
+          version: v0.69.3
           image-ref: socialnet:ci
           severity: CRITICAL,HIGH
           ignore-unfixed: true

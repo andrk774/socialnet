@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -20,6 +21,10 @@ type Config struct {
 	RefreshTTL   time.Duration
 	CookieSecure bool // false только для локальной разработки по http://
 	TrustProxy   bool // true, если API стоит за Nginx и ему можно верить в X-Forwarded-For
+	// TrustedProxies — подсети своих прокси (CIDR). IP клиента — первый справа
+	// адрес в X-Forwarded-For не из этих подсетей. Пусто — ровно один прокси
+	// (Nginx перед API): берётся последний адрес, который он сам дописал.
+	TrustedProxies []string
 
 	// Лимит на /api/v1/auth/* с одного IP: запросов в минуту и размер всплеска.
 	AuthRatePerMin int
@@ -113,6 +118,15 @@ func Load() (Config, error) {
 	}
 	if c.TrustProxy, err = boolean("TRUST_PROXY", false); err != nil {
 		return c, err
+	}
+	for _, cidr := range strings.Split(os.Getenv("TRUSTED_PROXIES"), ",") {
+		if cidr = strings.TrimSpace(cidr); cidr == "" {
+			continue
+		}
+		if _, err := netip.ParsePrefix(cidr); err != nil {
+			return c, fmt.Errorf("TRUSTED_PROXIES: %q is not a CIDR (example: 10.0.0.0/8)", cidr)
+		}
+		c.TrustedProxies = append(c.TrustedProxies, cidr)
 	}
 	for _, o := range strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",") {
 		if o = strings.TrimSpace(o); o != "" {
