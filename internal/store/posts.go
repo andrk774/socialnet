@@ -36,6 +36,7 @@ type PostVideo struct {
 	DurationSec int    `json:"duration_sec"`
 	PosterURL   string `json:"poster_url"`
 	HLSURL      string `json:"hls_url"`
+	MP4URL      string `json:"mp4_url,omitempty"` // для браузеров без HLS
 }
 
 func VideoURL(id, file string) string { return "/video/" + id + "/" + file }
@@ -93,7 +94,9 @@ const postSelect = `
 	                 FROM post_tracks pt JOIN tracks t ON t.id = pt.track_id
 	                 WHERE pt.post_id = p.id AND t.removed_at IS NULL), '[]'),
 	       COALESCE((SELECT json_agg(json_build_object('id', v.id, 'title', v.title,
-	                         'duration_sec', v.duration_sec) ORDER BY pv.position)
+	                         'duration_sec', v.duration_sec,
+	                         'mp4_url', CASE WHEN v.mp4 IS NOT NULL THEN '/video/' || v.id || '/' || v.mp4 || '.mp4' END)
+	                         ORDER BY pv.position)
 	                 FROM post_videos pv JOIN videos v ON v.id = pv.video_id
 	                 WHERE pv.post_id = p.id AND v.status = 'ready'), '[]')
 	FROM posts p

@@ -96,7 +96,7 @@ export function PostView({ initial, onDelete }) {
                 t.title),
             h("span", { class: "muted" }, duration(t.duration_sec)),
             h("audio", { controls: true, preload: "none", src: t.url })))),
-        p.videos.map((v) => h(Video, { key: v.id, src: v.hls_url, poster: v.poster_url, title: v.title })),
+        p.videos.map((v) => h(Video, { key: v.id, src: v.hls_url, mp4: v.mp4_url, poster: v.poster_url, title: v.title })),
         h("footer", { class: "post-actions" },
             h("div", { class: "react-wrap" },
                 h("button", { class: p.my_reaction ? "chip active" : "chip", "aria-pressed": !!p.my_reaction, onClick: () => (p.my_reaction ? react(null) : react("like")), onContextMenu: (e) => { e.preventDefault(); setPicking(!picking); } },
@@ -112,12 +112,15 @@ export function PostView({ initial, onDelete }) {
                 p.comments_count > 0 ? ` ${p.comments_count}` : "")),
         open && h(Comments, { post: p, onCount: (n) => setP({ ...p, comments_count: n }) })));
 }
-export function Video({ src, poster, title }) {
-    // HLS нативно умеют Safari, iOS и большинство Android. Остальным — честно скажем.
-    const native = document.createElement("video").canPlayType("application/vnd.apple.mpegurl") !== "";
+export function Video({ src, mp4, poster, title }) {
+    // Браузер берёт первый источник, который умеет играть: HLS (Safari, iOS,
+    // Android — с подстройкой качества под сеть) или MP4 (остальные).
+    const hls = document.createElement("video").canPlayType("application/vnd.apple.mpegurl") !== "";
     return (h("figure", { class: "video" },
-        native ? h("video", { controls: true, preload: "none", poster: poster, src: src }) : (h("div", { class: "video-fallback", style: { backgroundImage: `url("${poster}")` } },
-            h("p", null, "\u042D\u0442\u043E\u0442 \u0431\u0440\u0430\u0443\u0437\u0435\u0440 \u043D\u0435 \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u043E\u0434\u0438\u0442 HLS. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0432\u0438\u0434\u0435\u043E \u0432 Safari \u0438\u043B\u0438 \u043D\u0430 \u0442\u0435\u043B\u0435\u0444\u043E\u043D\u0435."))),
+        hls || mp4 ? (h("video", { controls: true, preload: "none", poster: poster, playsInline: true },
+            hls && h("source", { src: src, type: "application/vnd.apple.mpegurl" }),
+            mp4 && h("source", { src: mp4, type: "video/mp4" }))) : (h("div", { class: "video-fallback", style: { backgroundImage: `url("${poster}")` } },
+            h("p", null, "\u0412\u0438\u0434\u0435\u043E \u0435\u0449\u0451 \u0433\u043E\u0442\u043E\u0432\u0438\u0442\u0441\u044F \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0430. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0435\u0433\u043E \u043D\u0430 \u0442\u0435\u043B\u0435\u0444\u043E\u043D\u0435 \u0438\u043B\u0438 \u0432 Safari."))),
         title && h("figcaption", null, title)));
 }
 function Comments({ post: p, onCount }) {

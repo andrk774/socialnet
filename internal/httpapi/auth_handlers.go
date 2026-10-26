@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/mail"
@@ -346,6 +347,13 @@ func ipString(ip *netip.Addr) string {
 // internalError пишет подробности в лог, а клиенту отдаёт общий ответ
 // без стектрейсов и текста ошибок БД.
 func (s *Server) internalError(w http.ResponseWriter, r *http.Request, err error) {
+	// клиент ушёл, не дождавшись ответа (закрыл вкладку, перешёл по ссылке) —
+	// это не сбой сервера, будить дежурного незачем
+	if r.Context().Err() != nil && errors.Is(err, context.Canceled) {
+		s.log.Info("request canceled by client", "path", r.URL.Path)
+		w.WriteHeader(499)
+		return
+	}
 	s.log.Error("internal error", "err", err, "path", r.URL.Path)
 	writeError(w, http.StatusInternalServerError, "internal", "internal server error")
 }

@@ -105,6 +105,11 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "/api", "probe", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 4s
+      retries: 3
 
   # Фоновая обработка видео (ffmpeg). Изолирован сильнее всего:
   # только внутренняя сеть (нет интернета), файловая система только для
@@ -188,7 +193,10 @@ services:
     profiles: [monitoring]
     restart: unless-stopped
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      # Не обязателен для основного стека (иначе compose требовал бы его и без
+      # профиля monitoring). Пусто — Grafana попросит сменить admin/admin при
+      # первом входе; порт открыт только на localhost.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
     volumes:

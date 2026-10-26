@@ -106,7 +106,7 @@ export function PostView({ initial, onDelete }: { initial: Post; onDelete?: () =
       {p.tracks.map((t) => (
         <div class="track" key={t.id}><span>{t.artist} — {t.title}</span><span class="muted">{duration(t.duration_sec)}</span><audio controls preload="none" src={t.url} /></div>
       ))}
-      {p.videos.map((v) => <Video key={v.id} src={v.hls_url} poster={v.poster_url} title={v.title} />)}
+      {p.videos.map((v) => <Video key={v.id} src={v.hls_url} mp4={v.mp4_url} poster={v.poster_url} title={v.title} />)}
       <footer class="post-actions">
         <div class="react-wrap">
           <button class={p.my_reaction ? "chip active" : "chip"} aria-pressed={!!p.my_reaction}
@@ -132,14 +132,20 @@ export function PostView({ initial, onDelete }: { initial: Post; onDelete?: () =
   );
 }
 
-export function Video({ src, poster, title }: { src: string; poster: string; title?: string }) {
-  // HLS нативно умеют Safari, iOS и большинство Android. Остальным — честно скажем.
-  const native = document.createElement("video").canPlayType("application/vnd.apple.mpegurl") !== "";
+export function Video({ src, mp4, poster, title }: { src: string; mp4?: string; poster: string; title?: string }) {
+  // Браузер берёт первый источник, который умеет играть: HLS (Safari, iOS,
+  // Android — с подстройкой качества под сеть) или MP4 (остальные).
+  const hls = document.createElement("video").canPlayType("application/vnd.apple.mpegurl") !== "";
   return (
     <figure class="video">
-      {native ? <video controls preload="none" poster={poster} src={src} /> : (
+      {hls || mp4 ? (
+        <video controls preload="none" poster={poster} playsInline>
+          {hls && <source src={src} type="application/vnd.apple.mpegurl" />}
+          {mp4 && <source src={mp4} type="video/mp4" />}
+        </video>
+      ) : (
         <div class="video-fallback" style={{ backgroundImage: `url("${poster}")` }}>
-          <p>Этот браузер не воспроизводит HLS. Откройте видео в Safari или на телефоне.</p>
+          <p>Видео ещё готовится для этого браузера. Откройте его на телефоне или в Safari.</p>
         </div>
       )}
       {title && <figcaption>{title}</figcaption>}

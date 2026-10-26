@@ -81,6 +81,27 @@ jobs:
           name: e2e-screenshots
           path: ${{ runner.temp }}/shots
 
+  # Настоящие образы: сборка Dockerfile, весь стек в compose и сквозная проверка.
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: .env для проверки
+        run: |
+          cat > .env <<EOF
+          POSTGRES_PASSWORD=$(openssl rand -hex 16)
+          JWT_SECRET=$(openssl rand -hex 32)
+          TOTP_ENC_KEY=$(openssl rand -hex 32)
+          REDIS_PASSWORD=$(openssl rand -hex 16)
+          BACKUP_ENC_KEY=$(openssl rand -hex 32)
+          COOKIE_SECURE=false
+          EOF
+      - run: docker compose up -d --build --wait
+      - run: python3 deploy/smoke.py
+      - if: failure()
+        run: docker compose logs --tail 200
+      - run: docker compose down -v
+
   lint:
     runs-on: ubuntu-latest
     steps:

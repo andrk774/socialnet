@@ -46,6 +46,8 @@ func (m *moneyRequest) validate(r *http.Request) map[string]string {
 // moneyError переводит ошибки кошелька в ответы API.
 func (s *Server) moneyError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
+	case errors.Is(err, store.ErrWalletDebt):
+		writeError(w, http.StatusConflict, "wallet_debt", "a refunded purchase left a debt; spending is blocked until it is repaid")
 	case errors.Is(err, store.ErrInsufficientFunds):
 		writeError(w, http.StatusPaymentRequired, "insufficient_funds", "not enough coins")
 	case errors.Is(err, store.ErrIdempotencyReuse):
@@ -91,7 +93,12 @@ func (s *Server) handleWallet(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"balance": bal, "transactions": list(hist, p.Limit, txCursor)})
+	debt, err := s.store.Debt(r.Context(), acc.Owner)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"balance": bal, "debt": debt, "transactions": list(hist, p.Limit, txCursor)})
 }
 
 func (s *Server) handleTransfer(w http.ResponseWriter, r *http.Request) {
@@ -322,7 +329,12 @@ func (s *Server) handleCommunityWallet(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"balance": bal, "transactions": list(hist, p.Limit, txCursor)})
+	debt, err := s.store.Debt(r.Context(), acc.Owner)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"balance": bal, "debt": debt, "transactions": list(hist, p.Limit, txCursor)})
 }
 
 // Выводить монеты сообщества может только владелец и только участнику.

@@ -11,6 +11,8 @@ import (
 	"log/slog"
 	"math"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"socialnet/internal/av"
@@ -63,6 +65,8 @@ func (w *Worker) ProcessOne(ctx context.Context) (bool, error) {
 	switch job.Kind {
 	case "video_transcode":
 		err = w.transcodeVideo(ctx, job)
+	case "video_mp4":
+		err = w.backfillMP4(ctx, job)
 	default:
 		err = errors.New("unknown job kind " + job.Kind)
 	}
@@ -120,11 +124,18 @@ func (w *Worker) transcodeVideo(ctx context.Context, job *store.Job) error {
 		_ = os.RemoveAll(dir)
 		return err
 	}
+	// MP4 лучшего качества — для браузеров без HLS. Не получилось — видео
+	// всё равно публикуем: HLS-версия есть.
+	mp4 := made[len(made)-1]
+	if err := av.RemuxMP4(ctx, dir, mp4); err != nil {
+		w.Log.Warn("remux mp4", "id", id, "err", err)
+		mp4 = ""
+	}
 	if err := w.AV.Commit(ctx, "videos", id); err != nil { // в S3, если настроено
 		return err
 	}
 	secs := int(math.Min(math.Round(probe.Seconds), MaxVideoSeconds))
-	owner, err := w.Store.VideoReady(ctx, id, secs, v.Width, v.Height, made)
+	owner, err := w.Store.VideoReady(ctx, id, secs, v.Width, v.Height, made, mp4)
 	if errors.Is(err, store.ErrNotFound) {
 		_ = w.AV.Delete("videos", id) // видео удалили, пока шла обработка
 	} else if err != nil {
@@ -140,4 +151,47 @@ func (w *Worker) transcodeVideo(ctx context.Context, job *store.Job) error {
 	_ = os.Remove(src)
 	w.Log.Info("video ready", "id", id, "qualities", made)
 	return nil
+}
+
+// backfillMP4 собирает MP4 для видео, обработанного до появления MP4:
+// скачивает плейлист и сегменты (с диска или из S3) и склеивает их.
+func (w *Worker) backfillMP4(ctx context.Context, job *store.Job) error {
+	id, rendition := job.Payload["video_id"], job.Payload["rendition"]
+	tmpRoot, err := w.AV.TempDir()
+	if err != nil {
+		return err
+	}
+	tmp, err := os.MkdirTemp(tmpRoot, "mp4-")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.RemoveAll(tmp) }()
+	playlist := rendition + ".m3u8"
+	if err := w.AV.Fetch(ctx, "videos", id, playlist, filepath.Join(tmp, playlist)); err != nil {
+		return err
+	}
+	data, err := os.ReadFile(filepath.Join(tmp, playlist)) //nolint:gosec // наш временный файл
+	if err != nil {
+		return err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		name := strings.TrimSpace(line)
+		if name == "" || strings.HasPrefix(name, "#") {
+			continue
+		}
+		// в плейлисте только наши имена сегментов; всё прочее — повод остановиться
+		if _, err := w.AV.Key("videos", id, name); err != nil || !strings.HasSuffix(name, ".ts") {
+			return errors.New("unexpected entry in playlist: " + name)
+		}
+		if err := w.AV.Fetch(ctx, "videos", id, name, filepath.Join(tmp, name)); err != nil {
+			return err
+		}
+	}
+	if err := av.RemuxMP4(ctx, tmp, rendition); err != nil {
+		return err
+	}
+	if err := w.AV.PutFile(ctx, "videos", id, rendition+".mp4", tmp); err != nil {
+		return err
+	}
+	return w.Store.SetVideoMP4(ctx, id, rendition)
 }

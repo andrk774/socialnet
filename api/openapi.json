@@ -504,6 +504,9 @@
      },
      "hls_url": {
       "type": "string"
+     },
+     "mp4_url": {
+      "type": "string"
      }
     },
     "required": [
@@ -1761,6 +1764,9 @@
       "type": "string"
      },
      "hls_url": {
+      "type": "string"
+     },
+     "mp4_url": {
       "type": "string"
      },
      "qualities": {
@@ -6687,7 +6693,7 @@
     "tags": [
      "wallet"
     ],
-    "summary": "Уведомления ЮKassa (только с её адресов; статус перепроверяется через API)",
+    "summary": "Уведомления ЮKassa: payment.*, refund.succeeded (только с её адресов; всё перепроверяется через API)",
     "operationId": "post_api_v1_payments_yookassa",
     "security": [],
     "requestBody": {
@@ -10463,6 +10469,10 @@
            "type": "integer",
            "format": "int64"
           },
+          "debt": {
+           "type": "integer",
+           "format": "int64"
+          },
           "transactions": {
            "type": "object",
            "properties": {
@@ -10486,6 +10496,7 @@
          },
          "required": [
           "balance",
+          "debt",
           "transactions"
          ]
         }
@@ -10649,7 +10660,9 @@
                "pending",
                "succeeded",
                "canceled",
-               "error"
+               "error",
+               "refunded",
+               "partially_refunded"
               ]
              },
              "confirmation_url": {
@@ -10748,7 +10761,9 @@
             "pending",
             "succeeded",
             "canceled",
-            "error"
+            "error",
+            "refunded",
+            "partially_refunded"
            ]
           },
           "confirmation_url": {
@@ -10835,7 +10850,9 @@
             "pending",
             "succeeded",
             "canceled",
-            "error"
+            "error",
+            "refunded",
+            "partially_refunded"
            ]
           },
           "confirmation_url": {
