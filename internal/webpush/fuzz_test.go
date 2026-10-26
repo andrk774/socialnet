@@ -20,6 +20,7 @@ func FuzzDecrypt(f *testing.F) {
 func FuzzValidateEndpoint(f *testing.F) {
 	f.Add("https://fcm.googleapis.com/x")
 	f.Add("https://169.254.169.254/")
+	f.Add("HTTPS://fcm.googleapis.com/x") // найдено фаззером в CI: схема в верхнем регистре
 	f.Fuzz(func(t *testing.T, s string) {
 		if ValidateEndpoint(s, DefaultHosts) == nil {
 			// всё, что прошло проверку, должно быть https на разрешённом хосте

@@ -306,7 +306,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 // Cookie видна только эндпоинтам /api/v1/auth, недоступна JS (HttpOnly)
 // и не уходит с чужих сайтов (SameSite=Strict): это защита от XSS-кражи и CSRF.
 func (s *Server) setRefreshCookie(w http.ResponseWriter, value string, ttl time.Duration) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- HttpOnly и SameSite=Strict всегда; Secure выключается только COOKIE_SECURE=false для разработки по http
 		Name:     refreshCookie,
 		Value:    value,
 		Path:     "/api/v1/auth",
@@ -318,7 +318,7 @@ func (s *Server) setRefreshCookie(w http.ResponseWriter, value string, ttl time.
 }
 
 func (s *Server) clearRefreshCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- HttpOnly и SameSite=Strict всегда; Secure выключается только COOKIE_SECURE=false для разработки по http
 		Name:     refreshCookie,
 		Value:    "",
 		Path:     "/api/v1/auth",

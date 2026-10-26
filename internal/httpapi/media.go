@@ -100,7 +100,7 @@ func (s *Server) handleServeMedia(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, remote := s.files.(*media.S3); remote && s.cfg.MediaCDNURL != "" {
 		w.Header().Set("Cache-Control", "public, max-age=3600")
-		http.Redirect(w, r, s.cfg.MediaCDNURL+"/photos/"+id+"/"+size, http.StatusFound)
+		http.Redirect(w, r, s.cfg.MediaCDNURL+"/photos/"+id+"/"+size, http.StatusFound) // #nosec G710 -- адрес CDN из настроек, id и size проверены выше
 		return
 	}
 	f, mod, err := s.files.Open(id, size)

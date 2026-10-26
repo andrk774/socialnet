@@ -224,7 +224,7 @@ func (s *Server) serveRemoteAV(w http.ResponseWriter, r *http.Request, kind, id,
 	}
 	if s.cfg.MediaCDNURL != "" && kind != "voices" && kind != "docs" { // личное — только через нас
 		w.Header().Set("Cache-Control", "public, max-age=300")
-		http.Redirect(w, r, s.cfg.MediaCDNURL+"/"+key, http.StatusFound)
+		http.Redirect(w, r, s.cfg.MediaCDNURL+"/"+key, http.StatusFound) // #nosec G710 -- адрес CDN из настроек, key собран из проверенных UUID и имени файла
 		return
 	}
 	obj, err := s.avStore.Remote.Get(r.Context(), key, r.Header.Get("Range"))

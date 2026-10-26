@@ -109,10 +109,10 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 		if err := os.MkdirAll(o.Dir, 0o700); err != nil {
 			return res, err
 		}
-		if err := os.WriteFile(filepath.Join(o.Dir, res.Name), data, 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(o.Dir, res.Name), data, 0o600); err != nil { // #nosec G703 -- каталог из настроек, имя файла создаёт сам сервер
 			return res, err
 		}
-		if err := os.WriteFile(filepath.Join(o.Dir, res.Name+".sha256"), []byte(res.SHA256+"  "+res.Name+"\n"), 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(o.Dir, res.Name+".sha256"), []byte(res.SHA256+"  "+res.Name+"\n"), 0o600); err != nil { // #nosec G703 -- то же имя, созданное сервером
 			return res, err
 		}
 		if err := pruneDir(o.Dir, o.Keep); err != nil {
