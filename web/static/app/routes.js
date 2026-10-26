@@ -1,0 +1,98 @@
+// Маршрут из GPX: сводка, схема трека и профиль высот. Рисуется в SVG без
+// внешних библиотек и без запросов к картографическим серверам.
+import { h } from "../vendor/preact/index.js";
+import { useState } from "../vendor/preact/hooks.js";
+import { saveFile } from "./api.js";
+import { ErrorLine } from "./ui.js";
+const nf1 = new Intl.NumberFormat("ru", { maximumFractionDigits: 1 });
+const nf0 = new Intl.NumberFormat("ru", { maximumFractionDigits: 0 });
+export const km = (m) => (m < 1000 ? `${nf0.format(m)} м` : `${nf1.format(m / 1000)} км`);
+export function hours(sec) {
+    const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+    return h > 0 ? `${h} ч${m ? ` ${m} мин` : ""}` : `${m} мин`;
+}
+export function RouteCard({ route }) {
+    const [error, setError] = useState(null);
+    const stats = [["Расстояние", km(route.distance_m)]];
+    if (route.max_ele !== null) {
+        stats.push(["Набор", `↑ ${nf0.format(route.gain_m)} м`], ["Сброс", `↓ ${nf0.format(route.loss_m)} м`]);
+        stats.push(["Высота", `${nf0.format(route.min_ele ?? 0)}–${nf0.format(route.max_ele)} м`]);
+    }
+    if (route.moving_sec > 0)
+        stats.push(["В движении", hours(route.moving_sec)]);
+    else if (route.duration_sec > 0)
+        stats.push(["Время", hours(route.duration_sec)]);
+    return (h("section", { class: "route", "aria-label": `Маршрут: ${route.title}` },
+        h("header", { class: "route-head" },
+            h("strong", { class: "route-title" }, route.title),
+            h("button", { class: "link", onClick: () => saveFile(route.gpx_url, `${route.title}.gpx`).catch(setError) }, "\u0421\u043A\u0430\u0447\u0430\u0442\u044C GPX")),
+        h("dl", { class: "route-stats" }, stats.map(([k, v]) => h("div", { key: k },
+            h("dt", null, k),
+            h("dd", null, v)))),
+        h("div", { class: "route-graphics" },
+            h(TrackSketch, { points: route.preview }),
+            route.profile.length > 1 && h(ElevationProfile, { profile: route.profile })),
+        route.hidden_ends_m > 0 && h("p", { class: "muted route-note" },
+            "\u041F\u0435\u0440\u0432\u044B\u0435 \u0438 \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 ",
+            route.hidden_ends_m,
+            " \u043C \u0441\u043A\u0440\u044B\u0442\u044B \u0430\u0432\u0442\u043E\u0440\u043E\u043C."),
+        h(ErrorLine, { error: error })));
+}
+// TrackSketch — линия трека в своём масштабе (равнопромежуточная проекция с
+// поправкой на широту, чтобы север был сверху и пропорции не искажались).
+export function TrackSketch({ points }) {
+    if (points.length < 2)
+        return null;
+    const W = 240, H = 180, pad = 12;
+    const lat0 = (points.reduce((s, p) => s + p[0], 0) / points.length) * Math.PI / 180;
+    const xs = points.map((p) => p[1] * Math.cos(lat0)), ys = points.map((p) => p[0]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    const scale = Math.min((W - 2 * pad) / (maxX - minX || 1e-9), (H - 2 * pad) / (maxY - minY || 1e-9));
+    const ox = (W - (maxX - minX) * scale) / 2, oy = (H - (maxY - minY) * scale) / 2;
+    const X = (x) => ox + (x - minX) * scale, Y = (y) => H - oy - (y - minY) * scale;
+    const d = xs.map((x, i) => `${i ? "L" : "M"}${X(x).toFixed(1)} ${Y(ys[i]).toFixed(1)}`).join("");
+    const last = xs.length - 1;
+    return (h("svg", { class: "route-sketch", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "\u0421\u0445\u0435\u043C\u0430 \u0442\u0440\u0435\u043A\u0430" },
+        h("path", { d: d, fill: "none", class: "route-line", "stroke-width": "2.5", "stroke-linejoin": "round", "stroke-linecap": "round" }),
+        h("circle", { cx: X(xs[0]), cy: Y(ys[0]), r: "4.5", class: "route-start" }),
+        h("circle", { cx: X(xs[last]), cy: Y(ys[last]), r: "4.5", class: "route-finish" }),
+        h("text", { x: W - 6, y: 14, "text-anchor": "end", class: "route-north" }, "\u0421 \u2191")));
+}
+// ElevationProfile — высота по пройденному расстоянию.
+export function ElevationProfile({ profile }) {
+    const W = 360, H = 180, L = 40, R = 8, T = 10, B = 24;
+    const total = profile[profile.length - 1].d || 1;
+    let lo = Math.min(...profile.map((p) => p.e)), hi = Math.max(...profile.map((p) => p.e));
+    const step = niceStep((hi - lo) / 3 || 10);
+    lo = Math.floor(lo / step) * step;
+    hi = Math.max(Math.ceil(hi / step) * step, lo + step);
+    const X = (d) => L + (d / total) * (W - L - R);
+    const Y = (e) => T + (1 - (e - lo) / (hi - lo)) * (H - T - B);
+    const line = profile.map((p, i) => `${i ? "L" : "M"}${X(p.d).toFixed(1)} ${Y(p.e).toFixed(1)}`).join("");
+    const area = `${line}L${X(total).toFixed(1)} ${H - B}L${L} ${H - B}Z`;
+    const yTicks = [];
+    for (let e = lo; e <= hi + 1e-9; e += step)
+        yTicks.push(e);
+    const kmStep = niceStep(total / 1000 / 4) * 1000;
+    const xTicks = [];
+    for (let d = 0; d <= total + 1; d += kmStep)
+        xTicks.push(d);
+    return (h("svg", { class: "route-profile", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `Профиль высот: от ${Math.round(lo)} до ${Math.round(hi)} метров на ${km(total)}` },
+        yTicks.map((e, i) => (h("g", { key: `y${e}` },
+            h("line", { x1: L, x2: W - R, y1: Y(e), y2: Y(e), class: "route-grid" }),
+            h("text", { x: L - 6, y: Y(e) + 4, "text-anchor": "end", class: "route-axis" },
+                nf0.format(e),
+                i === yTicks.length - 1 ? " м" : "")))),
+        xTicks.map((d, i) => (h("text", { key: `x${d}`, x: X(d), y: H - 6, "text-anchor": i === 0 ? "start" : i === xTicks.length - 1 && X(d) > W - R - 20 ? "end" : "middle", class: "route-axis" },
+            nf1.format(d / 1000),
+            i === xTicks.length - 1 ? " км" : ""))),
+        h("path", { d: area, class: "route-area" }),
+        h("path", { d: line, fill: "none", class: "route-line", "stroke-width": "2", "stroke-linejoin": "round" })));
+}
+function niceStep(raw) {
+    if (!(raw > 0))
+        return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const n = raw / p;
+    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p;
+}

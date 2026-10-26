@@ -272,6 +272,13 @@ func (s *Server) Router() http.Handler {
 				r.Delete("/documents/{did}", s.handleDeleteDocument)
 				r.Get("/documents/{did}/download", s.handleDownloadDocument)
 
+				// маршруты (GPX)
+				r.Get("/routes", s.handleMyRoutes)
+				r.Get("/routes/{rid}", s.handleGetRoute)
+				r.Patch("/routes/{rid}", s.handleRenameRoute)
+				r.Delete("/routes/{rid}", s.handleDeleteRoute)
+				r.Get("/routes/{rid}/gpx", s.handleRouteGPX)
+
 				// уведомления
 				r.Get("/notifications", s.handleNotifications)
 				r.Post("/notifications/read", s.handleNotificationsRead)
@@ -464,6 +471,10 @@ func (s *Server) Router() http.Handler {
 	// Документы: до 50 МБ.
 	r.With(deadlines(10*time.Minute), middleware.Timeout(9*time.Minute), s.requireAuth).
 		Post("/api/v1/documents", s.handleUploadDocument)
+
+	// GPX-треки: до 15 МБ, разбор в памяти потоком.
+	r.With(deadlines(5*time.Minute), middleware.Timeout(4*time.Minute), s.requireAuth).
+		Post("/api/v1/routes", s.handleUploadRoute)
 
 	// Голосовые сообщения: до 5 МБ.
 	r.With(deadlines(5*time.Minute), middleware.Timeout(4*time.Minute), s.requireAuth).

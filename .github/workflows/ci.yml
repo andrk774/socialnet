@@ -162,6 +162,7 @@ jobs:
           - { pkg: ./internal/redisx, fn: FuzzReadReply }
           - { pkg: ./internal/backup, fn: FuzzDecrypt }
           - { pkg: ./internal/yookassa, fn: FuzzParseKopecks }
+          - { pkg: ./internal/gpx, fn: FuzzParse }
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6

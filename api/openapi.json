@@ -44,6 +44,10 @@
    "description": "Документы"
   },
   {
+   "name": "routes",
+   "description": "Маршруты GPX"
+  },
+  {
    "name": "bookmarks",
    "description": "Закладки"
   },
@@ -119,6 +123,7 @@
        "stories": "Истории",
        "events": "Мероприятия",
        "docs": "Документы",
+       "routes": "Маршруты",
        "bookmarks": "Закладки",
        "offline": "Токен без срока действия"
       }
@@ -595,6 +600,159 @@
      "created_at"
     ]
    },
+   "Route": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "owner_id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "title": {
+      "type": "string"
+     },
+     "distance_m": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "gain_m": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "loss_m": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "min_ele": {
+      "type": "number",
+      "nullable": true
+     },
+     "max_ele": {
+      "type": "number",
+      "nullable": true
+     },
+     "duration_sec": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "moving_sec": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "points": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "hidden_ends_m": {
+      "type": "integer",
+      "enum": [
+       0,
+       200,
+       500,
+       1000
+      ]
+     },
+     "bbox": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      }
+     },
+     "preview": {
+      "type": "array",
+      "items": {
+       "type": "array",
+       "items": {
+        "type": "number"
+       }
+      }
+     },
+     "profile": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "d": {
+         "type": "number"
+        },
+        "e": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "d",
+        "e"
+       ]
+      }
+     },
+     "gpx_url": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "detail": {
+      "type": "array",
+      "items": {
+       "type": "array",
+       "items": {
+        "type": "array",
+        "items": {
+         "type": "number"
+        }
+       }
+      }
+     },
+     "waypoints": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "lat": {
+         "type": "number"
+        },
+        "lon": {
+         "type": "number"
+        },
+        "name": {
+         "type": "string"
+        },
+        "ele": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "lat",
+        "lon",
+        "name"
+       ]
+      }
+     }
+    },
+    "required": [
+     "id",
+     "owner_id",
+     "title",
+     "distance_m",
+     "gain_m",
+     "loss_m",
+     "min_ele",
+     "max_ele",
+     "duration_sec",
+     "moving_sec",
+     "points",
+     "hidden_ends_m",
+     "bbox",
+     "preview",
+     "profile",
+     "gpx_url",
+     "created_at"
+    ]
+   },
    "Poll": {
     "type": "object",
     "properties": {
@@ -729,6 +887,12 @@
        "$ref": "#/components/schemas/PostDocument"
       }
      },
+     "routes": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/Route"
+      }
+     },
      "poll": {
       "$ref": "#/components/schemas/Poll",
       "nullable": true
@@ -792,6 +956,7 @@
      "tracks",
      "videos",
      "documents",
+     "routes",
      "poll",
      "audience",
      "bookmarked",
@@ -7231,7 +7396,7 @@
     "tags": [
      "moderation"
     ],
-    "summary": "Скрыть: posts|comments|communities|tracks|videos|documents",
+    "summary": "Скрыть: posts|comments|communities|tracks|videos|documents|routes",
     "operationId": "post_api_v1_mod_type_id_hide",
     "parameters": [
      {
@@ -8123,6 +8288,13 @@
           }
          },
          "document_ids": {
+          "type": "array",
+          "items": {
+           "type": "string",
+           "format": "uuid"
+          }
+         },
+         "route_ids": {
           "type": "array",
           "items": {
            "type": "string",
@@ -9193,7 +9365,8 @@
            "community",
            "track",
            "video",
-           "document"
+           "document",
+           "route"
           ]
          },
          "target_id": {
@@ -9236,6 +9409,286 @@
           "id",
           "status"
          ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/routes": {
+   "get": {
+    "tags": [
+     "routes"
+    ],
+    "summary": "Мои маршруты",
+    "operationId": "get_api_v1_routes",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Route"
+           }
+          },
+          "next_cursor": {
+           "type": "integer",
+           "format": "int64",
+           "nullable": true
+          }
+         },
+         "required": [
+          "items",
+          "next_cursor"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "routes"
+    ],
+    "summary": "Загрузить GPX (до 15 МБ): сервер считает статистику и хранит очищенный трек — без автора, устройства, времени и без концов (hidden_ends_m, по умолчанию 200 м)",
+    "operationId": "post_api_v1_routes",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "file": {
+          "type": "string",
+          "format": "binary"
+         },
+         "title": {
+          "type": "string"
+         },
+         "hidden_ends_m": {
+          "type": "string",
+          "enum": [
+           "0",
+           "200",
+           "500",
+           "1000"
+          ]
+         }
+        },
+        "required": [
+         "file"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Route"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/routes/{rid}": {
+   "delete": {
+    "tags": [
+     "routes"
+    ],
+    "summary": "Удалить (пропадёт из записей)",
+    "operationId": "delete_api_v1_routes_rid",
+    "parameters": [
+     {
+      "name": "rid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "routes"
+    ],
+    "summary": "Маршрут с подробной геометрией (владелец и зрители записи)",
+    "operationId": "get_api_v1_routes_rid",
+    "parameters": [
+     {
+      "name": "rid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Route"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "routes"
+    ],
+    "summary": "Переименовать",
+    "operationId": "patch_api_v1_routes_rid",
+    "parameters": [
+     {
+      "name": "rid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "title"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Route"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/routes/{rid}/gpx": {
+   "get": {
+    "tags": [
+     "routes"
+    ],
+    "summary": "Скачать очищенный GPX",
+    "operationId": "get_api_v1_routes_rid_gpx",
+    "parameters": [
+     {
+      "name": "rid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Файл",
+      "content": {
+       "application/octet-stream": {
+        "schema": {
+         "type": "string",
+         "format": "binary"
         }
        }
       }

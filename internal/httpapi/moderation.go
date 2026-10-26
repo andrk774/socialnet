@@ -26,12 +26,12 @@ func (s *Server) handleCreateReport(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Reason = strings.TrimSpace(req.Reason)
 	errs := map[string]string{}
-	oneOf(errs, "target_type", &req.TargetType, "post", "comment", "user", "community", "track", "video", "document")
+	oneOf(errs, "target_type", &req.TargetType, "post", "comment", "user", "community", "track", "video", "document", "route")
 	var targetUUID *string
-	if req.TargetType == "track" || req.TargetType == "video" || req.TargetType == "document" {
+	if req.TargetType == "track" || req.TargetType == "video" || req.TargetType == "document" || req.TargetType == "route" {
 		u := strings.ToLower(req.TargetUUID)
 		if !validUUID(u) {
-			errs["target_uuid"] = "required for tracks, videos and documents"
+			errs["target_uuid"] = "required for tracks, videos, documents and routes"
 		}
 		targetUUID, req.TargetID = &u, 0
 	}
@@ -52,6 +52,15 @@ func (s *Server) handleCreateReport(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.TargetType == "document" { // документ — только тот, к которому есть доступ
 		if ok, err := s.store.DocumentAccess(r.Context(), me, *targetUUID); err != nil {
+			s.internalError(w, r, err)
+			return
+		} else if !ok {
+			writeError(w, http.StatusNotFound, "not_found", "target not found")
+			return
+		}
+	}
+	if req.TargetType == "route" { // маршрут — только тот, что виден
+		if ok, err := s.store.RouteAccess(r.Context(), me, *targetUUID); err != nil {
 			s.internalError(w, r, err)
 			return
 		} else if !ok {
@@ -284,7 +293,7 @@ func (s *Server) handleSetHidden(hidden bool) http.HandlerFunc {
 			action = "unhide"
 		}
 		// треки и видео: id — UUID, снятие с блок-листом
-		if typ := map[string]string{"tracks": "track", "videos": "video", "documents": "document"}[chi.URLParam(r, "type")]; typ != "" {
+		if typ := map[string]string{"tracks": "track", "videos": "video", "documents": "document", "routes": "route"}[chi.URLParam(r, "type")]; typ != "" {
 			uid := strings.ToLower(chi.URLParam(r, "id"))
 			if !validUUID(uid) {
 				writeError(w, http.StatusNotFound, "not_found", "not found")

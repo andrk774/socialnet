@@ -20,6 +20,8 @@ def obj(**props):
 str_ = {"type": "string"}
 int_ = {"type": "integer", "format": "int64"}
 bool_ = {"type": "boolean"}
+num = {"type": "number"}
+def enum_int(*v): return {"type": "integer", "enum": list(v)}
 uuid = {"type": "string", "format": "uuid"}
 dt = {"type": "string", "format": "date-time"}
 b64 = {"type": "string", "format": "byte", "description": "base64"}
@@ -52,12 +54,17 @@ schemas = {
     "PostVideo": obj(id=uuid, title=str_, duration_sec=int_, poster_url=str_, hls_url=str_, **{"mp4_url?": str_}),
     "PostDocument": obj(id=uuid, title=str_, ext=str_, size=int_, url=str_),
     "Document": obj(id=uuid, owner_id=int_, title=str_, ext=str_, size=int_, url=str_, created_at=dt),
+    "Route": obj(id=uuid, owner_id=int_, title=str_, distance_m=int_, gain_m=int_, loss_m=int_,
+                 min_ele=nullable(num), max_ele=nullable(num), duration_sec=int_, moving_sec=int_, points=int_,
+                 hidden_ends_m=enum_int(0, 200, 500, 1000), bbox=arr(num), preview=arr(arr(num)),
+                 profile=arr(obj(d=num, e=num)), gpx_url=str_, created_at=dt,
+                 **{"detail?": arr(arr(arr(num))), "waypoints?": arr(obj(lat=num, lon=num, name=str_, **{"ele?": num}))}),
     "Poll": obj(id=int_, question=str_, multiple=bool_, anonymous=bool_, closes_at=nullable(dt), closed=bool_,
                 voters_count=int_, results_hidden=bool_, my_votes=arr(int_),
                 options=arr(obj(id=int_, text=str_, votes=nullable(int_)))),
     "Post": obj(id=int_, author=S("UserCard"), **{"community?": obj(id=int_, slug=str_, name=str_)}, text=str_,
                 photos=arr(S("Photo")), tracks=arr(S("PostTrack")), videos=arr(S("PostVideo")),
-                documents=arr(S("PostDocument")), poll=nullable(S("Poll")),
+                documents=arr(S("PostDocument")), routes=arr(S("Route")), poll=nullable(S("Poll")),
                 audience=enum("everyone", "friends", "only_me", "list"), bookmarked=bool_,
                 likes_count=int_, comments_count=int_, liked_by_me=bool_,
                 my_reaction=nullable(enum("like", "love", "haha", "wow", "sad", "angry")),
@@ -123,7 +130,7 @@ A = "/api/v1"
 SCOPES = {"profile": "Профиль, друзья, поиск", "friends": "Заявки в друзья", "wall": "Публикации и комментарии",
           "photos": "Загрузка фото", "messages": "Сообщения", "notifications": "Уведомления", "music": "Музыка",
           "video": "Видео", "communities": "Сообщества", "stories": "Истории", "events": "Мероприятия",
-          "docs": "Документы", "bookmarks": "Закладки", "offline": "Токен без срока действия"}
+          "docs": "Документы", "routes": "Маршруты", "bookmarks": "Закладки", "offline": "Токен без срока действия"}
 # --- служебные ---
 r("GET", "/health", "service", "Проверка живости", resp=obj(status=str_), auth=False)
 r("GET", "/.well-known/security.txt", "service", "security.txt (RFC 9116)", auth=False, resp="text")
@@ -168,7 +175,7 @@ r("GET", A + "/blocks", "friends", "Чёрный список", resp=lst(S("User
 audience = enum("everyone", "friends", "only_me", "list")
 new_poll = obj(question=str_, options=arr(str_), **{"multiple?": bool_, "anonymous?": bool_, "closes_at?": dt})
 post_body = obj(**{"text?": str_, "photo_ids?": arr(uuid), "track_ids?": arr(uuid), "video_ids?": arr(uuid),
-                   "document_ids?": arr(uuid), "community_id?": int_, "audience?": audience, "audience_ids?": arr(int_),
+                   "document_ids?": arr(uuid), "route_ids?": arr(uuid), "community_id?": int_, "audience?": audience, "audience_ids?": arr(int_),
                    "poll?": new_poll, "publish_at?": dt})
 scheduled = obj(id=int_, author_id=int_, **{"community_id?": int_, "post_id?": int_, "error?": str_}, publish_at=dt,
                 payload={"type": "object"}, status=enum("pending", "published", "failed", "canceled"), created_at=dt)
@@ -183,6 +190,14 @@ r("GET", A + "/posts/{id}/poll/options/{oid}/voters", "posts", "Кто выбр�
 r("GET", A + "/scheduled-posts", "posts", "Отложенные посты: свои или ?community_id= (редакторам)", resp=obj(items=arr(scheduled)))
 r("PATCH", A + "/scheduled-posts/{sid}", "posts", "Перенести отложенный пост", obj(publish_at=dt), scheduled)
 r("DELETE", A + "/scheduled-posts/{sid}", "posts", "Отменить отложенный пост", code=204)
+# --- маршруты ---
+r("POST", A + "/routes", "routes", "Загрузить GPX (до 15 МБ): сервер считает статистику и хранит очищенный трек — без автора, устройства, времени и без концов (hidden_ends_m, по умолчанию 200 м)",
+  resp=S("Route"), code=201, content=upload_form(**{"title?": str_, "hidden_ends_m?": enum("0", "200", "500", "1000")}))
+r("GET", A + "/routes", "routes", "Мои маршруты", resp=lst(S("Route")))
+r("GET", A + "/routes/{rid}", "routes", "Маршрут с подробной геометрией (владелец и зрители записи)", resp=S("Route"))
+r("PATCH", A + "/routes/{rid}", "routes", "Переименовать", obj(title=str_), S("Route"))
+r("DELETE", A + "/routes/{rid}", "routes", "Удалить (пропадёт из записей)", code=204)
+r("GET", A + "/routes/{rid}/gpx", "routes", "Скачать очищенный GPX", resp="binary")
 # --- закладки ---
 bookmark = obj(id=int_, kind=enum("post", "video", "track"), created_at=dt,
                **{"post?": S("Post"), "video?": S("Video"), "track?": S("Track")})
@@ -228,12 +243,12 @@ r("POST", A + "/media", "media", "Загрузить фото (JPEG/PNG/GIF до
 r("DELETE", A + "/media/{id}", "media", "Удалить фото", code=204)
 r("GET", "/media/{id}/{size}", "media", "Файл фото: size = full | thumb", auth=False, resp="binary")
 # --- безопасность / модерация ---
-r("POST", A + "/reports", "moderation", "Пожаловаться", obj(target_type=enum("post", "comment", "user", "community", "track", "video", "document"), **{"target_id?": int_, "target_uuid?": uuid}, reason=str_), obj(id=int_, status=str_), 201)
+r("POST", A + "/reports", "moderation", "Пожаловаться", obj(target_type=enum("post", "comment", "user", "community", "track", "video", "document", "route"), **{"target_id?": int_, "target_uuid?": uuid}, reason=str_), obj(id=int_, status=str_), 201)
 r("GET", A + "/mod/reports", "moderation", "Очередь жалоб (модератор)", resp=lst(S("Report")))
 r("POST", A + "/mod/reports/{id}/resolve", "moderation", "Решение по жалобе", obj(action=enum("dismiss", "hide", "ban"), **{"note?": str_}), code=204)
 r("POST", A + "/mod/users/{id}/ban", "moderation", "Забанить", obj(**{"reason?": str_}), code=204)
 r("POST", A + "/mod/users/{id}/unban", "moderation", "Разбанить", code=204)
-r("POST", A + "/mod/{type}/{id}/hide", "moderation", "Скрыть: posts|comments|communities|tracks|videos|documents", code=204)
+r("POST", A + "/mod/{type}/{id}/hide", "moderation", "Скрыть: posts|comments|communities|tracks|videos|documents|routes", code=204)
 r("POST", A + "/mod/{type}/{id}/unhide", "moderation", "Вернуть скрытое", code=204)
 r("GET", A + "/mod/log", "moderation", "Журнал модерации", resp=lst(S("ModAction")))
 r("PUT", A + "/admin/users/{id}/role", "moderation", "Назначить роль (админ)", obj(role=enum("user", "moderator", "admin")), code=204)
@@ -433,7 +448,7 @@ def build(routes_file=None):
             ("auth", "Вход, регистрация, пароль, 2FA, сеансы"), ("users", "Профиль, приватность, статус"),
             ("friends", "Друзья и блокировки"), ("posts", "Посты, лента, комментарии"),
             ("messages", "Личные сообщения и WebSocket"), ("notifications", "Уведомления и push"),
-            ("media", "Фото"), ("documents", "Документы"), ("bookmarks", "Закладки"), ("music", "Музыка и плейлисты"), ("video", "Видео"),
+            ("media", "Фото"), ("documents", "Документы"), ("routes", "Маршруты GPX"), ("bookmarks", "Закладки"), ("music", "Музыка и плейлисты"), ("video", "Видео"),
             ("stories", "Истории"), ("events", "Мероприятия"), ("communities", "Сообщества"), ("wallet", "Монеты, подарки"), ("search", "Поиск"),
             ("developers", "OAuth-приложения, боты сообществ, Callback API"),
             ("moderation", "Жалобы, модерация, администрирование"), ("service", "Служебное")]],

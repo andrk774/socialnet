@@ -80,6 +80,7 @@ type Post struct {
 	Tracks        []PostTrack    `json:"tracks"`
 	Videos        []PostVideo    `json:"videos"`
 	Documents     []PostDocument `json:"documents"`
+	Routes        []Route        `json:"routes"`
 	Poll          *Poll          `json:"poll"`
 	Audience      string         `json:"audience"` // everyone | friends | only_me | list
 	Bookmarked    bool           `json:"bookmarked"`
@@ -148,6 +149,15 @@ const postSelect = `
 	                         ORDER BY pd.position)
 	                 FROM post_documents pd JOIN documents d ON d.id = pd.document_id
 	                 WHERE pd.post_id = p.id AND d.deleted_at IS NULL AND d.hidden_at IS NULL), '[]'),
+	       COALESCE((SELECT json_agg(json_build_object('id', r.id, 'owner_id', r.owner_id, 'title', r.title,
+	                         'distance_m', r.distance_m, 'gain_m', r.gain_m, 'loss_m', r.loss_m,
+	                         'min_ele', r.min_ele, 'max_ele', r.max_ele, 'duration_sec', r.duration_sec,
+	                         'moving_sec', r.moving_sec, 'points', r.points, 'hidden_ends_m', r.hidden_ends_m,
+	                         'bbox', json_build_array(r.min_lat, r.min_lon, r.max_lat, r.max_lon),
+	                         'preview', r.preview, 'profile', r.profile, 'created_at', r.created_at)
+	                         ORDER BY pr.position)
+	                 FROM post_routes pr JOIN routes r ON r.id = pr.route_id
+	                 WHERE pr.post_id = p.id AND r.deleted_at IS NULL AND r.hidden_at IS NULL), '[]'),
 	       (SELECT json_build_object('id', pl.id, 'question', pl.question, 'multiple', pl.multiple,
 	                 'anonymous', pl.anonymous, 'closes_at', pl.closes_at, 'voters_count', pl.voters_count,
 	                 'closed', pl.closes_at IS NOT NULL AND pl.closes_at <= now(),
@@ -181,13 +191,14 @@ func (s *Store) queryPosts(ctx context.Context, sql string, args ...any) ([]Post
 			tracks    []byte
 			videos    []byte
 			docs      []byte
+			routes    []byte
 			poll      []byte
 			reactions []byte
 		)
 		if err := rows.Scan(&p.ID, &p.Author.ID, &p.Author.Username, &p.Author.FirstName, &p.Author.LastName, &avatar,
 			&cID, &cSlug, &cName,
 			&p.Text, &p.LikesCount, &p.CommentsCount, &p.CreatedAt, &p.EditedAt, &p.MyReaction, &reactions, &mediaIDs,
-			&tracks, &videos, &docs, &poll, &p.Audience, &p.Bookmarked); err != nil {
+			&tracks, &videos, &docs, &routes, &poll, &p.Audience, &p.Bookmarked); err != nil {
 			return nil, err
 		}
 		p.LikedByMe = p.MyReaction != nil
@@ -212,6 +223,12 @@ func (s *Store) queryPosts(ctx context.Context, sql string, args ...any) ([]Post
 		}
 		for i := range p.Documents {
 			p.Documents[i].URL = DocumentURL(p.Documents[i].ID)
+		}
+		if err := json.Unmarshal(routes, &p.Routes); err != nil {
+			return nil, err
+		}
+		for i := range p.Routes {
+			p.Routes[i].GPXURL = RouteGPXURL(p.Routes[i].ID)
 		}
 		if poll != nil {
 			if p.Poll, err = decodePoll(poll, viewer == p.Author.ID); err != nil {
@@ -240,6 +257,7 @@ type NewPost struct {
 	TrackIDs    []string // любые доступные треки — музыкой делятся
 	VideoIDs    []string // любые готовые видео
 	DocumentIDs []string // только свои документы
+	RouteIDs    []string // только свои маршруты
 	Hashtags    []string
 	Audience    string  // пусто = everyone
 	AudienceIDs []int64 // для audience = list: только друзья автора
@@ -331,6 +349,20 @@ func (s *Store) CreatePost(ctx context.Context, np NewPost) (int64, error) {
 			return 0, err
 		}
 		if int(tag.RowsAffected()) != len(np.DocumentIDs) {
+			return 0, ErrBadMedia
+		}
+	}
+	if len(np.RouteIDs) > 0 {
+		tag, err := tx.Exec(ctx, `
+			INSERT INTO post_routes (post_id, route_id, position)
+			SELECT $1, r.id, t.ord::smallint
+			FROM unnest($2::uuid[]) WITH ORDINALITY AS t(id, ord)
+			JOIN routes r ON r.id = t.id AND r.owner_id = $3 AND r.deleted_at IS NULL AND r.hidden_at IS NULL`,
+			id, np.RouteIDs, np.AuthorID)
+		if err != nil {
+			return 0, err
+		}
+		if int(tag.RowsAffected()) != len(np.RouteIDs) {
 			return 0, ErrBadMedia
 		}
 	}
@@ -666,8 +698,11 @@ func (s *Store) CheckPostAttachments(ctx context.Context, author int64, np NewPo
 		   AND (SELECT count(*) FROM tracks WHERE id = ANY($3::uuid[]) AND removed_at IS NULL) = cardinality($3::uuid[])
 		   AND (SELECT count(*) FROM videos WHERE id = ANY($4::uuid[]) AND status = 'ready') = cardinality($4::uuid[])
 		   AND (SELECT count(*) FROM documents WHERE id = ANY($5::uuid[]) AND owner_id = $1
-		          AND deleted_at IS NULL AND hidden_at IS NULL) = cardinality($5::uuid[])`,
-		author, nonNil(np.MediaIDs), nonNil(np.TrackIDs), nonNil(np.VideoIDs), nonNil(np.DocumentIDs)).Scan(&ok)
+		          AND deleted_at IS NULL AND hidden_at IS NULL) = cardinality($5::uuid[])
+		   AND (SELECT count(*) FROM routes WHERE id = ANY($6::uuid[]) AND owner_id = $1
+		          AND deleted_at IS NULL AND hidden_at IS NULL) = cardinality($6::uuid[])`,
+		author, nonNil(np.MediaIDs), nonNil(np.TrackIDs), nonNil(np.VideoIDs), nonNil(np.DocumentIDs),
+		nonNil(np.RouteIDs)).Scan(&ok)
 	if err != nil {
 		return err
 	}

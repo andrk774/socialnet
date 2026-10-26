@@ -33,6 +33,7 @@ var scopeInfo = map[string]string{
 	"events":        "Мероприятия",
 	"docs":          "Документы: загрузка и скачивание",
 	"bookmarks":     "Закладки",
+	"routes":        "Маршруты: загрузка GPX и скачивание",
 	"offline":       "Доступ в любое время (токен без срока действия)",
 }
 
@@ -66,6 +67,10 @@ var scopeRoutes = map[string][]string{
 	"docs": {
 		"POST /api/v1/documents", "GET /api/v1/documents", "PATCH /api/v1/documents/{did}",
 		"DELETE /api/v1/documents/{did}", "GET /api/v1/documents/{did}/download",
+	},
+	"routes": {
+		"POST /api/v1/routes", "GET /api/v1/routes", "GET /api/v1/routes/{rid}", "PATCH /api/v1/routes/{rid}",
+		"DELETE /api/v1/routes/{rid}", "GET /api/v1/routes/{rid}/gpx",
 	},
 	"bookmarks": {
 		"GET /api/v1/bookmarks", "PUT /api/v1/bookmarks/{kind}/{target}", "DELETE /api/v1/bookmarks/{kind}/{target}",

@@ -1,7 +1,8 @@
 import { h, Fragment } from "../vendor/preact/index.js";
 import { useRef, useState } from "../vendor/preact/hooks.js";
-import { Audience, Comment, Doc, Page, Photo, Poll, Post, PostDocument, Reaction, Scheduled, UserCard, api, del, fileSize, fullName, get, patch, post, put, saveFile, upload } from "./api.js";
+import { Audience, Comment, Doc, Page, Photo, Poll, Post, PostDocument, Reaction, Route, Scheduled, UserCard, api, del, fileSize, fullName, get, patch, post, put, saveFile, upload } from "./api.js";
 import { me } from "./session.js";
+import { RouteCard, km } from "./routes.js";
 import { Avatar, Empty, ErrorLine, Loading, RichText, Time, UserLink, duration, useLoad } from "./ui.js";
 
 const reactions: [Reaction, string, string][] = [
@@ -20,6 +21,8 @@ export function Composer({ communityId, onPosted }: { communityId?: number; onPo
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [docs, setDocs] = useState<Doc[]>([]);
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [hideEnds, setHideEnds] = useState("200");
   const [poll, setPoll] = useState<PollDraft | null>(null);
   const [audience, setAudience] = useState<Audience>("everyone");
   const [picked, setPicked] = useState<number[]>([]);
@@ -29,6 +32,7 @@ export function Composer({ communityId, onPosted }: { communityId?: number; onPo
   const [note, setNote] = useState("");
   const file = useRef<HTMLInputElement>(null);
   const docFile = useRef<HTMLInputElement>(null);
+  const gpxFile = useRef<HTMLInputElement>(null);
   const friends = useLoad(() => (audience === "list" ? get<Page<UserCard>>(`/users/${me()!.id}/friends?limit=50`) : Promise.resolve(null)), [audience]);
 
   async function addPhotos(files: FileList | null) {
@@ -53,24 +57,32 @@ export function Composer({ communityId, onPosted }: { communityId?: number; onPo
     }
   }
 
+  async function addRoute(files: FileList | null) {
+    const f = files?.[0];
+    if (!f) return;
+    setError(null);
+    try { setRoutes([...routes, await upload<Route>("/routes", f, { hidden_ends_m: hideEnds })]); } catch (e) { setError(e); }
+    if (gpxFile.current) gpxFile.current.value = "";
+  }
+
   async function submit(e: Event) {
     e.preventDefault();
     setBusy(true); setError(null); setNote("");
-    const body: Record<string, unknown> = { text, photo_ids: photos.map((x) => x.id), document_ids: docs.map((x) => x.id) };
+    const body: Record<string, unknown> = { text, photo_ids: photos.map((x) => x.id), document_ids: docs.map((x) => x.id), route_ids: routes.map((x) => x.id) };
     if (communityId) body.community_id = communityId;
     else { body.audience = audience; if (audience === "list") body.audience_ids = picked; }
     if (poll) body.poll = { ...poll, options: poll.options.filter((o) => o.trim()) };
     if (when) body.publish_at = new Date(when).toISOString();
     try {
       const r = await post<Post | Scheduled>("/posts", body);
-      setText(""); setPhotos([]); setDocs([]); setPoll(null); setWhen(null);
+      setText(""); setPhotos([]); setDocs([]); setRoutes([]); setPoll(null); setWhen(null);
       if (when) setNote(`Запись выйдет ${new Date((r as Scheduled).publish_at).toLocaleString("ru", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}. Её можно перенести в разделе «Отложенные».`);
       else onPosted(r as Post);
     } catch (err) { setError(err); } finally { setBusy(false); }
   }
 
   const setOpt = (i: number, v: string) => setPoll(poll && { ...poll, options: poll.options.map((o, j) => (j === i ? v : o)) });
-  const empty = !text.trim() && photos.length === 0 && docs.length === 0 && !poll;
+  const empty = !text.trim() && photos.length === 0 && docs.length === 0 && routes.length === 0 && !poll;
   return (
     <form class="composer" onSubmit={submit}>
       <label class="sr-only" for="composer-text">Текст записи</label>
@@ -93,6 +105,17 @@ export function Composer({ communityId, onPosted }: { communityId?: number; onPo
               <span class="doc-ext" aria-hidden="true">{d.ext}</span>
               <span class="doc-name">{d.title}<span class="muted"> · {fileSize(d.size)}</span></span>
               <button type="button" class="icon-btn" aria-label={`Убрать документ ${d.title}`} onClick={() => setDocs(docs.filter((x) => x !== d))}>×</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {routes.length > 0 && (
+        <ul class="doc-list">
+          {routes.map((r) => (
+            <li key={r.id} class="doc">
+              <span class="doc-ext" aria-hidden="true">gpx</span>
+              <span class="doc-name">{r.title}<span class="muted"> · {km(r.distance_m)}{r.max_ele !== null ? ` · ↑ ${r.gain_m} м` : ""}</span></span>
+              <button type="button" class="icon-btn" aria-label={`Убрать трек ${r.title}`} onClick={() => setRoutes(routes.filter((x) => x !== r))}>×</button>
             </li>
           ))}
         </ul>
@@ -140,8 +163,17 @@ export function Composer({ communityId, onPosted }: { communityId?: number; onPo
         <div class="composer-tools">
           <input ref={file} type="file" accept="image/jpeg,image/png,image/gif" multiple hidden onChange={(e) => addPhotos((e.target as HTMLInputElement).files)} />
           <input ref={docFile} type="file" multiple hidden onChange={(e) => addDocs((e.target as HTMLInputElement).files)} />
+          <input ref={gpxFile} type="file" accept=".gpx,application/gpx+xml" hidden data-kind="gpx" onChange={(e) => addRoute((e.target as HTMLInputElement).files)} />
           <button type="button" class="ghost" onClick={() => file.current?.click()} disabled={photos.length >= 10}>Фото</button>
           <button type="button" class="ghost" onClick={() => docFile.current?.click()} disabled={docs.length >= 10}>Документ</button>
+          <span class="track-pick">
+            <button type="button" class="ghost" onClick={() => gpxFile.current?.click()} disabled={routes.length >= 3}>Трек GPX</button>
+            <select aria-label="Скрыть начало и конец трека" title="Скрыть начало и конец трека, чтобы по нему нельзя было найти ваш дом"
+              value={hideEnds} onChange={(e) => setHideEnds((e.target as HTMLSelectElement).value)}>
+              <option value="0">концы видны</option><option value="200">скрыть 200 м</option>
+              <option value="500">скрыть 500 м</option><option value="1000">скрыть 1 км</option>
+            </select>
+          </span>
           <button type="button" class="ghost" aria-pressed={!!poll} onClick={() => setPoll(poll ? null : { question: "", options: ["", ""], multiple: false, anonymous: false })}>Опрос</button>
           <button type="button" class="ghost" aria-pressed={when !== null} onClick={() => setWhen(when === null ? localInput(new Date(Date.now() + 3600_000)) : null)}>Отложить</button>
           {!communityId && (
@@ -297,6 +329,7 @@ export function PostView({ initial, onDelete }: { initial: Post; onDelete?: () =
         <div class="track" key={t.id}><span>{t.artist} — {t.title}</span><span class="muted">{duration(t.duration_sec)}</span><audio controls preload="none" src={t.url} /></div>
       ))}
       {p.videos.map((v) => <Video key={v.id} src={v.hls_url} mp4={v.mp4_url} poster={v.poster_url} title={v.title} />)}
+      {p.routes?.map((r) => <RouteCard key={r.id} route={r} />)}
       {p.documents.length > 0 && <DocList docs={p.documents} />}
       {p.poll && <PollView postId={p.id} initial={p.poll} />}
       <footer class="post-actions">
