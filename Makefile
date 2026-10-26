@@ -1,4 +1,4 @@
-.PHONY: smoke web vendor-preact e2e up down logs build test test-db psql fmt lint openapi fuzz
+.PHONY: test-db-up smoke web vendor-preact e2e up down logs build test test-db psql fmt lint openapi fuzz
 
 up:            ## собрать и запустить всё в Docker
 	docker compose up -d --build
@@ -17,10 +17,15 @@ test:          ## юнит-тесты (без базы)
 
 # Интеграционные тесты против Postgres из docker compose.
 # ВНИМАНИЕ: тесты пересоздают таблицы, поэтому используется отдельная база socialnet_test.
-test-db:
+# tr -d '\r' — на случай, если .env сохранили в Windows с переводами строк CRLF.
+TEST_DB_URL = postgres://socialnet:$$(grep ^POSTGRES_PASSWORD= .env | cut -d= -f2- | tr -d '\r')@127.0.0.1:5432/socialnet_test?sslmode=disable
+
+test-db-up:    ## поднять Postgres и создать тестовую базу
+	docker compose up -d --wait db
 	docker compose exec -T db psql -U socialnet -d socialnet -c 'CREATE DATABASE socialnet_test' 2>/dev/null || true
-	TEST_DATABASE_URL="postgres://socialnet:$$(grep ^POSTGRES_PASSWORD .env | cut -d= -f2)@127.0.0.1:5432/socialnet_test?sslmode=disable" \
-		go test -count=1 -v ./...
+
+test-db: test-db-up
+	TEST_DATABASE_URL="$(TEST_DB_URL)" go test -count=1 -p 1 ./...
 
 psql:          ## консоль базы
 	docker compose exec db psql -U socialnet -d socialnet
@@ -48,9 +53,11 @@ web:
 vendor-preact:
 	node web/tools/vendor-preact.mjs /tmp/preact
 
-# Сквозной тест в Chromium (нужны node и playwright)
-e2e:
-	go test -count=1 -run TestFrontendE2E ./internal/httpapi/
+# Сквозной тест в Chromium: нужны node и playwright (npm i -g playwright &&
+# npx playwright install chromium); ffmpeg необязателен — без него проверка видео пропускается
+e2e: test-db-up
+	TEST_DATABASE_URL="$(TEST_DB_URL)" NODE_PATH="$$(npm root -g)" \
+		go test -count=1 -v -run TestFrontendE2E ./internal/httpapi/
 
 # Весь стек в Docker + сквозная проверка (регистрация, видео, копия, метрики, изоляция)
 smoke:
