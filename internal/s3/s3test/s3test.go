@@ -5,6 +5,7 @@ package s3test
 import (
 	"bytes"
 	"encoding/xml"
+	"html"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -62,7 +63,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		s.BadSigs++
 		s.mu.Unlock()
 		w.WriteHeader(http.StatusForbidden)
-		_, _ = io.WriteString(w, "<Error><Code>SignatureDoesNotMatch</Code><Message>"+err.Error()+"</Message></Error>")
+		_, _ = io.WriteString(w, "<Error><Code>SignatureDoesNotMatch</Code><Message>"+html.EscapeString(err.Error())+"</Message></Error>")
 		return
 	}
 	path := strings.TrimPrefix(r.URL.Path, "/media")

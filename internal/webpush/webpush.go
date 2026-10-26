@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"net/http"
 	"net/url"
 	"strings"
@@ -67,11 +66,11 @@ func NewVAPID(public, private, subject string) (*VAPID, error) {
 	if b64.EncodeToString(k.PublicKey().Bytes()) != public {
 		return nil, errors.New("VAPID_PUBLIC_KEY does not match VAPID_PRIVATE_KEY")
 	}
-	pub := k.PublicKey().Bytes()
-	priv := &ecdsa.PrivateKey{
-		PublicKey: ecdsa.PublicKey{Curve: elliptic.P256(),
-			X: new(big.Int).SetBytes(pub[1:33]), Y: new(big.Int).SetBytes(pub[33:])},
-		D: new(big.Int).SetBytes(d),
+	// ParseRawPrivateKey (Go 1.25+) вместо ручной сборки ключа из big.Int:
+	// поля X, Y, D устарели в Go 1.26, а самодельный ключ мог оказаться неверным.
+	priv, err := ecdsa.ParseRawPrivateKey(elliptic.P256(), d)
+	if err != nil {
+		return nil, err
 	}
 	return &VAPID{priv: priv, Public: public, Subject: subject}, nil
 }
