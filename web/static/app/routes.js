@@ -1,9 +1,25 @@
-// Маршрут из GPX: сводка, схема трека и профиль высот. Рисуется в SVG без
-// внешних библиотек и без запросов к картографическим серверам.
+// Маршрут из GPX: сводка, схема трека, профиль высот и карта. Схема и профиль
+// рисуются в SVG без внешних запросов; карта — Leaflet с тайлами через прокси
+// нашего сервера, так что браузер посетителя к OSM не обращается.
 import { h } from "../vendor/preact/index.js";
-import { useState } from "../vendor/preact/hooks.js";
-import { saveFile } from "./api.js";
-import { ErrorLine } from "./ui.js";
+import { useEffect, useRef, useState } from "../vendor/preact/hooks.js";
+import * as L from "../vendor/leaflet/leaflet-src.esm.js";
+import { get, saveFile } from "./api.js";
+import { ErrorLine, Loading } from "./ui.js";
+let mapConfig = null;
+export function loadMapConfig() {
+    mapConfig ??= get("/client-config").then((c) => c.map).catch((e) => {
+        mapConfig = null; // в следующий раз спросим снова
+        throw e;
+    });
+    return mapConfig;
+}
+const escapeHTML = (s) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+function label(text) {
+    const el = document.createElement("span");
+    el.textContent = text; // имена точек пишет автор GPX — только как текст
+    return el;
+}
 const nf1 = new Intl.NumberFormat("ru", { maximumFractionDigits: 1 });
 const nf0 = new Intl.NumberFormat("ru", { maximumFractionDigits: 0 });
 export const km = (m) => (m < 1000 ? `${nf0.format(m)} м` : `${nf1.format(m / 1000)} км`);
@@ -13,6 +29,9 @@ export function hours(sec) {
 }
 export function RouteCard({ route }) {
     const [error, setError] = useState(null);
+    const [map, setMap] = useState(false);
+    const [canMap, setCanMap] = useState(false);
+    useEffect(() => { loadMapConfig().then((c) => setCanMap(c.enabled), () => setCanMap(false)); }, []);
     const stats = [["Расстояние", km(route.distance_m)]];
     if (route.max_ele !== null) {
         stats.push(["Набор", `↑ ${nf0.format(route.gain_m)} м`], ["Сброс", `↓ ${nf0.format(route.loss_m)} м`]);
@@ -25,10 +44,13 @@ export function RouteCard({ route }) {
     return (h("section", { class: "route", "aria-label": `Маршрут: ${route.title}` },
         h("header", { class: "route-head" },
             h("strong", { class: "route-title" }, route.title),
-            h("button", { class: "link", onClick: () => saveFile(route.gpx_url, `${route.title}.gpx`).catch(setError) }, "\u0421\u043A\u0430\u0447\u0430\u0442\u044C GPX")),
+            h("span", { class: "route-actions" },
+                canMap && h("button", { class: "link", "aria-expanded": map, onClick: () => setMap(!map) }, map ? "Скрыть карту" : "Показать на карте"),
+                h("button", { class: "link", onClick: () => saveFile(route.gpx_url, `${route.title}.gpx`).catch(setError) }, "\u0421\u043A\u0430\u0447\u0430\u0442\u044C GPX"))),
         h("dl", { class: "route-stats" }, stats.map(([k, v]) => h("div", { key: k },
             h("dt", null, k),
             h("dd", null, v)))),
+        map && h(RouteMap, { route: route }),
         h("div", { class: "route-graphics" },
             h(TrackSketch, { points: route.preview }),
             route.profile.length > 1 && h(ElevationProfile, { profile: route.profile })),
@@ -37,6 +59,65 @@ export function RouteCard({ route }) {
             route.hidden_ends_m,
             " \u043C \u0441\u043A\u0440\u044B\u0442\u044B \u0430\u0432\u0442\u043E\u0440\u043E\u043C."),
         h(ErrorLine, { error: error })));
+}
+// RouteMap — трек на карте. Подробная геометрия грузится только по запросу:
+// в ленте у записи лишь упрощённая схема.
+export function RouteMap({ route }) {
+    const box = useRef(null);
+    const [full, setFull] = useState(false);
+    const [detail, setDetail] = useState(route.detail ? route : null);
+    const [error, setError] = useState(null);
+    const mapRef = useRef(null);
+    useEffect(() => {
+        if (!detail)
+            get(`/routes/${route.id}`).then(setDetail, setError);
+    }, [route.id]);
+    useEffect(() => {
+        if (!detail || !box.current)
+            return;
+        let alive = true, m = null;
+        loadMapConfig().then((cfg) => {
+            if (!alive || !box.current)
+                return;
+            m = L.map(box.current, { scrollWheelZoom: false, maxZoom: cfg.max_zoom });
+            m.attributionControl.setPrefix(false);
+            L.tileLayer(cfg.tiles, { maxZoom: cfg.max_zoom, attribution: escapeHTML(cfg.attribution) }).addTo(m);
+            const segs = detail.detail?.length ? detail.detail : [detail.preview];
+            for (const seg of segs) {
+                L.polyline(seg, { className: "map-route-halo", weight: 7, interactive: false }).addTo(m);
+                L.polyline(seg, { className: "map-route", weight: 4, interactive: false }).addTo(m);
+            }
+            for (const wp of detail.waypoints ?? []) {
+                const p = L.circleMarker([wp.lat, wp.lon], { className: "map-waypoint", radius: 5, weight: 2, fillOpacity: 1 }).addTo(m);
+                if (wp.name)
+                    p.bindTooltip(label(wp.name), { direction: "top" });
+            }
+            const first = segs[0][0], lastSeg = segs[segs.length - 1], last = lastSeg[lastSeg.length - 1];
+            if (first)
+                L.circleMarker(first, { className: "map-start", radius: 7, weight: 3, fillOpacity: 1 }).addTo(m).bindTooltip(label("Старт"));
+            if (last)
+                L.circleMarker(last, { className: "map-finish", radius: 7, weight: 3, fillOpacity: 1 }).addTo(m).bindTooltip(label("Финиш"));
+            const [s, w, n, e] = detail.bbox;
+            m.fitBounds([[s, w], [n, e]], { padding: [24, 24], maxZoom: 15 });
+            mapRef.current = m;
+        }, setError);
+        return () => { alive = false; m?.remove(); mapRef.current = null; };
+    }, [detail]);
+    useEffect(() => {
+        mapRef.current?.invalidateSize();
+        if (!full)
+            return;
+        const onKey = (e) => { if (e.key === "Escape")
+            setFull(false); };
+        document.addEventListener("keydown", onKey);
+        document.body.classList.add("no-scroll");
+        return () => { document.removeEventListener("keydown", onKey); document.body.classList.remove("no-scroll"); };
+    }, [full]);
+    return (h("div", { class: full ? "route-map-wrap route-map-full" : "route-map-wrap", role: full ? "dialog" : undefined, "aria-label": full ? `Карта: ${route.title}` : undefined },
+        !detail && !error && h(Loading, null),
+        h(ErrorLine, { error: error }),
+        h("div", { ref: box, class: "route-map", "aria-label": "\u041A\u0430\u0440\u0442\u0430 \u043C\u0430\u0440\u0448\u0440\u0443\u0442\u0430" }),
+        detail && h("button", { class: "map-full-toggle", onClick: () => setFull(!full) }, full ? "Закрыть" : "Во весь экран")));
 }
 // TrackSketch — линия трека в своём масштабе (равнопромежуточная проекция с
 // поправкой на широту, чтобы север был сверху и пропорции не искажались).

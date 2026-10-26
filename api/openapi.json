@@ -4125,6 +4125,67 @@
     }
    }
   },
+  "/api/v1/client-config": {
+   "get": {
+    "tags": [
+     "service"
+    ],
+    "summary": "Что включено на сервере (карта: адрес тайлов, атрибуция, максимальный масштаб)",
+    "operationId": "get_api_v1_client_config",
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "map": {
+           "type": "object",
+           "properties": {
+            "enabled": {
+             "type": "boolean"
+            },
+            "tiles": {
+             "type": "string"
+            },
+            "attribution": {
+             "type": "string"
+            },
+            "max_zoom": {
+             "type": "integer",
+             "format": "int64"
+            }
+           },
+           "required": [
+            "enabled",
+            "tiles",
+            "attribution",
+            "max_zoom"
+           ]
+          }
+         },
+         "required": [
+          "map"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/comments/{id}": {
    "delete": {
     "tags": [
@@ -13183,6 +13244,65 @@
      },
      {
       "name": "size",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "Файл",
+      "content": {
+       "application/octet-stream": {
+        "schema": {
+         "type": "string",
+         "format": "binary"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/tiles/{z}/{x}/{y}": {
+   "get": {
+    "tags": [
+     "service"
+    ],
+    "summary": "Тайл карты через кеширующий прокси ({y} с суффиксом .png); 404 — карта выключена или неверные координаты",
+    "operationId": "get_tiles_z_x_y",
+    "parameters": [
+     {
+      "name": "z",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "x",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "y",
       "in": "path",
       "required": true,
       "schema": {

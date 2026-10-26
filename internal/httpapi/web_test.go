@@ -1,10 +1,15 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -68,6 +73,11 @@ func TestFrontendE2E(t *testing.T) {
 	}
 	ts, srv, _ := setupFull(t, 1000)
 	srv.uploadLimiter = newIPRateLimiter(100, 100)
+	// карта без интернета: источник тайлов — заглушка с сеткой
+	tiles := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(fakeTile(t)) }))
+	t.Cleanup(tiles.Close)
+	srv.cfg.TileURL, srv.cfg.TileMaxZoom, srv.cfg.TileAttribution = tiles.URL+"/{z}/{x}/{y}.png", 17, "© тестовая карта"
+	srv.tiles = newTileProxy(t.TempDir())
 	// видео для проверки плеера: воркер обрабатывает очередь в фоне
 	var clip string
 	if av.Available() {
@@ -108,4 +118,23 @@ func TestFrontendE2E(t *testing.T) {
 		t.Fatalf("e2e: %v\n%s", err, out)
 	}
 	t.Logf("%s", out)
+}
+
+// fakeTile — светлый тайл с сеткой, чтобы на снимках была видна карта.
+func fakeTile(t *testing.T) []byte {
+	img := image.NewRGBA(image.Rect(0, 0, 256, 256))
+	for y := range 256 {
+		for x := range 256 {
+			c := color.RGBA{0xEE, 0xF1, 0xE8, 0xFF}
+			if x%64 == 0 || y%64 == 0 {
+				c = color.RGBA{0xC9, 0xD3, 0xC0, 0xFF}
+			}
+			img.Set(x, y, c)
+		}
+	}
+	var b bytes.Buffer
+	if err := png.Encode(&b, img); err != nil {
+		t.Fatal(err)
+	}
+	return b.Bytes()
 }

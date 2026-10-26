@@ -38,6 +38,9 @@ func TestLoadErrors(t *testing.T) {
 		"shop without secret":  {"YOOKASSA_SHOP_ID": "1"},
 		"s3 without bucket":    {"S3_ENDPOINT": "http://minio:9000"},
 		"bad backup hour":      {"BACKUP_HOUR": "24"},
+		"tile url not http":    {"TILE_URL": "file:///etc/{z}/{x}/{y}"},
+		"tile url no xyz":      {"TILE_URL": "https://tiles.example/map.png"},
+		"bad tile zoom":        {"TILE_MAX_ZOOM": "25"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			base(t)
@@ -48,5 +51,17 @@ func TestLoadErrors(t *testing.T) {
 				t.Fatal("accepted")
 			}
 		})
+	}
+}
+
+func TestTileConfig(t *testing.T) {
+	base(t)
+	c, err := Load()
+	if err != nil || c.TileURL != "https://tile.openstreetmap.org/{z}/{x}/{y}.png" || c.TileMaxZoom != 17 || c.TileAttribution == "" {
+		t.Fatalf("defaults: %v %+v", err, c)
+	}
+	t.Setenv("TILE_URL", "") // задано пустым — карта выключена
+	if c, err = Load(); err != nil || c.TileURL != "" {
+		t.Fatalf("disabled: %v %q", err, c.TileURL)
 	}
 }
