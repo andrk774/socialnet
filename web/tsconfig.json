@@ -13,6 +13,9 @@
     "noImplicitReturns": true,
     "skipLibCheck": true,
     "rootDir": "ts/app",
+    // "../vendor/…" из ts/app находит static/vendor: так исходники и собранный
+    // static/app импортируют одно и то же без символической ссылки (её нет в Windows)
+    "rootDirs": ["./ts", "./static"],
     "outDir": "static/app",
     "removeComments": false,
     "newLine": "lf",

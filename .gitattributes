@@ -1,0 +1,6 @@
+# Одинаковые переводы строк на Linux и Windows (иначе Git на Windows
+# меняет LF на CRLF, и gofmt, скрипты и сравнение файлов расходятся)
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.mp4 binary

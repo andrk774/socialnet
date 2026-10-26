@@ -237,7 +237,7 @@ func (s *Server) RunDetectorOnce(ctx context.Context) ([]store.Alert, error) {
 		for _, a := range alerts {
 			fmt.Fprintf(&b, "[%s] %s — %s %s\n", a.Severity, a.Rule, a.Subject, a.Details)
 		}
-		b.WriteString("\nПодробности: " + s.cfg.AppURL + "/admin/alerts\n")
+		fmt.Fprintf(&b, "\nПодробности: %s/admin?tab=alerts\n", s.cfg.AppURL)
 		s.sendMail(s.cfg.SecurityContact, fmt.Sprintf("Socialnet: %d новых тревог безопасности", len(alerts)), b.String())
 	}
 	return alerts, err
