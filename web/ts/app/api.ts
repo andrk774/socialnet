@@ -18,9 +18,16 @@ export interface Poll {
   id: number; question: string; multiple: boolean; anonymous: boolean; closes_at: string | null; closed: boolean;
   voters_count: number; results_hidden: boolean; my_votes: number[]; options: PollOption[];
 }
+export interface Route {
+  id: string; owner_id: number; title: string; distance_m: number; gain_m: number; loss_m: number;
+  min_ele: number | null; max_ele: number | null; duration_sec: number; moving_sec: number; points: number;
+  hidden_ends_m: number; bbox: [number, number, number, number]; preview: [number, number][];
+  profile: { d: number; e: number }[]; gpx_url: string; created_at: string;
+  detail?: [number, number][][]; waypoints?: { lat: number; lon: number; ele?: number; name: string }[];
+}
 export interface Post {
   id: number; author: UserCard; community?: { id: number; slug: string; name: string }; text: string;
-  photos: Photo[]; tracks: PostTrack[]; videos: PostVideo[]; documents: PostDocument[]; poll: Poll | null;
+  photos: Photo[]; tracks: PostTrack[]; videos: PostVideo[]; documents: PostDocument[]; routes: Route[]; poll: Poll | null;
   audience: Audience; bookmarked: boolean; likes_count: number; comments_count: number;
   my_reaction: Reaction | null; reactions: Partial<Record<Reaction, number>>; created_at: string;
 }

@@ -346,7 +346,7 @@ func Poster(ctx context.Context, in, format, out string, seconds float64) error 
 
 var (
 	idRe   = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	fileRe = regexp.MustCompile(`^(file\.bin|audio\.mp3|voice\.mp3|master\.m3u8|poster\.jpg|(360p|720p)\.(m3u8|mp4)|(360p|720p)_[0-9]{4}\.ts)$`)
+	fileRe = regexp.MustCompile(`^(file\.bin|route\.gpx|audio\.mp3|voice\.mp3|master\.m3u8|poster\.jpg|(360p|720p)\.(m3u8|mp4)|(360p|720p)_[0-9]{4}\.ts)$`)
 )
 
 // Store хранит обработанные файлы: <root>/<kind>/<id[:2]>/<id>/<имя>.
@@ -366,7 +366,7 @@ func NewStore(root string) (*Store, error) {
 }
 
 func (s *Store) Dir(kind, id string) (string, error) {
-	if (kind != "tracks" && kind != "videos" && kind != "voices" && kind != "docs") || !idRe.MatchString(id) {
+	if (kind != "tracks" && kind != "videos" && kind != "voices" && kind != "docs" && kind != "routes") || !idRe.MatchString(id) {
 		return "", ErrNotFound
 	}
 	return filepath.Join(s.root, kind, id[:2], id), nil
@@ -414,7 +414,7 @@ func (s *Store) Key(kind, id, name string) (string, error) {
 }
 
 var contentTypes = map[string]string{".mp3": "audio/mpeg", ".m3u8": "application/vnd.apple.mpegurl",
-	".ts": "video/mp2t", ".jpg": "image/jpeg", ".mp4": "video/mp4", ".bin": "application/octet-stream"}
+	".ts": "video/mp2t", ".jpg": "image/jpeg", ".mp4": "video/mp4", ".bin": "application/octet-stream", ".gpx": "application/gpx+xml"}
 
 // Commit выгружает обработанные файлы в S3 (если оно настроено).
 func (s *Store) Commit(ctx context.Context, kind, id string) error {

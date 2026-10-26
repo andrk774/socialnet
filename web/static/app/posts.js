@@ -2,6 +2,7 @@ import { h, Fragment } from "../vendor/preact/index.js";
 import { useRef, useState } from "../vendor/preact/hooks.js";
 import { api, del, fileSize, fullName, get, patch, post, put, saveFile, upload } from "./api.js";
 import { me } from "./session.js";
+import { RouteCard, km } from "./routes.js";
 import { Avatar, Empty, ErrorLine, Loading, RichText, Time, UserLink, duration, useLoad } from "./ui.js";
 const reactions = [
     ["like", "👍", "Нравится"], ["love", "❤️", "Люблю"], ["haha", "😄", "Смешно"],
@@ -14,6 +15,8 @@ export function Composer({ communityId, onPosted }) {
     const [text, setText] = useState("");
     const [photos, setPhotos] = useState([]);
     const [docs, setDocs] = useState([]);
+    const [routes, setRoutes] = useState([]);
+    const [hideEnds, setHideEnds] = useState("200");
     const [poll, setPoll] = useState(null);
     const [audience, setAudience] = useState("everyone");
     const [picked, setPicked] = useState([]);
@@ -23,6 +26,7 @@ export function Composer({ communityId, onPosted }) {
     const [note, setNote] = useState("");
     const file = useRef(null);
     const docFile = useRef(null);
+    const gpxFile = useRef(null);
     const friends = useLoad(() => (audience === "list" ? get(`/users/${me().id}/friends?limit=50`) : Promise.resolve(null)), [audience]);
     async function addPhotos(files) {
         if (!files)
@@ -52,12 +56,26 @@ export function Composer({ communityId, onPosted }) {
             }
         }
     }
+    async function addRoute(files) {
+        const f = files?.[0];
+        if (!f)
+            return;
+        setError(null);
+        try {
+            setRoutes([...routes, await upload("/routes", f, { hidden_ends_m: hideEnds })]);
+        }
+        catch (e) {
+            setError(e);
+        }
+        if (gpxFile.current)
+            gpxFile.current.value = "";
+    }
     async function submit(e) {
         e.preventDefault();
         setBusy(true);
         setError(null);
         setNote("");
-        const body = { text, photo_ids: photos.map((x) => x.id), document_ids: docs.map((x) => x.id) };
+        const body = { text, photo_ids: photos.map((x) => x.id), document_ids: docs.map((x) => x.id), route_ids: routes.map((x) => x.id) };
         if (communityId)
             body.community_id = communityId;
         else {
@@ -74,6 +92,7 @@ export function Composer({ communityId, onPosted }) {
             setText("");
             setPhotos([]);
             setDocs([]);
+            setRoutes([]);
             setPoll(null);
             setWhen(null);
             if (when)
@@ -89,7 +108,7 @@ export function Composer({ communityId, onPosted }) {
         }
     }
     const setOpt = (i, v) => setPoll(poll && { ...poll, options: poll.options.map((o, j) => (j === i ? v : o)) });
-    const empty = !text.trim() && photos.length === 0 && docs.length === 0 && !poll;
+    const empty = !text.trim() && photos.length === 0 && docs.length === 0 && routes.length === 0 && !poll;
     return (h("form", { class: "composer", onSubmit: submit },
         h("label", { class: "sr-only", for: "composer-text" }, "\u0422\u0435\u043A\u0441\u0442 \u0437\u0430\u043F\u0438\u0441\u0438"),
         h("textarea", { id: "composer-text", placeholder: "\u0427\u0442\u043E \u0443 \u0432\u0430\u0441 \u043D\u043E\u0432\u043E\u0433\u043E?", value: text, maxLength: 10000, onInput: (e) => setText(e.target.value), rows: text.split("\n").length > 2 ? 5 : 2 }),
@@ -104,6 +123,15 @@ export function Composer({ communityId, onPosted }) {
                     " \u00B7 ",
                     fileSize(d.size))),
             h("button", { type: "button", class: "icon-btn", "aria-label": `Убрать документ ${d.title}`, onClick: () => setDocs(docs.filter((x) => x !== d)) }, "\u00D7")))))),
+        routes.length > 0 && (h("ul", { class: "doc-list" }, routes.map((r) => (h("li", { key: r.id, class: "doc" },
+            h("span", { class: "doc-ext", "aria-hidden": "true" }, "gpx"),
+            h("span", { class: "doc-name" },
+                r.title,
+                h("span", { class: "muted" },
+                    " \u00B7 ",
+                    km(r.distance_m),
+                    r.max_ele !== null ? ` · ↑ ${r.gain_m} м` : "")),
+            h("button", { type: "button", class: "icon-btn", "aria-label": `Убрать трек ${r.title}`, onClick: () => setRoutes(routes.filter((x) => x !== r)) }, "\u00D7")))))),
         poll && (h("fieldset", { class: "poll-edit" },
             h("legend", null, "\u041E\u043F\u0440\u043E\u0441"),
             h("label", { class: "sr-only", for: "poll-q" }, "\u0412\u043E\u043F\u0440\u043E\u0441"),
@@ -140,8 +168,16 @@ export function Composer({ communityId, onPosted }) {
             h("div", { class: "composer-tools" },
                 h("input", { ref: file, type: "file", accept: "image/jpeg,image/png,image/gif", multiple: true, hidden: true, onChange: (e) => addPhotos(e.target.files) }),
                 h("input", { ref: docFile, type: "file", multiple: true, hidden: true, onChange: (e) => addDocs(e.target.files) }),
+                h("input", { ref: gpxFile, type: "file", accept: ".gpx,application/gpx+xml", hidden: true, "data-kind": "gpx", onChange: (e) => addRoute(e.target.files) }),
                 h("button", { type: "button", class: "ghost", onClick: () => file.current?.click(), disabled: photos.length >= 10 }, "\u0424\u043E\u0442\u043E"),
                 h("button", { type: "button", class: "ghost", onClick: () => docFile.current?.click(), disabled: docs.length >= 10 }, "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442"),
+                h("span", { class: "track-pick" },
+                    h("button", { type: "button", class: "ghost", onClick: () => gpxFile.current?.click(), disabled: routes.length >= 3 }, "\u0422\u0440\u0435\u043A GPX"),
+                    h("select", { "aria-label": "\u0421\u043A\u0440\u044B\u0442\u044C \u043D\u0430\u0447\u0430\u043B\u043E \u0438 \u043A\u043E\u043D\u0435\u0446 \u0442\u0440\u0435\u043A\u0430", title: "\u0421\u043A\u0440\u044B\u0442\u044C \u043D\u0430\u0447\u0430\u043B\u043E \u0438 \u043A\u043E\u043D\u0435\u0446 \u0442\u0440\u0435\u043A\u0430, \u0447\u0442\u043E\u0431\u044B \u043F\u043E \u043D\u0435\u043C\u0443 \u043D\u0435\u043B\u044C\u0437\u044F \u0431\u044B\u043B\u043E \u043D\u0430\u0439\u0442\u0438 \u0432\u0430\u0448 \u0434\u043E\u043C", value: hideEnds, onChange: (e) => setHideEnds(e.target.value) },
+                        h("option", { value: "0" }, "\u043A\u043E\u043D\u0446\u044B \u0432\u0438\u0434\u043D\u044B"),
+                        h("option", { value: "200" }, "\u0441\u043A\u0440\u044B\u0442\u044C 200 \u043C"),
+                        h("option", { value: "500" }, "\u0441\u043A\u0440\u044B\u0442\u044C 500 \u043C"),
+                        h("option", { value: "1000" }, "\u0441\u043A\u0440\u044B\u0442\u044C 1 \u043A\u043C"))),
                 h("button", { type: "button", class: "ghost", "aria-pressed": !!poll, onClick: () => setPoll(poll ? null : { question: "", options: ["", ""], multiple: false, anonymous: false }) }, "\u041E\u043F\u0440\u043E\u0441"),
                 h("button", { type: "button", class: "ghost", "aria-pressed": when !== null, onClick: () => setWhen(when === null ? localInput(new Date(Date.now() + 3600_000)) : null) }, "\u041E\u0442\u043B\u043E\u0436\u0438\u0442\u044C"),
                 !communityId && (h("select", { "aria-label": "\u041A\u0442\u043E \u0443\u0432\u0438\u0434\u0438\u0442 \u0437\u0430\u043F\u0438\u0441\u044C", value: audience, onChange: (e) => setAudience(e.target.value) }, Object.keys(audienceLabel).map((a) => h("option", { key: a, value: a }, audienceLabel[a]))))),
@@ -283,6 +319,7 @@ export function PostView({ initial, onDelete }) {
             h("span", { class: "muted" }, duration(t.duration_sec)),
             h("audio", { controls: true, preload: "none", src: t.url })))),
         p.videos.map((v) => h(Video, { key: v.id, src: v.hls_url, mp4: v.mp4_url, poster: v.poster_url, title: v.title })),
+        p.routes?.map((r) => h(RouteCard, { key: r.id, route: r })),
         p.documents.length > 0 && h(DocList, { docs: p.documents }),
         p.poll && h(PollView, { postId: p.id, initial: p.poll }),
         h("footer", { class: "post-actions" },

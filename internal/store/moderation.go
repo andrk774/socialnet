@@ -79,6 +79,8 @@ func (s *Store) TargetAuthorUUID(ctx context.Context, typ, id string) (int64, er
 		q = `SELECT owner_id FROM videos WHERE id = $1::uuid AND status <> 'removed'`
 	case "document":
 		q = `SELECT owner_id FROM documents WHERE id = $1::uuid AND deleted_at IS NULL AND hidden_at IS NULL`
+	case "route":
+		q = `SELECT owner_id FROM routes WHERE id = $1::uuid AND deleted_at IS NULL AND hidden_at IS NULL`
 	default:
 		return 0, ErrNotFound
 	}

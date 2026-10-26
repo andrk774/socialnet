@@ -247,7 +247,7 @@ func (s *Server) handleBookmarks(w http.ResponseWriter, r *http.Request) {
 func (s *Server) schedulePost(w http.ResponseWriter, r *http.Request, me int64, req createPostRequest) {
 	err := s.store.CheckPostAttachments(r.Context(), me, store.NewPost{
 		MediaIDs: req.PhotoIDs, TrackIDs: req.TrackIDs, VideoIDs: req.VideoIDs, DocumentIDs: req.DocumentIDs,
-		Audience: req.Audience, AudienceIDs: req.AudienceIDs,
+		RouteIDs: req.RouteIDs, Audience: req.Audience, AudienceIDs: req.AudienceIDs,
 	})
 	if writePostError(w, err) {
 		return

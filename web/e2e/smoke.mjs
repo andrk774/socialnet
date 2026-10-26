@@ -126,6 +126,34 @@ await bob.page.goto(base + "/u/anna");
 await bob.page.locator("article.post").first().waitFor();
 assert.equal(await bob.page.getByText("Маршрут на субботу").count(), 0, "only_me post visible to bob");
 
+// трек GPX: загрузка в редакторе, карточка со статистикой и профилем, чистый файл на скачивание
+{
+  const pts = [];
+  for (let i = 0; i <= 300; i++) pts.push([55.05 + i * 10 / 111195, 400 + i + 30 * Math.sin(i / 20)]);
+  for (let i = 299; i >= 0; i--) pts.push([55.05 + i * 10 / 111195, 400 + i + 30 * Math.sin(i / 20)]);
+  const gpxText = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="Garmin"><metadata><author><name>Анна</name></author></metadata>`
+    + `<trk><name>Двуглавая сопка</name><trkseg>`
+    + pts.map(([lat, ele], i) => `<trkpt lat="${lat.toFixed(6)}" lon="60.1"><ele>${ele.toFixed(1)}</ele><time>${new Date(Date.UTC(2026, 6, 4, 6, 0, i * 10)).toISOString()}</time></trkpt>`).join("")
+    + `</trkseg></trk></gpx>`;
+  await anna.page.goto(base + "/");
+  await anna.page.locator('.composer input[data-kind="gpx"]').setInputFiles({ name: "hike.gpx", mimeType: "application/gpx+xml", buffer: Buffer.from(gpxText) });
+  await anna.page.locator(".composer .doc").getByText("Двуглавая сопка").waitFor();
+  await anna.page.getByPlaceholder("Что у вас нового?").fill("Сходили на Двуглавую");
+  await anna.page.getByRole("button", { name: "Опубликовать" }).click();
+  const card = anna.page.locator("article.post section.route").first();
+  await card.waitFor();
+  await card.locator("dd", { hasText: "6 км" }).waitFor();
+  await card.locator("dd", { hasText: "↑ 340 м" }).waitFor(); // набор без шума GPS
+  assert.equal(await card.locator("svg.route-profile path").count(), 2, "elevation profile drawn");
+  assert.equal(await card.locator("svg.route-sketch circle").count(), 2, "start and finish drawn");
+  await card.getByText("Первые и последние 200 м скрыты").waitFor();
+  await anna.page.screenshot({ path: `${shots}/12-route.png`, fullPage: true });
+  const dl = anna.page.waitForEvent("download");
+  await card.getByRole("button", { name: "Скачать GPX" }).click();
+  const gpxFile = await (await import("node:fs")).readFileSync(await (await dl).path(), "utf8");
+  assert.ok(gpxFile.includes("<trkpt") && !gpxFile.includes("<time>") && !gpxFile.includes("Анна") && !gpxFile.includes("Garmin"), "downloaded GPX must be clean");
+}
+
 // отложенная запись
 await anna.page.goto(base + "/");
 await anna.page.getByPlaceholder("Что у вас нового?").fill("Это выйдет через час");

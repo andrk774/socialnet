@@ -292,3 +292,25 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0 .25rem 0 0;
 @media (max-width: 760px) { .admin-users th:nth-child(4), .admin-users td:nth-child(4) { display: none; } }
 .admin .row select { width: auto; }
 .plain-list time { white-space: nowrap; }
+
+/* ---------- маршруты (GPX) ---------- */
+.route { border: 1px solid var(--line); border-radius: var(--radius-m); padding: .75rem 1rem; margin: .75rem 0; }
+.route-head { display: flex; justify-content: space-between; align-items: baseline; gap: .75rem; flex-wrap: wrap; }
+.route-title { font-size: var(--step-0); }
+.route-stats { display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; margin: .5rem 0; }
+.route-stats dt { font-size: var(--step--1); color: var(--ink-2); }
+.route-stats dd { margin: 0; font-weight: 650; font-variant-numeric: tabular-nums; }
+.route-graphics { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: .75rem; align-items: center; }
+.route-sketch, .route-profile { width: 100%; height: auto; display: block; }
+.route-sketch { background: var(--tint); border-radius: var(--radius-s); }
+.route-line { stroke: var(--malachite); }
+.route-area { fill: color-mix(in srgb, var(--band) 22%, transparent); }
+.route-start { fill: var(--malachite); stroke: var(--surface); stroke-width: 2; }
+.route-finish { fill: var(--garnet); stroke: var(--surface); stroke-width: 2; }
+.route-north { font-size: 11px; fill: var(--ink-2); }
+.route-grid { stroke: var(--line); stroke-width: 1; }
+.route-axis { font-size: 11px; fill: var(--ink-2); font-variant-numeric: tabular-nums; }
+.route-note { margin: .25rem 0 0; }
+.track-pick { display: inline-flex; gap: .25rem; align-items: center; }
+.track-pick select { width: auto; padding: .4rem .35rem; font-size: var(--step--1); }
+@media (max-width: 520px) { .route-graphics { grid-template-columns: 1fr; } }

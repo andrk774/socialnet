@@ -153,6 +153,10 @@ func (s *Store) Takedown(ctx context.Context, kind, id string, hidden bool, reas
 			err = tx.QueryRow(ctx, `
 				UPDATE documents SET hidden_at = CASE WHEN $2 THEN COALESCE(hidden_at, now()) ELSE NULL END
 				WHERE id = $1::uuid RETURNING sha256`, id, hidden).Scan(&sha)
+		case "route":
+			err = tx.QueryRow(ctx, `
+				UPDATE routes SET hidden_at = CASE WHEN $2 THEN COALESCE(hidden_at, now()) ELSE NULL END
+				WHERE id = $1::uuid RETURNING sha256`, id, hidden).Scan(&sha)
 		default:
 			return ErrNotFound
 		}

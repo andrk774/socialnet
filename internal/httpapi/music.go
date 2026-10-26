@@ -222,7 +222,7 @@ func (s *Server) serveRemoteAV(w http.ResponseWriter, r *http.Request, kind, id,
 		http.NotFound(w, r)
 		return
 	}
-	if s.cfg.MediaCDNURL != "" && kind != "voices" && kind != "docs" { // личное — только через нас
+	if s.cfg.MediaCDNURL != "" && kind != "voices" && kind != "docs" && kind != "routes" { // личное — только через нас
 		w.Header().Set("Cache-Control", "public, max-age=300")
 		http.Redirect(w, r, s.cfg.MediaCDNURL+"/"+key, http.StatusFound) // #nosec G710 -- адрес CDN из настроек, key собран из проверенных UUID и имени файла
 		return

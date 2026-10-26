@@ -23,6 +23,7 @@ type createPostRequest struct {
 	TrackIDs    []string       `json:"track_ids"`
 	VideoIDs    []string       `json:"video_ids"`
 	DocumentIDs []string       `json:"document_ids"`
+	RouteIDs    []string       `json:"route_ids"`
 	CommunityID *int64         `json:"community_id"`
 	Audience    string         `json:"audience,omitempty"`     // everyone | friends | only_me | list
 	AudienceIDs []int64        `json:"audience_ids,omitempty"` // для list: друзья, которым виден пост
@@ -60,12 +61,15 @@ func (req *createPostRequest) validate(at time.Time) map[string]string {
 	if req.DocumentIDs, e = dedupeUUIDs(req.DocumentIDs, maxDocsPerPost); e != "" {
 		errs["document_ids"] = e
 	}
+	if req.RouteIDs, e = dedupeUUIDs(req.RouteIDs, maxRoutesPerPost); e != "" {
+		errs["route_ids"] = e
+	}
 	if req.Poll != nil {
 		if pe := validatePoll(req.Poll, at); pe != "" {
 			errs["poll"] = pe
 		}
 	}
-	if req.Text == "" && len(req.PhotoIDs)+len(req.TrackIDs)+len(req.VideoIDs)+len(req.DocumentIDs) == 0 && req.Poll == nil {
+	if req.Text == "" && len(req.PhotoIDs)+len(req.TrackIDs)+len(req.VideoIDs)+len(req.DocumentIDs)+len(req.RouteIDs) == 0 && req.Poll == nil {
 		errs["text"] = "post must have text, attachments or a poll"
 	}
 	if req.Audience == "" {
@@ -160,7 +164,7 @@ func (s *Server) publishPost(ctx context.Context, me int64, req createPostReques
 	id, err := s.store.CreatePost(ctx, store.NewPost{
 		AuthorID: me, CommunityID: req.CommunityID, Text: req.Text,
 		MediaIDs: req.PhotoIDs, TrackIDs: req.TrackIDs, VideoIDs: req.VideoIDs, DocumentIDs: req.DocumentIDs,
-		Hashtags: textparse.Hashtags(req.Text), Audience: req.Audience, AudienceIDs: req.AudienceIDs,
+		RouteIDs: req.RouteIDs, Hashtags: textparse.Hashtags(req.Text), Audience: req.Audience, AudienceIDs: req.AudienceIDs,
 		Poll: req.Poll, ScheduledID: scheduledID,
 	})
 	if err != nil {
@@ -183,7 +187,7 @@ func writePostError(w http.ResponseWriter, err error) bool {
 	switch {
 	case errors.Is(err, store.ErrBadMedia):
 		writeFieldErrors(w, http.StatusUnprocessableEntity, "validation_failed", "invalid input",
-			map[string]string{"attachments": "unknown attachment, or photo/document is not yours, or video is not ready"})
+			map[string]string{"attachments": "unknown attachment, or photo/document/route is not yours, or video is not ready"})
 	case errors.Is(err, store.ErrNotFriends):
 		writeFieldErrors(w, http.StatusUnprocessableEntity, "validation_failed", "invalid input",
 			map[string]string{"audience_ids": "you can choose only your friends"})
@@ -328,7 +332,7 @@ func (s *Server) handleUpdatePost(w http.ResponseWriter, r *http.Request) {
 	if req.Text == nil && req.Audience == nil {
 		errs["text"] = "nothing to change: send text and/or audience"
 	}
-	hasContent := len(post.Photos)+len(post.Tracks)+len(post.Videos)+len(post.Documents) > 0 || post.Poll != nil
+	hasContent := len(post.Photos)+len(post.Tracks)+len(post.Videos)+len(post.Documents)+len(post.Routes) > 0 || post.Poll != nil
 	if req.Text != nil {
 		t := strings.TrimSpace(*req.Text)
 		req.Text = &t
