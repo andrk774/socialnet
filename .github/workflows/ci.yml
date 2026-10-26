@@ -137,10 +137,12 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+      # Версия закреплена: @latest означал бы, что проверка меняется сама по себе
+      # и может упасть или пропустить проблему без изменений в коде.
+      # gosec отдельно не запускается: он уже входит в golangci-lint (задание lint)
+      # с закреплённой версией и теми же исключениями, что и локальный `make lint`.
       - name: govulncheck — известные уязвимости в зависимостях
-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
-      - name: gosec — статический анализ безопасности
-        run: go run github.com/securego/gosec/v2/cmd/gosec@latest -exclude-dir=api -exclude=G115 ./...
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
   fuzz:
     runs-on: ubuntu-latest

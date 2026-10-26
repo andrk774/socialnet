@@ -54,7 +54,11 @@ func escapeLabel(v string) string {
 func labelString(names, values []string, extra ...string) string {
 	var parts []string
 	for i, n := range names {
-		parts = append(parts, n+`="`+escapeLabel(values[i])+`"`)
+		v := ""
+		if i < len(values) { // число значений проверяет With, но лишняя граница не мешает
+			v = values[i]
+		}
+		parts = append(parts, n+`="`+escapeLabel(v)+`"`)
 	}
 	for i := 0; i+1 < len(extra); i += 2 {
 		parts = append(parts, extra[i]+`="`+escapeLabel(extra[i+1])+`"`)

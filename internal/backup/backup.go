@@ -189,7 +189,7 @@ func restoreCheck(ctx context.Context, o Options, data []byte, before map[string
 		}
 		data = plain.Bytes()
 	}
-	if err := os.WriteFile(file, data, 0o600); err != nil {
+	if err := os.WriteFile(file, data, 0o600); err != nil { // #nosec G703 -- file в каталоге из os.MkdirTemp, имя задано сервером
 		return err
 	}
 

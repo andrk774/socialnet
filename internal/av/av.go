@@ -81,7 +81,7 @@ func baseArgs() []string {
 func run(ctx context.Context, timeout time.Duration, name string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204 -- name — только ffmpeg/ffprobe, аргументы без оболочки
+	cmd := exec.CommandContext(ctx, name, args...)  // #nosec G204 -- name — только ffmpeg/ffprobe, аргументы без оболочки
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH")} // без лишних переменных окружения
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
