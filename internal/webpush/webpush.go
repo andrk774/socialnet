@@ -203,6 +203,11 @@ var DefaultHosts = []string{
 }
 
 func ValidateEndpoint(endpoint string, allowed []string) error {
+	// Только каноническое «https://» в нижнем регистре: url.Parse принимает и
+	// «HTTPS://», но адрес хранится и сравнивается как строка — одна форма надёжнее.
+	if !strings.HasPrefix(endpoint, "https://") {
+		return ErrBadEndpoint
+	}
 	u, err := url.Parse(endpoint)
 	if err != nil || u.Scheme != "https" || u.User != nil || u.Host == "" {
 		return ErrBadEndpoint

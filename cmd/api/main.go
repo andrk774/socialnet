@@ -42,11 +42,11 @@ func run(log *slog.Logger) error {
 	if len(os.Args) == 3 && os.Args[1] == "probe" {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, os.Args[2], nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, os.Args[2], nil) // #nosec G704 -- команда probe для healthcheck: адрес задаёт docker-compose
 		if err != nil {
 			return err
 		}
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := http.DefaultClient.Do(req) // #nosec G704 -- см. выше
 		if err != nil {
 			return err
 		}
