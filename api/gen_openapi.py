@@ -50,16 +50,23 @@ schemas = {
     "Photo": obj(id=uuid, url=str_, thumb_url=str_),
     "PostTrack": obj(id=uuid, title=str_, artist=str_, duration_sec=int_, url=str_),
     "PostVideo": obj(id=uuid, title=str_, duration_sec=int_, poster_url=str_, hls_url=str_, **{"mp4_url?": str_}),
+    "PostDocument": obj(id=uuid, title=str_, ext=str_, size=int_, url=str_),
+    "Document": obj(id=uuid, owner_id=int_, title=str_, ext=str_, size=int_, url=str_, created_at=dt),
+    "Poll": obj(id=int_, question=str_, multiple=bool_, anonymous=bool_, closes_at=nullable(dt), closed=bool_,
+                voters_count=int_, results_hidden=bool_, my_votes=arr(int_),
+                options=arr(obj(id=int_, text=str_, votes=nullable(int_)))),
     "Post": obj(id=int_, author=S("UserCard"), **{"community?": obj(id=int_, slug=str_, name=str_)}, text=str_,
                 photos=arr(S("Photo")), tracks=arr(S("PostTrack")), videos=arr(S("PostVideo")),
+                documents=arr(S("PostDocument")), poll=nullable(S("Poll")),
+                audience=enum("everyone", "friends", "only_me", "list"), bookmarked=bool_,
                 likes_count=int_, comments_count=int_, liked_by_me=bool_,
                 my_reaction=nullable(enum("like", "love", "haha", "wow", "sad", "angry")),
                 reactions={"type": "object", "additionalProperties": int_},
                 created_at=dt, **{"edited_at?": dt}),
     "Comment": obj(id=int_, post_id=int_, **{"parent_id?": int_, "reply_to?": S("UserCard")}, replies_count=int_,
                    author=S("UserCard"), text=str_, created_at=dt),
-    "Attachment": obj(kind=enum("photo", "track", "voice"), id=uuid, url=str_,
-                      **{"thumb_url?": str_, "title?": str_, "artist?": str_, "duration_sec?": int_}),
+    "Attachment": obj(kind=enum("photo", "track", "voice", "document"), id=uuid, url=str_,
+                      **{"thumb_url?": str_, "title?": str_, "artist?": str_, "duration_sec?": int_, "ext?": str_, "size?": int_}),
     "ChatMember": obj(id=int_, username=str_, first_name=str_, last_name=str_, avatar_url=nullable(str_),
                       role=enum("owner", "admin", "member")),
     "Story": obj(id=int_, author_id=int_, **{"photo?": S("Photo"), "video?": S("PostVideo"), "views_count?": int_},
@@ -116,7 +123,7 @@ A = "/api/v1"
 SCOPES = {"profile": "Профиль, друзья, поиск", "friends": "Заявки в друзья", "wall": "Публикации и комментарии",
           "photos": "Загрузка фото", "messages": "Сообщения", "notifications": "Уведомления", "music": "Музыка",
           "video": "Видео", "communities": "Сообщества", "stories": "Истории", "events": "Мероприятия",
-          "offline": "Токен без срока действия"}
+          "docs": "Документы", "bookmarks": "Закладки", "offline": "Токен без срока действия"}
 # --- служебные ---
 r("GET", "/health", "service", "Проверка живости", resp=obj(status=str_), auth=False)
 r("GET", "/.well-known/security.txt", "service", "security.txt (RFC 9116)", auth=False, resp="text")
@@ -158,10 +165,37 @@ r("POST", A + "/users/{id}/block", "friends", "Заблокировать", code
 r("DELETE", A + "/users/{id}/block", "friends", "Разблокировать", code=204)
 r("GET", A + "/blocks", "friends", "Чёрный список", resp=lst(S("UserCard")))
 # --- посты ---
-post_body = obj(**{"text?": str_, "photo_ids?": arr(uuid), "track_ids?": arr(uuid), "video_ids?": arr(uuid), "community_id?": int_})
-r("POST", A + "/posts", "posts", "Опубликовать пост", post_body, S("Post"), 201)
+audience = enum("everyone", "friends", "only_me", "list")
+new_poll = obj(question=str_, options=arr(str_), **{"multiple?": bool_, "anonymous?": bool_, "closes_at?": dt})
+post_body = obj(**{"text?": str_, "photo_ids?": arr(uuid), "track_ids?": arr(uuid), "video_ids?": arr(uuid),
+                   "document_ids?": arr(uuid), "community_id?": int_, "audience?": audience, "audience_ids?": arr(int_),
+                   "poll?": new_poll, "publish_at?": dt})
+scheduled = obj(id=int_, author_id=int_, **{"community_id?": int_, "post_id?": int_, "error?": str_}, publish_at=dt,
+                payload={"type": "object"}, status=enum("pending", "published", "failed", "canceled"), created_at=dt)
+r("POST", A + "/posts", "posts", "Опубликовать пост (с publish_at — отложить: ответ 202 и отложенный пост)", post_body, S("Post"), 201)
 r("GET", A + "/posts/{id}", "posts", "Пост", resp=S("Post"))
-r("PATCH", A + "/posts/{id}", "posts", "Изменить текст поста", obj(text=str_), S("Post"))
+r("PATCH", A + "/posts/{id}", "posts", "Изменить текст и/или аудиторию поста",
+  obj(**{"text?": str_, "audience?": audience, "audience_ids?": arr(int_)}), S("Post"))
+r("GET", A + "/posts/{id}/audience", "posts", "Кому виден пост (только автору)", resp=obj(audience=audience, user_ids=arr(int_)))
+r("POST", A + "/posts/{id}/poll/votes", "posts", "Проголосовать в опросе", obj(option_ids=arr(int_)), S("Poll"))
+r("DELETE", A + "/posts/{id}/poll/votes", "posts", "Отозвать голос", resp=S("Poll"))
+r("GET", A + "/posts/{id}/poll/options/{oid}/voters", "posts", "Кто выбрал вариант (не в анонимных опросах)", resp=lst(S("UserCard")))
+r("GET", A + "/scheduled-posts", "posts", "Отложенные посты: свои или ?community_id= (редакторам)", resp=obj(items=arr(scheduled)))
+r("PATCH", A + "/scheduled-posts/{sid}", "posts", "Перенести отложенный пост", obj(publish_at=dt), scheduled)
+r("DELETE", A + "/scheduled-posts/{sid}", "posts", "Отменить отложенный пост", code=204)
+# --- закладки ---
+bookmark = obj(id=int_, kind=enum("post", "video", "track"), created_at=dt,
+               **{"post?": S("Post"), "video?": S("Video"), "track?": S("Track")})
+r("GET", A + "/bookmarks", "bookmarks", "Закладки: ?kind=post|video|track", resp=lst(bookmark))
+r("PUT", A + "/bookmarks/{kind}/{target}", "bookmarks", "Добавить в закладки (kind: post|video|track)", code=204)
+r("DELETE", A + "/bookmarks/{kind}/{target}", "bookmarks", "Убрать из закладок", code=204)
+# --- документы ---
+r("POST", A + "/documents", "documents", "Загрузить документ (PDF, DOC(X), XLS(X), PPT(X), ODF, EPUB, DjVu, RTF, TXT, ZIP, 7Z, RAR… до 50 МБ)",
+  resp=S("Document"), code=201, content=upload_form(**{"title?": str_}))
+r("GET", A + "/documents", "documents", "Мои документы", resp=lst(S("Document")))
+r("PATCH", A + "/documents/{did}", "documents", "Переименовать", obj(title=str_), S("Document"))
+r("DELETE", A + "/documents/{did}", "documents", "Удалить (пропадёт из постов и сообщений)", code=204)
+r("GET", A + "/documents/{did}/download", "documents", "Скачать (владелец, зрители поста, участники беседы)", resp="binary")
 r("DELETE", A + "/posts/{id}", "posts", "Удалить пост", code=204)
 r("POST", A + "/posts/{id}/like", "posts", "Лайк", resp=obj(likes_count=int_, liked_by_me=bool_))
 r("DELETE", A + "/posts/{id}/like", "posts", "Убрать лайк", resp=obj(likes_count=int_, liked_by_me=bool_))
@@ -194,12 +228,12 @@ r("POST", A + "/media", "media", "Загрузить фото (JPEG/PNG/GIF до
 r("DELETE", A + "/media/{id}", "media", "Удалить фото", code=204)
 r("GET", "/media/{id}/{size}", "media", "Файл фото: size = full | thumb", auth=False, resp="binary")
 # --- безопасность / модерация ---
-r("POST", A + "/reports", "moderation", "Пожаловаться", obj(target_type=enum("post", "comment", "user", "community", "track", "video"), **{"target_id?": int_, "target_uuid?": uuid}, reason=str_), obj(id=int_, status=str_), 201)
+r("POST", A + "/reports", "moderation", "Пожаловаться", obj(target_type=enum("post", "comment", "user", "community", "track", "video", "document"), **{"target_id?": int_, "target_uuid?": uuid}, reason=str_), obj(id=int_, status=str_), 201)
 r("GET", A + "/mod/reports", "moderation", "Очередь жалоб (модератор)", resp=lst(S("Report")))
 r("POST", A + "/mod/reports/{id}/resolve", "moderation", "Решение по жалобе", obj(action=enum("dismiss", "hide", "ban"), **{"note?": str_}), code=204)
 r("POST", A + "/mod/users/{id}/ban", "moderation", "Забанить", obj(**{"reason?": str_}), code=204)
 r("POST", A + "/mod/users/{id}/unban", "moderation", "Разбанить", code=204)
-r("POST", A + "/mod/{type}/{id}/hide", "moderation", "Скрыть: posts|comments|communities|tracks|videos", code=204)
+r("POST", A + "/mod/{type}/{id}/hide", "moderation", "Скрыть: posts|comments|communities|tracks|videos|documents", code=204)
 r("POST", A + "/mod/{type}/{id}/unhide", "moderation", "Вернуть скрытое", code=204)
 r("GET", A + "/mod/log", "moderation", "Журнал модерации", resp=lst(S("ModAction")))
 r("PUT", A + "/admin/users/{id}/role", "moderation", "Назначить роль (админ)", obj(role=enum("user", "moderator", "admin")), code=204)
@@ -296,6 +330,21 @@ audit = obj(id=int_, actor_id=int_, actor_role=str_, action=str_, target=str_, *
             status=int_, ip=str_, user_agent=str_, request_id=str_, created_at=dt)
 alert = obj(id=int_, rule=str_, subject=str_, severity=enum("low", "medium", "high"), details={"type": "object"},
             created_at=dt, acknowledged_by=nullable(int_))
+admin_user = obj(id=int_, username=str_, email=str_, first_name=str_, last_name=str_, avatar_url=nullable(str_),
+                 role=enum("user", "moderator", "admin"), email_verified=bool_, is_bot=bool_, created_at=dt,
+                 **{"banned_at?": dt, "ban_reason?": str_, "last_seen_at?": dt})
+r("GET", A + "/admin/stats", "moderation", "Сводка: пользователи, активность, жалобы, тревоги, платежи",
+  resp=obj(users=int_, users_new_24h=int_, users_new_7d=int_, active_24h=int_, banned=int_, posts_24h=int_,
+           comments_24h=int_, messages_24h=int_, open_reports=int_, open_alerts=int_, new_vulnerability_reports=int_,
+           scheduled_posts_pending=int_, documents=int_, paid_kopecks_30d=int_))
+r("GET", A + "/admin/users", "moderation", "Поиск пользователей: ?q= (id, email, username, имя)&filter=all|banned|staff|unverified", resp=lst(admin_user))
+r("GET", A + "/admin/users/{id}", "moderation", "Карточка пользователя (без пароля и секретов — их нет в открытом виде)",
+  resp={"allOf": [admin_user, obj(two_factor_enabled=bool_, active_sessions=int_, posts=int_, comments=int_, friends=int_,
+                                  open_reports_against=int_, reports_filed=int_, balance=int_, debt=int_,
+                                  **{"last_login_at?": dt}, recent_security_events=arr(S("SecurityEvent")))]})
+r("POST", A + "/admin/users/{id}/password-reset", "moderation", "Отправить пользователю письмо со ссылкой на сброс пароля",
+  obj(**{"revoke_sessions?": bool_}), obj(sent_to=str_, sessions_revoked=bool_), 202)
+r("POST", A + "/admin/users/{id}/revoke-sessions", "moderation", "Завершить все сеансы и токены приложений пользователя", code=204)
 r("GET", A + "/admin/audit", "moderation", "Журнал действий модераторов и админов: ?actor_id=&before=", resp=lst(audit))
 r("GET", A + "/admin/audit/verify", "moderation", "Проверить цепочку хешей журнала", resp=obj(ok=bool_, checked=int_, broken_at=int_))
 r("GET", A + "/admin/alerts", "moderation", "Тревоги детектора аномалий: ?status=all", resp=lst(alert))
@@ -350,7 +399,7 @@ def build(routes_file=None):
     for (method, path), d in sorted(R.items(), key=lambda x: (x[0][1], x[0][0])):
         # числовые id, кроме /mod/{type}/{id}: там бывает и UUID трека или видео
         params = [{"name": n, "in": "path", "required": True,
-                   "schema": int_ if n in ("id", "userID", "uid", "tid") and "/tracks/" not in path and "{type}" not in path else str_}
+                   "schema": int_ if (n in ("id", "userID", "uid", "tid", "oid") or (n == "sid" and "scheduled" in path)) and "/tracks/" not in path and "{type}" not in path else str_}
                   for n in re.findall(r"{(\w+)}", path)]
         op = {"tags": [d["tag"]], "summary": d["summary"], "operationId": (method.lower() + re.sub(r"[^a-zA-Z0-9]+", "_", path)).strip("_")}
         if params:
@@ -384,7 +433,7 @@ def build(routes_file=None):
             ("auth", "Вход, регистрация, пароль, 2FA, сеансы"), ("users", "Профиль, приватность, статус"),
             ("friends", "Друзья и блокировки"), ("posts", "Посты, лента, комментарии"),
             ("messages", "Личные сообщения и WebSocket"), ("notifications", "Уведомления и push"),
-            ("media", "Фото"), ("music", "Музыка и плейлисты"), ("video", "Видео"),
+            ("media", "Фото"), ("documents", "Документы"), ("bookmarks", "Закладки"), ("music", "Музыка и плейлисты"), ("video", "Видео"),
             ("stories", "Истории"), ("events", "Мероприятия"), ("communities", "Сообщества"), ("wallet", "Монеты, подарки"), ("search", "Поиск"),
             ("developers", "OAuth-приложения, боты сообществ, Callback API"),
             ("moderation", "Жалобы, модерация, администрирование"), ("service", "Служебное")]],

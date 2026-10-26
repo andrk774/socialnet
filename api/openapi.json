@@ -40,6 +40,14 @@
    "description": "Фото"
   },
   {
+   "name": "documents",
+   "description": "Документы"
+  },
+  {
+   "name": "bookmarks",
+   "description": "Закладки"
+  },
+  {
    "name": "music",
    "description": "Музыка и плейлисты"
   },
@@ -110,6 +118,8 @@
        "communities": "Сообщества",
        "stories": "Истории",
        "events": "Мероприятия",
+       "docs": "Документы",
+       "bookmarks": "Закладки",
        "offline": "Токен без срока действия"
       }
      }
@@ -517,6 +527,151 @@
      "hls_url"
     ]
    },
+   "PostDocument": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "title": {
+      "type": "string"
+     },
+     "ext": {
+      "type": "string"
+     },
+     "size": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "url": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "title",
+     "ext",
+     "size",
+     "url"
+    ]
+   },
+   "Document": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "owner_id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "title": {
+      "type": "string"
+     },
+     "ext": {
+      "type": "string"
+     },
+     "size": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "url": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    },
+    "required": [
+     "id",
+     "owner_id",
+     "title",
+     "ext",
+     "size",
+     "url",
+     "created_at"
+    ]
+   },
+   "Poll": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "question": {
+      "type": "string"
+     },
+     "multiple": {
+      "type": "boolean"
+     },
+     "anonymous": {
+      "type": "boolean"
+     },
+     "closes_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+     },
+     "closed": {
+      "type": "boolean"
+     },
+     "voters_count": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "results_hidden": {
+      "type": "boolean"
+     },
+     "my_votes": {
+      "type": "array",
+      "items": {
+       "type": "integer",
+       "format": "int64"
+      }
+     },
+     "options": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "integer",
+         "format": "int64"
+        },
+        "text": {
+         "type": "string"
+        },
+        "votes": {
+         "type": "integer",
+         "format": "int64",
+         "nullable": true
+        }
+       },
+       "required": [
+        "id",
+        "text",
+        "votes"
+       ]
+      }
+     }
+    },
+    "required": [
+     "id",
+     "question",
+     "multiple",
+     "anonymous",
+     "closes_at",
+     "closed",
+     "voters_count",
+     "results_hidden",
+     "my_votes",
+     "options"
+    ]
+   },
    "Post": {
     "type": "object",
     "properties": {
@@ -568,6 +723,28 @@
        "$ref": "#/components/schemas/PostVideo"
       }
      },
+     "documents": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/PostDocument"
+      }
+     },
+     "poll": {
+      "$ref": "#/components/schemas/Poll",
+      "nullable": true
+     },
+     "audience": {
+      "type": "string",
+      "enum": [
+       "everyone",
+       "friends",
+       "only_me",
+       "list"
+      ]
+     },
+     "bookmarked": {
+      "type": "boolean"
+     },
      "likes_count": {
       "type": "integer",
       "format": "int64"
@@ -614,6 +791,10 @@
      "photos",
      "tracks",
      "videos",
+     "documents",
+     "poll",
+     "audience",
+     "bookmarked",
      "likes_count",
      "comments_count",
      "liked_by_me",
@@ -672,7 +853,8 @@
       "enum": [
        "photo",
        "track",
-       "voice"
+       "voice",
+       "document"
       ]
      },
      "id": {
@@ -692,6 +874,13 @@
       "type": "string"
      },
      "duration_sec": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "ext": {
+      "type": "string"
+     },
+     "size": {
       "type": "integer",
       "format": "int64"
      }
@@ -2097,6 +2286,497 @@
     }
    }
   },
+  "/api/v1/admin/stats": {
+   "get": {
+    "tags": [
+     "moderation"
+    ],
+    "summary": "Сводка: пользователи, активность, жалобы, тревоги, платежи",
+    "operationId": "get_api_v1_admin_stats",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "users": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "users_new_24h": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "users_new_7d": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "active_24h": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "banned": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "posts_24h": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "comments_24h": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "messages_24h": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "open_reports": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "open_alerts": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "new_vulnerability_reports": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "scheduled_posts_pending": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "documents": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "paid_kopecks_30d": {
+           "type": "integer",
+           "format": "int64"
+          }
+         },
+         "required": [
+          "users",
+          "users_new_24h",
+          "users_new_7d",
+          "active_24h",
+          "banned",
+          "posts_24h",
+          "comments_24h",
+          "messages_24h",
+          "open_reports",
+          "open_alerts",
+          "new_vulnerability_reports",
+          "scheduled_posts_pending",
+          "documents",
+          "paid_kopecks_30d"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/admin/users": {
+   "get": {
+    "tags": [
+     "moderation"
+    ],
+    "summary": "Поиск пользователей: ?q= (id, email, username, имя)&filter=all|banned|staff|unverified",
+    "operationId": "get_api_v1_admin_users",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "username": {
+              "type": "string"
+             },
+             "email": {
+              "type": "string"
+             },
+             "first_name": {
+              "type": "string"
+             },
+             "last_name": {
+              "type": "string"
+             },
+             "avatar_url": {
+              "type": "string",
+              "nullable": true
+             },
+             "role": {
+              "type": "string",
+              "enum": [
+               "user",
+               "moderator",
+               "admin"
+              ]
+             },
+             "email_verified": {
+              "type": "boolean"
+             },
+             "is_bot": {
+              "type": "boolean"
+             },
+             "created_at": {
+              "type": "string",
+              "format": "date-time"
+             },
+             "banned_at": {
+              "type": "string",
+              "format": "date-time"
+             },
+             "ban_reason": {
+              "type": "string"
+             },
+             "last_seen_at": {
+              "type": "string",
+              "format": "date-time"
+             }
+            },
+            "required": [
+             "id",
+             "username",
+             "email",
+             "first_name",
+             "last_name",
+             "avatar_url",
+             "role",
+             "email_verified",
+             "is_bot",
+             "created_at"
+            ]
+           }
+          },
+          "next_cursor": {
+           "type": "integer",
+           "format": "int64",
+           "nullable": true
+          }
+         },
+         "required": [
+          "items",
+          "next_cursor"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/admin/users/{id}": {
+   "get": {
+    "tags": [
+     "moderation"
+    ],
+    "summary": "Карточка пользователя (без пароля и секретов — их нет в открытом виде)",
+    "operationId": "get_api_v1_admin_users_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "allOf": [
+          {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "username": {
+             "type": "string"
+            },
+            "email": {
+             "type": "string"
+            },
+            "first_name": {
+             "type": "string"
+            },
+            "last_name": {
+             "type": "string"
+            },
+            "avatar_url": {
+             "type": "string",
+             "nullable": true
+            },
+            "role": {
+             "type": "string",
+             "enum": [
+              "user",
+              "moderator",
+              "admin"
+             ]
+            },
+            "email_verified": {
+             "type": "boolean"
+            },
+            "is_bot": {
+             "type": "boolean"
+            },
+            "created_at": {
+             "type": "string",
+             "format": "date-time"
+            },
+            "banned_at": {
+             "type": "string",
+             "format": "date-time"
+            },
+            "ban_reason": {
+             "type": "string"
+            },
+            "last_seen_at": {
+             "type": "string",
+             "format": "date-time"
+            }
+           },
+           "required": [
+            "id",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "avatar_url",
+            "role",
+            "email_verified",
+            "is_bot",
+            "created_at"
+           ]
+          },
+          {
+           "type": "object",
+           "properties": {
+            "two_factor_enabled": {
+             "type": "boolean"
+            },
+            "active_sessions": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "posts": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "comments": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "friends": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "open_reports_against": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "reports_filed": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "balance": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "debt": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "last_login_at": {
+             "type": "string",
+             "format": "date-time"
+            },
+            "recent_security_events": {
+             "type": "array",
+             "items": {
+              "$ref": "#/components/schemas/SecurityEvent"
+             }
+            }
+           },
+           "required": [
+            "two_factor_enabled",
+            "active_sessions",
+            "posts",
+            "comments",
+            "friends",
+            "open_reports_against",
+            "reports_filed",
+            "balance",
+            "debt",
+            "recent_security_events"
+           ]
+          }
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/admin/users/{id}/password-reset": {
+   "post": {
+    "tags": [
+     "moderation"
+    ],
+    "summary": "Отправить пользователю письмо со ссылкой на сброс пароля",
+    "operationId": "post_api_v1_admin_users_id_password_reset",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "revoke_sessions": {
+          "type": "boolean"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "sent_to": {
+           "type": "string"
+          },
+          "sessions_revoked": {
+           "type": "boolean"
+          }
+         },
+         "required": [
+          "sent_to",
+          "sessions_revoked"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/admin/users/{id}/revoke-sessions": {
+   "post": {
+    "tags": [
+     "moderation"
+    ],
+    "summary": "Завершить все сеансы и токены приложений пользователя",
+    "operationId": "post_api_v1_admin_users_id_revoke_sessions",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/admin/users/{id}/role": {
    "put": {
     "tags": [
@@ -3029,6 +3709,168 @@
         }
        }
       }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/bookmarks": {
+   "get": {
+    "tags": [
+     "bookmarks"
+    ],
+    "summary": "Закладки: ?kind=post|video|track",
+    "operationId": "get_api_v1_bookmarks",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "kind": {
+              "type": "string",
+              "enum": [
+               "post",
+               "video",
+               "track"
+              ]
+             },
+             "created_at": {
+              "type": "string",
+              "format": "date-time"
+             },
+             "post": {
+              "$ref": "#/components/schemas/Post"
+             },
+             "video": {
+              "$ref": "#/components/schemas/Video"
+             },
+             "track": {
+              "$ref": "#/components/schemas/Track"
+             }
+            },
+            "required": [
+             "id",
+             "kind",
+             "created_at"
+            ]
+           }
+          },
+          "next_cursor": {
+           "type": "integer",
+           "format": "int64",
+           "nullable": true
+          }
+         },
+         "required": [
+          "items",
+          "next_cursor"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/bookmarks/{kind}/{target}": {
+   "delete": {
+    "tags": [
+     "bookmarks"
+    ],
+    "summary": "Убрать из закладок",
+    "operationId": "delete_api_v1_bookmarks_kind_target",
+    "parameters": [
+     {
+      "name": "kind",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "target",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "bookmarks"
+    ],
+    "summary": "Добавить в закладки (kind: post|video|track)",
+    "operationId": "put_api_v1_bookmarks_kind_target",
+    "parameters": [
+     {
+      "name": "kind",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "target",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
      },
      "default": {
       "description": "Ошибка",
@@ -5179,6 +6021,238 @@
     }
    }
   },
+  "/api/v1/documents": {
+   "get": {
+    "tags": [
+     "documents"
+    ],
+    "summary": "Мои документы",
+    "operationId": "get_api_v1_documents",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Document"
+           }
+          },
+          "next_cursor": {
+           "type": "integer",
+           "format": "int64",
+           "nullable": true
+          }
+         },
+         "required": [
+          "items",
+          "next_cursor"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "documents"
+    ],
+    "summary": "Загрузить документ (PDF, DOC(X), XLS(X), PPT(X), ODF, EPUB, DjVu, RTF, TXT, ZIP, 7Z, RAR… до 50 МБ)",
+    "operationId": "post_api_v1_documents",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "file": {
+          "type": "string",
+          "format": "binary"
+         },
+         "title": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "file"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Document"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/documents/{did}": {
+   "delete": {
+    "tags": [
+     "documents"
+    ],
+    "summary": "Удалить (пропадёт из постов и сообщений)",
+    "operationId": "delete_api_v1_documents_did",
+    "parameters": [
+     {
+      "name": "did",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "documents"
+    ],
+    "summary": "Переименовать",
+    "operationId": "patch_api_v1_documents_did",
+    "parameters": [
+     {
+      "name": "did",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "title"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Document"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/documents/{did}/download": {
+   "get": {
+    "tags": [
+     "documents"
+    ],
+    "summary": "Скачать (владелец, зрители поста, участники беседы)",
+    "operationId": "get_api_v1_documents_did_download",
+    "parameters": [
+     {
+      "name": "did",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Файл",
+      "content": {
+       "application/octet-stream": {
+        "schema": {
+         "type": "string",
+         "format": "binary"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/events": {
    "get": {
     "tags": [
@@ -6157,7 +7231,7 @@
     "tags": [
      "moderation"
     ],
-    "summary": "Скрыть: posts|comments|communities|tracks|videos",
+    "summary": "Скрыть: posts|comments|communities|tracks|videos|documents",
     "operationId": "post_api_v1_mod_type_id_hide",
     "parameters": [
      {
@@ -7015,7 +8089,7 @@
     "tags": [
      "posts"
     ],
-    "summary": "Опубликовать пост",
+    "summary": "Опубликовать пост (с publish_at — отложить: ответ 202 и отложенный пост)",
     "operationId": "post_api_v1_posts",
     "requestBody": {
      "required": true,
@@ -7048,9 +8122,64 @@
            "format": "uuid"
           }
          },
+         "document_ids": {
+          "type": "array",
+          "items": {
+           "type": "string",
+           "format": "uuid"
+          }
+         },
          "community_id": {
           "type": "integer",
           "format": "int64"
+         },
+         "audience": {
+          "type": "string",
+          "enum": [
+           "everyone",
+           "friends",
+           "only_me",
+           "list"
+          ]
+         },
+         "audience_ids": {
+          "type": "array",
+          "items": {
+           "type": "integer",
+           "format": "int64"
+          }
+         },
+         "poll": {
+          "type": "object",
+          "properties": {
+           "question": {
+            "type": "string"
+           },
+           "options": {
+            "type": "array",
+            "items": {
+             "type": "string"
+            }
+           },
+           "multiple": {
+            "type": "boolean"
+           },
+           "anonymous": {
+            "type": "boolean"
+           },
+           "closes_at": {
+            "type": "string",
+            "format": "date-time"
+           }
+          },
+          "required": [
+           "question",
+           "options"
+          ]
+         },
+         "publish_at": {
+          "type": "string",
+          "format": "date-time"
          }
         }
        }
@@ -7159,7 +8288,7 @@
     "tags": [
      "posts"
     ],
-    "summary": "Изменить текст поста",
+    "summary": "Изменить текст и/или аудиторию поста",
     "operationId": "patch_api_v1_posts_id",
     "parameters": [
      {
@@ -7181,11 +8310,24 @@
         "properties": {
          "text": {
           "type": "string"
+         },
+         "audience": {
+          "type": "string",
+          "enum": [
+           "everyone",
+           "friends",
+           "only_me",
+           "list"
+          ]
+         },
+         "audience_ids": {
+          "type": "array",
+          "items": {
+           "type": "integer",
+           "format": "int64"
+          }
          }
-        },
-        "required": [
-         "text"
-        ]
+        }
        }
       }
      }
@@ -7197,6 +8339,70 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/Post"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/posts/{id}/audience": {
+   "get": {
+    "tags": [
+     "posts"
+    ],
+    "summary": "Кому виден пост (только автору)",
+    "operationId": "get_api_v1_posts_id_audience",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "audience": {
+           "type": "string",
+           "enum": [
+            "everyone",
+            "friends",
+            "only_me",
+            "list"
+           ]
+          },
+          "user_ids": {
+           "type": "array",
+           "items": {
+            "type": "integer",
+            "format": "int64"
+           }
+          }
+         },
+         "required": [
+          "audience",
+          "user_ids"
+         ]
         }
        }
       }
@@ -7440,6 +8646,178 @@
           "likes_count",
           "liked_by_me"
          ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/posts/{id}/poll/options/{oid}/voters": {
+   "get": {
+    "tags": [
+     "posts"
+    ],
+    "summary": "Кто выбрал вариант (не в анонимных опросах)",
+    "operationId": "get_api_v1_posts_id_poll_options_oid_voters",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     },
+     {
+      "name": "oid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/UserCard"
+           }
+          },
+          "next_cursor": {
+           "type": "integer",
+           "format": "int64",
+           "nullable": true
+          }
+         },
+         "required": [
+          "items",
+          "next_cursor"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/posts/{id}/poll/votes": {
+   "delete": {
+    "tags": [
+     "posts"
+    ],
+    "summary": "Отозвать голос",
+    "operationId": "delete_api_v1_posts_id_poll_votes",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Poll"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "posts"
+    ],
+    "summary": "Проголосовать в опросе",
+    "operationId": "post_api_v1_posts_id_poll_votes",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "option_ids": {
+          "type": "array",
+          "items": {
+           "type": "integer",
+           "format": "int64"
+          }
+         }
+        },
+        "required": [
+         "option_ids"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Poll"
         }
        }
       }
@@ -7814,7 +9192,8 @@
            "user",
            "community",
            "track",
-           "video"
+           "video",
+           "document"
           ]
          },
          "target_id": {
@@ -7856,6 +9235,240 @@
          "required": [
           "id",
           "status"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/scheduled-posts": {
+   "get": {
+    "tags": [
+     "posts"
+    ],
+    "summary": "Отложенные посты: свои или ?community_id= (редакторам)",
+    "operationId": "get_api_v1_scheduled_posts",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "author_id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "community_id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "post_id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "error": {
+              "type": "string"
+             },
+             "publish_at": {
+              "type": "string",
+              "format": "date-time"
+             },
+             "payload": {
+              "type": "object"
+             },
+             "status": {
+              "type": "string",
+              "enum": [
+               "pending",
+               "published",
+               "failed",
+               "canceled"
+              ]
+             },
+             "created_at": {
+              "type": "string",
+              "format": "date-time"
+             }
+            },
+            "required": [
+             "id",
+             "author_id",
+             "publish_at",
+             "payload",
+             "status",
+             "created_at"
+            ]
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/scheduled-posts/{sid}": {
+   "delete": {
+    "tags": [
+     "posts"
+    ],
+    "summary": "Отменить отложенный пост",
+    "operationId": "delete_api_v1_scheduled_posts_sid",
+    "parameters": [
+     {
+      "name": "sid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "posts"
+    ],
+    "summary": "Перенести отложенный пост",
+    "operationId": "patch_api_v1_scheduled_posts_sid",
+    "parameters": [
+     {
+      "name": "sid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "publish_at": {
+          "type": "string",
+          "format": "date-time"
+         }
+        },
+        "required": [
+         "publish_at"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "author_id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "community_id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "post_id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "error": {
+           "type": "string"
+          },
+          "publish_at": {
+           "type": "string",
+           "format": "date-time"
+          },
+          "payload": {
+           "type": "object"
+          },
+          "status": {
+           "type": "string",
+           "enum": [
+            "pending",
+            "published",
+            "failed",
+            "canceled"
+           ]
+          },
+          "created_at": {
+           "type": "string",
+           "format": "date-time"
+          }
+         },
+         "required": [
+          "id",
+          "author_id",
+          "publish_at",
+          "payload",
+          "status",
+          "created_at"
          ]
         }
        }

@@ -20,7 +20,7 @@ async function newUser(name, viewport = { width: 1280, height: 860 }) {
   // включая нарушения CSP («Refused to …»), считается ошибкой
   page.on("console", (m) => { if (m.type() === "error" && !m.text().startsWith("Failed to load resource")) problems.push(`${name}: console: ${m.text()}`); });
   page.on("pageerror", (e) => problems.push(`${name}: pageerror: ${e.message}`));
-  page.on("requestfailed", (r) => { if (!r.url().includes("/api/v1/ws")) problems.push(`${name}: failed ${r.url()} ${r.failure()?.errorText}`); });
+  page.on("requestfailed", (r) => { if (!r.url().includes("/api/v1/ws")) problems.push(`${name}: failed ${r.method()} ${r.url()} ${r.failure()?.errorText}`); });
   await page.goto(base + "/");
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
   await page.getByLabel("Имя", { exact: true }).fill(name === "anna" ? "Анна" : "Борис");
@@ -79,6 +79,80 @@ await bob.page.getByLabel("Сообщение").fill("Иду!");
 await bob.page.getByRole("button", { name: "Отправить", exact: true }).click();
 await anna.page.locator(".msg").filter({ hasText: "Иду!" }).waitFor({ timeout: 5000 });
 await anna.page.screenshot({ path: `${shots}/03-chat.png` });
+
+// опрос: Анна спрашивает, Борис голосует и видит проценты
+await anna.page.goto(base + "/");
+await anna.page.getByRole("button", { name: "Опрос" }).click();
+await anna.page.getByLabel("Вопрос").fill("Куда в субботу?");
+await anna.page.getByLabel("Вариант 1").fill("Тургояк");
+await anna.page.getByLabel("Вариант 2").fill("Таганай");
+await anna.page.getByRole("button", { name: "Опубликовать" }).click();
+await anna.page.locator("fieldset.poll").first().waitFor();
+await bob.page.goto(base + "/u/anna");
+const pollPost = bob.page.locator("article.post").filter({ has: bob.page.locator("fieldset.poll") }).first();
+await pollPost.getByRole("button", { name: "Тургояк" }).click();
+await pollPost.getByText("100%").waitFor();
+await pollPost.getByText("Проголосовали: 1").waitFor();
+// закладка
+const saved = bob.page.waitForEvent("requestfinished", (r) => r.url().includes("/bookmarks/post/"), { timeout: 5000 });
+await pollPost.getByRole("button", { name: "В закладки" }).click();
+await pollPost.getByRole("button", { name: "В закладках" }).waitFor();
+await saved; // запрос завершён целиком, и переход на другую страницу его не оборвёт
+await bob.page.goto(base + "/bookmarks");
+await bob.page.getByText("Куда в субботу?").waitFor();
+await bob.page.screenshot({ path: `${shots}/08-poll-bookmarks.png`, fullPage: true });
+
+// документ в записи: Борис скачивает его, файл совпадает
+const pdf = "%PDF-1.4\n% маршрут\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n";
+await anna.page.goto(base + "/");
+await anna.page.locator(".composer input[type=file]:not([accept])").setInputFiles({ name: "Маршрут.pdf", mimeType: "application/pdf", buffer: Buffer.from(pdf) });
+await anna.page.locator(".composer .doc").getByText("Маршрут").waitFor();
+await anna.page.getByPlaceholder("Что у вас нового?").fill("Маршрут на субботу");
+await anna.page.getByRole("button", { name: "Опубликовать" }).click();
+await anna.page.locator("article.post .doc").first().waitFor();
+await bob.page.goto(base + "/u/anna");
+const dl = bob.page.waitForEvent("download");
+await bob.page.getByRole("button", { name: "Маршрут.pdf" }).click();
+const file = await dl;
+assert.equal(file.suggestedFilename(), "Маршрут.pdf");
+const fs0 = await import("node:fs");
+assert.equal(fs0.readFileSync(await file.path(), "utf8"), pdf, "downloaded document differs");
+
+// аудитория: запись «только мне» Борис больше не видит
+const docPost = anna.page.locator("article.post").filter({ hasText: "Маршрут на субботу" });
+await docPost.getByLabel("Кто видит запись").selectOption("only_me");
+await docPost.getByText("видят: только я").waitFor();
+await bob.page.goto(base + "/u/anna");
+await bob.page.locator("article.post").first().waitFor();
+assert.equal(await bob.page.getByText("Маршрут на субботу").count(), 0, "only_me post visible to bob");
+
+// отложенная запись
+await anna.page.goto(base + "/");
+await anna.page.getByPlaceholder("Что у вас нового?").fill("Это выйдет через час");
+await anna.page.getByRole("button", { name: "Отложить" }).click();
+await anna.page.getByRole("button", { name: "Запланировать" }).click();
+await anna.page.getByText(/Запись выйдет/).waitFor();
+await anna.page.goto(base + "/scheduled");
+await anna.page.getByText("Это выйдет через час").waitFor();
+await anna.page.screenshot({ path: `${shots}/09-scheduled.png`, fullPage: true });
+
+// админка (Анну сделал администратором Go-тест): сводка, поиск, карточка, сброс пароля письмом
+anna.page.on("dialog", (d) => d.accept());
+await anna.page.goto(base + "/admin");
+await anna.page.getByText("Пользователей").waitFor();
+await anna.page.screenshot({ path: `${shots}/10-admin-stats.png`, fullPage: true });
+await anna.page.getByRole("tab", { name: "Пользователи" }).click();
+await anna.page.getByPlaceholder(/id, почта/).fill("bob");
+await anna.page.getByRole("button", { name: "Найти" }).click();
+await anna.page.getByRole("link", { name: "Борис" }).click();
+await anna.page.getByText("Журнал безопасности").waitFor();
+assert.equal(await anna.page.locator(".admin-card").getByText(/хэш/).count(), 1, "explains why there is no password");
+await anna.page.getByRole("button", { name: "Отправить ссылку для сброса пароля" }).click();
+await anna.page.getByText(/Письмо со ссылкой отправлено/).waitFor();
+await anna.page.screenshot({ path: `${shots}/11-admin-user.png`, fullPage: true });
+// Борис выкинут из всех сеансов: следующий запрос вернёт его на вход
+await bob.page.goto(base + "/");
+await bob.page.getByRole("button", { name: "Войти" }).first().waitFor();
 
 // профиль, кошелёк, безопасность; после перезагрузки сеанс восстанавливается из cookie
 await anna.page.goto(base + "/wallet");

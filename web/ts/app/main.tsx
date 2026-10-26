@@ -5,8 +5,10 @@ import { AuthPage } from "./auth.js";
 import { ChatPage, ConversationsPage, DirectPage } from "./messages.js";
 import { CommunitiesPage, CommunityPage, FeedPage, MusicPage, NotificationsPage, OAuthPage, PostPage, SearchPage, SettingsPage, TagPage, WalletPage } from "./pages.js";
 import { ProfilePage } from "./profile.js";
+import { AdminPage } from "./admin.js";
+import { BookmarksPage, DocumentsPage, ScheduledPage } from "./library.js";
 import { on, startRealtime, stopRealtime } from "./realtime.js";
-import { match, navigate, usePath } from "./router.js";
+import { match, navigate, query, usePath } from "./router.js";
 import { loadMe, setMe, useMe } from "./session.js";
 import { Avatar, ErrorLine, Loading } from "./ui.js";
 
@@ -26,13 +28,18 @@ function routes(path: string, onRead: () => void, myId: number): ComponentChildr
   if (match("/wallet", path)) return <WalletPage />;
   if (match("/settings", path)) return <SettingsPage />;
   if (match("/search", path)) return <SearchPage />;
+  if (match("/bookmarks", path)) return <BookmarksPage />;
+  if (match("/documents", path)) return <DocumentsPage />;
+  if (match("/scheduled", path)) { const c = query("community"); return <ScheduledPage communityId={c ? +c : undefined} />; }
+  if (match("/admin", path)) return <AdminPage />;
   if (match("/oauth/authorize", path)) return <OAuthPage />;
   return <section><h1>Страница не найдена</h1><p><a href="/">Вернуться в ленту</a></p></section>;
 }
 
 const nav: [string, string][] = [
   ["/", "Лента"], ["/im", "Сообщения"], ["/notifications", "Уведомления"],
-  ["/communities", "Сообщества"], ["/music", "Музыка"], ["/wallet", "Кошелёк"], ["/settings", "Безопасность"],
+  ["/communities", "Сообщества"], ["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"],
+  ["/scheduled", "Отложенные"], ["/wallet", "Кошелёк"], ["/settings", "Безопасность"],
 ];
 
 function Shell() {
@@ -62,7 +69,7 @@ function Shell() {
       <div class="layout">
       <nav class="sidenav" aria-label="Разделы">
         <ul>
-          {nav.map(([href, label]) => (
+          {[...nav, ...(user.role === "admin" ? [["/admin", "Админка"]] : user.role === "moderator" ? [["/admin", "Модерация"]] : [])].map(([href, label]) => (
             <li key={href}>
               <a href={href} aria-current={active(href) ? "page" : undefined}>
                 {label}{href === "/notifications" && unread > 0 && <span class="badge" aria-label={`новых: ${unread}`}>{unread}</span>}

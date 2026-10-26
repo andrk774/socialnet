@@ -155,6 +155,7 @@ func (s *Server) Start(ctx context.Context) {
 	}
 	go s.RunCallbacks(ctx)
 	go s.runDetector(ctx)
+	go s.runScheduler(ctx)
 }
 
 // NewS3 — клиент объектного хранилища из настроек; nil, если S3 не настроен.

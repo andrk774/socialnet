@@ -12,13 +12,15 @@ import (
 const MaxChatMembers = 500
 
 type Attachment struct {
-	Kind        string `json:"kind"` // photo | track | voice
+	Kind        string `json:"kind"` // photo | track | voice | document
 	ID          string `json:"id"`
 	URL         string `json:"url"`
 	ThumbURL    string `json:"thumb_url,omitempty"`
 	Title       string `json:"title,omitempty"`
 	Artist      string `json:"artist,omitempty"`
 	DurationSec int    `json:"duration_sec,omitempty"`
+	Ext         string `json:"ext,omitempty"`  // для документов
+	Size        int64  `json:"size,omitempty"` // для документов
 }
 
 type Message struct {
@@ -213,7 +215,7 @@ func (s *Store) ChatMembers(ctx context.Context, convID int64) ([]ChatMember, er
 // ---------- сообщения ----------
 
 type AttachmentRef struct {
-	Kind string // photo | track | voice
+	Kind string // photo | track | voice | document
 	ID   string
 }
 
@@ -253,6 +255,10 @@ func (s *Store) SendMessage(ctx context.Context, m NewMessage) (*Message, error)
 			case "voice":
 				q = `INSERT INTO message_attachments (message_id, position, kind, voice_id)
 				     SELECT $1, $2, 'voice', id FROM voices WHERE id = $3::uuid AND owner_id = $4`
+			case "document":
+				q = `INSERT INTO message_attachments (message_id, position, kind, document_id)
+				     SELECT $1, $2, 'document', id FROM documents
+				     WHERE id = $3::uuid AND owner_id = $4 AND deleted_at IS NULL AND hidden_at IS NULL`
 			default:
 				return ErrBadMedia
 			}
@@ -287,12 +293,15 @@ const messageSelect = `
 	SELECT m.id, m.conversation_id, m.sender_id, m.kind, m.body, m.ciphertext, m.nonce, m.created_at,
 	       COALESCE((SELECT json_agg(json_build_object(
 	                   'kind', a.kind, 'media_id', a.media_id, 'track_id', a.track_id, 'voice_id', a.voice_id,
-	                   'title', t.title, 'artist', t.artist,
+	                   'document_id', a.document_id,
+	                   'title', COALESCE(t.title, d.title), 'artist', t.artist, 'ext', d.ext, 'size', d.size_bytes,
 	                   'duration_sec', COALESCE(t.duration_sec, v.duration_sec)) ORDER BY a.position)
 	                 FROM message_attachments a
 	                 LEFT JOIN tracks t ON t.id = a.track_id
 	                 LEFT JOIN voices v ON v.id = a.voice_id
-	                 WHERE a.message_id = m.id AND (a.track_id IS NULL OR t.removed_at IS NULL)), '[]')
+	                 LEFT JOIN documents d ON d.id = a.document_id
+	                 WHERE a.message_id = m.id AND (a.track_id IS NULL OR t.removed_at IS NULL)
+	                   AND (a.document_id IS NULL OR (d.deleted_at IS NULL AND d.hidden_at IS NULL))), '[]')
 	FROM messages m`
 
 func (s *Store) messages(ctx context.Context, where string, arg any, before int64, limit int) ([]Message, error) {
@@ -330,6 +339,9 @@ func decodeAttachments(raw []byte) ([]Attachment, error) {
 		MediaID  *string `json:"media_id"`
 		TrackID  *string `json:"track_id"`
 		VoiceID  *string `json:"voice_id"`
+		DocID    *string `json:"document_id"`
+		Ext      *string `json:"ext"`
+		Size     *int64  `json:"size"`
 		Title    *string `json:"title"`
 		Artist   *string `json:"artist"`
 		Duration *int    `json:"duration_sec"`
@@ -347,6 +359,14 @@ func decodeAttachments(raw []byte) ([]Attachment, error) {
 			a.ID, a.URL = *r.TrackID, AudioURL(*r.TrackID)
 		case r.VoiceID != nil:
 			a.ID, a.URL = *r.VoiceID, VoiceURL(*r.VoiceID)
+		case r.DocID != nil:
+			a.ID, a.URL = *r.DocID, DocumentURL(*r.DocID)
+			if r.Ext != nil {
+				a.Ext = *r.Ext
+			}
+			if r.Size != nil {
+				a.Size = *r.Size
+			}
 		}
 		if r.Title != nil {
 			a.Title = *r.Title

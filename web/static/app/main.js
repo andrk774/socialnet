@@ -5,8 +5,10 @@ import { AuthPage } from "./auth.js";
 import { ChatPage, ConversationsPage, DirectPage } from "./messages.js";
 import { CommunitiesPage, CommunityPage, FeedPage, MusicPage, NotificationsPage, OAuthPage, PostPage, SearchPage, SettingsPage, TagPage, WalletPage } from "./pages.js";
 import { ProfilePage } from "./profile.js";
+import { AdminPage } from "./admin.js";
+import { BookmarksPage, DocumentsPage, ScheduledPage } from "./library.js";
 import { on, startRealtime, stopRealtime } from "./realtime.js";
-import { match, navigate, usePath } from "./router.js";
+import { match, navigate, query, usePath } from "./router.js";
 import { loadMe, setMe, useMe } from "./session.js";
 import { Avatar, ErrorLine, Loading } from "./ui.js";
 function routes(path, onRead, myId) {
@@ -39,6 +41,16 @@ function routes(path, onRead, myId) {
         return h(SettingsPage, null);
     if (match("/search", path))
         return h(SearchPage, null);
+    if (match("/bookmarks", path))
+        return h(BookmarksPage, null);
+    if (match("/documents", path))
+        return h(DocumentsPage, null);
+    if (match("/scheduled", path)) {
+        const c = query("community");
+        return h(ScheduledPage, { communityId: c ? +c : undefined });
+    }
+    if (match("/admin", path))
+        return h(AdminPage, null);
     if (match("/oauth/authorize", path))
         return h(OAuthPage, null);
     return h("section", null,
@@ -48,7 +60,8 @@ function routes(path, onRead, myId) {
 }
 const nav = [
     ["/", "Лента"], ["/im", "Сообщения"], ["/notifications", "Уведомления"],
-    ["/communities", "Сообщества"], ["/music", "Музыка"], ["/wallet", "Кошелёк"], ["/settings", "Безопасность"],
+    ["/communities", "Сообщества"], ["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"],
+    ["/scheduled", "Отложенные"], ["/wallet", "Кошелёк"], ["/settings", "Безопасность"],
 ];
 function Shell() {
     const path = usePath();
@@ -75,7 +88,7 @@ function Shell() {
         h("div", { class: "layout" },
             h("nav", { class: "sidenav", "aria-label": "\u0420\u0430\u0437\u0434\u0435\u043B\u044B" },
                 h("ul", null,
-                    nav.map(([href, label]) => (h("li", { key: href },
+                    [...nav, ...(user.role === "admin" ? [["/admin", "Админка"]] : user.role === "moderator" ? [["/admin", "Модерация"]] : [])].map(([href, label]) => (h("li", { key: href },
                         h("a", { href: href, "aria-current": active(href) ? "page" : undefined },
                             label,
                             href === "/notifications" && unread > 0 && h("span", { class: "badge", "aria-label": `новых: ${unread}` }, unread))))),

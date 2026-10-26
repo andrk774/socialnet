@@ -1,6 +1,7 @@
 import { h } from "../vendor/preact/index.js";
 import { useEffect, useRef, useState } from "../vendor/preact/hooks.js";
-import { Conversation, Message, Page, UserCard, fetchBlob, fullName, get, post } from "./api.js";
+import { Conversation, Doc, Message, Page, UserCard, fetchBlob, fullName, get, post, upload } from "./api.js";
+import { DocList } from "./posts.js";
 import { on, sendTyping } from "./realtime.js";
 import { navigate } from "./router.js";
 import { me } from "./session.js";
@@ -43,7 +44,7 @@ function preview(m?: Message) {
   if (!m) return "";
   if (m.encrypted) return "Зашифрованное сообщение";
   if (m.body) return m.body;
-  return m.attachments.map((a) => ({ photo: "Фото", track: "Трек", voice: "Голосовое" })[a.kind]).join(", ");
+  return m.attachments.map((a) => ({ photo: "Фото", track: "Трек", voice: "Голосовое", document: "Документ" })[a.kind]).join(", ");
 }
 
 // /im/u/:id — открыть (или создать) личный диалог с пользователем
@@ -79,6 +80,8 @@ export function ChatPage({ id }: { id: number }) {
   const [typing, setTyping] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   const lastTyping = useRef(0);
+  const docInput = useRef<HTMLInputElement>(null);
+  const [doc, setDoc] = useState<Doc | null>(null);
 
   useEffect(() => {
     setMsgs(null);
@@ -107,8 +110,8 @@ export function ChatPage({ id }: { id: number }) {
     e.preventDefault();
     setError(null);
     try {
-      const m = await post<Message>(`/conversations/${id}/messages`, { body: text });
-      setText("");
+      const m = await post<Message>(`/conversations/${id}/messages`, { body: text, ...(doc ? { attachments: [{ kind: "document", id: doc.id }] } : {}) });
+      setText(""); setDoc(null);
       setMsgs((xs) => (xs && !xs.some((x) => x.id === m.id) ? [...xs, m] : xs));
     } catch (err) { setError(err); }
   }
@@ -131,6 +134,7 @@ export function ChatPage({ id }: { id: number }) {
               {m.attachments.map((a) => (
                 a.kind === "photo" ? <img key={a.id} src={a.thumb_url ?? a.url} alt="" /> :
                 a.kind === "track" ? <span key={a.id} class="track">{a.artist} — {a.title} <audio controls preload="none" src={a.url} /></span> :
+                a.kind === "document" ? <DocList key={a.id} docs={[{ id: a.id, title: a.title ?? "Документ", ext: a.ext ?? "", size: a.size ?? 0, url: a.url }]} /> :
                 <VoiceNote key={a.id} url={a.url} seconds={a.duration_sec ?? 0} />
               ))}
               <Time iso={m.created_at} />
@@ -140,9 +144,15 @@ export function ChatPage({ id }: { id: number }) {
         {typing && <p class="muted typing">печатает…</p>}
         <div ref={end} />
       </div>
+      {doc && <p class="muted">Документ: {doc.title}.{doc.ext} <button class="link" onClick={() => setDoc(null)}>убрать</button></p>}
       <form class="chat-form" onSubmit={send}>
+        <input ref={docInput} type="file" hidden onChange={async (e) => {
+          const f = (e.target as HTMLInputElement).files?.[0];
+          if (f) { setError(null); try { setDoc(await upload<Doc>("/documents", f)); } catch (err) { setError(err); } }
+        }} />
+        <button type="button" class="icon-btn" aria-label="Прикрепить документ" onClick={() => docInput.current?.click()}>📎</button>
         <input value={text} onInput={input} placeholder="Сообщение" aria-label="Сообщение" maxLength={4000} />
-        <button class="primary" disabled={!text.trim()}>Отправить</button>
+        <button class="primary" disabled={!text.trim() && !doc}>Отправить</button>
       </form>
     </section>
   );

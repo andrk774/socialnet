@@ -23,8 +23,12 @@ function setToken(t) {
         listeners.forEach((fn) => fn(t !== null));
 }
 async function parse(res) {
-    if (res.status === 204)
+    // тело читаем всегда, даже пустое: иначе Chromium считает запрос незавершённым
+    // и обрывает его при переходе на другую страницу
+    if (res.status === 204) {
+        await res.arrayBuffer().catch(() => null);
         return null;
+    }
     const type = res.headers.get("Content-Type") ?? "";
     return type.includes("application/json") ? res.json() : res.text();
 }
@@ -77,6 +81,8 @@ export async function api(method, path, body, retry = true) {
 export const get = (path) => api("GET", path);
 export const post = (path, body) => api("POST", path, body);
 export const del = (path) => api("DELETE", path);
+export const patch = (path, body) => api("PATCH", path, body);
+export const put = (path, body) => api("PUT", path, body);
 export async function login(email, password) {
     const r = await api("POST", "/auth/login", { email, password });
     if (r.mfa_required)
@@ -117,4 +123,22 @@ export async function fetchBlob(path, retry = true) {
     if (!res.ok)
         throw new ApiError(res.status, "http_" + res.status, res.statusText);
     return res.blob();
+}
+// saveFile — скачать документ: он закрыт токеном, поэтому не простой ссылкой.
+export async function saveFile(path, name) {
+    const url = URL.createObjectURL(await fetchBlob(path));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 0);
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+export function fileSize(n) {
+    if (n < 1024)
+        return `${n} Б`;
+    if (n < 1024 * 1024)
+        return `${Math.round(n / 1024)} КБ`;
+    return `${(n / 1024 / 1024).toFixed(1).replace(".", ",")} МБ`;
 }

@@ -16,7 +16,7 @@ import (
 )
 
 type attachmentReq struct {
-	Kind string `json:"kind"` // photo | track | voice
+	Kind string `json:"kind"` // photo | track | voice | document
 	ID   string `json:"id"`
 }
 
@@ -37,8 +37,8 @@ func (req *sendMessageRequest) validate(group bool) map[string]string {
 	for i := range req.Attachments {
 		a := &req.Attachments[i]
 		a.ID = strings.ToLower(a.ID)
-		if (a.Kind != "photo" && a.Kind != "track" && a.Kind != "voice") || !validUUID(a.ID) {
-			errs["attachments"] = "each attachment needs kind photo|track|voice and a valid id"
+		if (a.Kind != "photo" && a.Kind != "track" && a.Kind != "voice" && a.Kind != "document") || !validUUID(a.ID) {
+			errs["attachments"] = "each attachment needs kind photo|track|voice|document and a valid id"
 		}
 	}
 	switch {

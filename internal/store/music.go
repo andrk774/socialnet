@@ -149,6 +149,10 @@ func (s *Store) Takedown(ctx context.Context, kind, id string, hidden bool, reas
 				UPDATE videos SET status = CASE WHEN $2 THEN 'removed'
 					WHEN ready_at IS NOT NULL THEN 'ready' ELSE 'failed' END
 				WHERE id = $1::uuid RETURNING source_sha256`, id, hidden).Scan(&sha)
+		case "document":
+			err = tx.QueryRow(ctx, `
+				UPDATE documents SET hidden_at = CASE WHEN $2 THEN COALESCE(hidden_at, now()) ELSE NULL END
+				WHERE id = $1::uuid RETURNING sha256`, id, hidden).Scan(&sha)
 		default:
 			return ErrNotFound
 		}

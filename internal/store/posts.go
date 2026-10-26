@@ -41,6 +41,36 @@ type PostVideo struct {
 
 func VideoURL(id, file string) string { return "/video/" + id + "/" + file }
 
+// PostDocument — документ во вложениях поста (скачивание — с проверкой доступа).
+type PostDocument struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	Ext   string `json:"ext"`
+	Size  int64  `json:"size"`
+	URL   string `json:"url"`
+}
+
+func DocumentURL(id string) string { return "/api/v1/documents/" + id + "/download" }
+
+type PollOption struct {
+	ID    int64  `json:"id"`
+	Text  string `json:"text"`
+	Votes *int   `json:"votes"` // null, пока зритель не проголосовал (чтобы не влиять на выбор)
+}
+
+type Poll struct {
+	ID            int64        `json:"id"`
+	Question      string       `json:"question"`
+	Multiple      bool         `json:"multiple"`
+	Anonymous     bool         `json:"anonymous"`
+	ClosesAt      *time.Time   `json:"closes_at"`
+	Closed        bool         `json:"closed"`
+	VotersCount   int          `json:"voters_count"`
+	ResultsHidden bool         `json:"results_hidden"`
+	MyVotes       []int64      `json:"my_votes"`
+	Options       []PollOption `json:"options"`
+}
+
 type Post struct {
 	ID            int64          `json:"id"`
 	Author        UserCard       `json:"author"`
@@ -49,6 +79,10 @@ type Post struct {
 	Photos        []Photo        `json:"photos"`
 	Tracks        []PostTrack    `json:"tracks"`
 	Videos        []PostVideo    `json:"videos"`
+	Documents     []PostDocument `json:"documents"`
+	Poll          *Poll          `json:"poll"`
+	Audience      string         `json:"audience"` // everyone | friends | only_me | list
+	Bookmarked    bool           `json:"bookmarked"`
 	LikesCount    int            `json:"likes_count"`
 	CommentsCount int            `json:"comments_count"`
 	LikedByMe     bool           `json:"liked_by_me"`
@@ -75,6 +109,17 @@ const postVisible = `
 			AND EXISTS (SELECT 1 FROM follows x WHERE x.follower_id = $1 AND x.followee_id = p.author_id)
 			AND EXISTS (SELECT 1 FROM follows y WHERE y.follower_id = p.author_id AND y.followee_id = $1))
 	)
+	-- аудитория конкретного поста — поверх приватности профиля
+	AND (
+		p.community_id IS NOT NULL
+		OR p.author_id = $1
+		OR p.audience = 'everyone'
+		OR (p.audience = 'friends'
+			AND EXISTS (SELECT 1 FROM follows x WHERE x.follower_id = $1 AND x.followee_id = p.author_id)
+			AND EXISTS (SELECT 1 FROM follows y WHERE y.follower_id = p.author_id AND y.followee_id = $1))
+		OR (p.audience = 'list'
+			AND EXISTS (SELECT 1 FROM post_audience pa WHERE pa.post_id = p.id AND pa.user_id = $1))
+	)
 	AND (p.community_id IS NOT NULL OR NOT EXISTS (
 		SELECT 1 FROM blocks b
 		WHERE (b.blocker_id = p.author_id AND b.blocked_id = $1)
@@ -98,12 +143,27 @@ const postSelect = `
 	                         'mp4_url', CASE WHEN v.mp4 IS NOT NULL THEN '/video/' || v.id || '/' || v.mp4 || '.mp4' END)
 	                         ORDER BY pv.position)
 	                 FROM post_videos pv JOIN videos v ON v.id = pv.video_id
-	                 WHERE pv.post_id = p.id AND v.status = 'ready'), '[]')
+	                 WHERE pv.post_id = p.id AND v.status = 'ready'), '[]'),
+	       COALESCE((SELECT json_agg(json_build_object('id', d.id, 'title', d.title, 'ext', d.ext, 'size', d.size_bytes)
+	                         ORDER BY pd.position)
+	                 FROM post_documents pd JOIN documents d ON d.id = pd.document_id
+	                 WHERE pd.post_id = p.id AND d.deleted_at IS NULL AND d.hidden_at IS NULL), '[]'),
+	       (SELECT json_build_object('id', pl.id, 'question', pl.question, 'multiple', pl.multiple,
+	                 'anonymous', pl.anonymous, 'closes_at', pl.closes_at, 'voters_count', pl.voters_count,
+	                 'closed', pl.closes_at IS NOT NULL AND pl.closes_at <= now(),
+	                 'my_votes', COALESCE((SELECT json_agg(pv2.option_id ORDER BY pv2.option_id) FROM poll_votes pv2
+	                                       WHERE pv2.poll_id = pl.id AND pv2.user_id = $1), '[]'),
+	                 'options', (SELECT json_agg(json_build_object('id', o.id, 'text', o.text, 'votes', o.votes_count)
+	                                     ORDER BY o.position) FROM poll_options o WHERE o.poll_id = pl.id))
+	        FROM polls pl WHERE pl.post_id = p.id),
+	       p.audience,
+	       EXISTS (SELECT 1 FROM bookmarks bm WHERE bm.user_id = $1 AND bm.kind = 'post' AND bm.target = p.id::text)
 	FROM posts p
 	JOIN users a ON a.id = p.author_id
 	LEFT JOIN communities c ON c.id = p.community_id`
 
 func (s *Store) queryPosts(ctx context.Context, sql string, args ...any) ([]Post, error) {
+	viewer, _ := args[0].(int64)
 	rows, err := s.pool.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
@@ -120,12 +180,14 @@ func (s *Store) queryPosts(ctx context.Context, sql string, args ...any) ([]Post
 			mediaIDs  []string
 			tracks    []byte
 			videos    []byte
+			docs      []byte
+			poll      []byte
 			reactions []byte
 		)
 		if err := rows.Scan(&p.ID, &p.Author.ID, &p.Author.Username, &p.Author.FirstName, &p.Author.LastName, &avatar,
 			&cID, &cSlug, &cName,
 			&p.Text, &p.LikesCount, &p.CommentsCount, &p.CreatedAt, &p.EditedAt, &p.MyReaction, &reactions, &mediaIDs,
-			&tracks, &videos); err != nil {
+			&tracks, &videos, &docs, &poll, &p.Audience, &p.Bookmarked); err != nil {
 			return nil, err
 		}
 		p.LikedByMe = p.MyReaction != nil
@@ -144,6 +206,17 @@ func (s *Store) queryPosts(ctx context.Context, sql string, args ...any) ([]Post
 		for i := range p.Videos {
 			p.Videos[i].PosterURL = VideoURL(p.Videos[i].ID, "poster.jpg")
 			p.Videos[i].HLSURL = VideoURL(p.Videos[i].ID, "master.m3u8")
+		}
+		if err := json.Unmarshal(docs, &p.Documents); err != nil {
+			return nil, err
+		}
+		for i := range p.Documents {
+			p.Documents[i].URL = DocumentURL(p.Documents[i].ID)
+		}
+		if poll != nil {
+			if p.Poll, err = decodePoll(poll, viewer == p.Author.ID); err != nil {
+				return nil, err
+			}
 		}
 		p.Author.AvatarURL = MediaURL(avatar, "thumb")
 		if cID != nil {
@@ -166,7 +239,20 @@ type NewPost struct {
 	MediaIDs    []string
 	TrackIDs    []string // любые доступные треки — музыкой делятся
 	VideoIDs    []string // любые готовые видео
+	DocumentIDs []string // только свои документы
 	Hashtags    []string
+	Audience    string  // пусто = everyone
+	AudienceIDs []int64 // для audience = list: только друзья автора
+	Poll        *NewPoll
+	ScheduledID *int64 // публикация отложенного поста: отметить его в той же транзакции
+}
+
+type NewPoll struct {
+	Question  string     `json:"question"`
+	Options   []string   `json:"options"`
+	Multiple  bool       `json:"multiple"`
+	Anonymous bool       `json:"anonymous"`
+	ClosesAt  *time.Time `json:"closes_at"`
 }
 
 func (s *Store) CreatePost(ctx context.Context, np NewPost) (int64, error) {
@@ -176,11 +262,19 @@ func (s *Store) CreatePost(ctx context.Context, np NewPost) (int64, error) {
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
 
+	if np.Audience == "" {
+		np.Audience = "everyone"
+	}
 	var id int64
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO posts (author_id, community_id, text) VALUES ($1, $2, $3) RETURNING id`,
-		np.AuthorID, np.CommunityID, np.Text).Scan(&id); err != nil {
+		INSERT INTO posts (author_id, community_id, text, audience) VALUES ($1, $2, $3, $4) RETURNING id`,
+		np.AuthorID, np.CommunityID, np.Text, np.Audience).Scan(&id); err != nil {
 		return 0, err
+	}
+	if np.Audience == "list" {
+		if err := setAudience(ctx, tx, id, np.AuthorID, np.AudienceIDs); err != nil {
+			return 0, err
+		}
 	}
 
 	if len(np.MediaIDs) > 0 {
@@ -226,10 +320,91 @@ func (s *Store) CreatePost(ctx context.Context, np NewPost) (int64, error) {
 		}
 	}
 
+	if len(np.DocumentIDs) > 0 {
+		tag, err := tx.Exec(ctx, `
+			INSERT INTO post_documents (post_id, document_id, position)
+			SELECT $1, d.id, t.ord::smallint
+			FROM unnest($2::uuid[]) WITH ORDINALITY AS t(id, ord)
+			JOIN documents d ON d.id = t.id AND d.owner_id = $3 AND d.deleted_at IS NULL AND d.hidden_at IS NULL`,
+			id, np.DocumentIDs, np.AuthorID)
+		if err != nil {
+			return 0, err
+		}
+		if int(tag.RowsAffected()) != len(np.DocumentIDs) {
+			return 0, ErrBadMedia
+		}
+	}
+	if np.Poll != nil {
+		if err := createPoll(ctx, tx, id, np.Poll); err != nil {
+			return 0, err
+		}
+	}
+
 	if err := setHashtags(ctx, tx, id, np.Hashtags); err != nil {
 		return 0, err
 	}
+	if np.ScheduledID != nil {
+		tag, err := tx.Exec(ctx, `
+			UPDATE scheduled_posts SET status = 'published', post_id = $2, updated_at = now()
+			WHERE id = $1 AND status = 'pending'`, *np.ScheduledID, id)
+		if err != nil {
+			return 0, err
+		}
+		if tag.RowsAffected() != 1 { // уже опубликован другим экземпляром или отменён
+			return 0, ErrNotPending
+		}
+	}
 	return id, tx.Commit(ctx)
+}
+
+// ErrNotFriends: в списке аудитории есть не друг автора.
+var (
+	ErrNotFriends = errors.New("audience must consist of friends")
+	ErrNotPending = errors.New("scheduled post is no longer pending")
+)
+
+// setAudience: выбранные зрители поста — только взаимные друзья автора,
+// иначе через список можно было бы «показать» пост кому угодно.
+func setAudience(ctx context.Context, tx pgx.Tx, postID, author int64, ids []int64) error {
+	if _, err := tx.Exec(ctx, `DELETE FROM post_audience WHERE post_id = $1`, postID); err != nil {
+		return err
+	}
+	tag, err := tx.Exec(ctx, `
+		INSERT INTO post_audience (post_id, user_id)
+		SELECT $1, u FROM unnest($2::bigint[]) AS u
+		WHERE EXISTS (SELECT 1 FROM follows x WHERE x.follower_id = $3 AND x.followee_id = u)
+		  AND EXISTS (SELECT 1 FROM follows y WHERE y.follower_id = u AND y.followee_id = $3)
+		ON CONFLICT DO NOTHING`, postID, ids, author)
+	if err != nil {
+		return err
+	}
+	if int(tag.RowsAffected()) != len(ids) {
+		return ErrNotFriends
+	}
+	return nil
+}
+
+// SetPostAudience меняет аудиторию своего поста.
+func (s *Store) SetPostAudience(ctx context.Context, postID, author int64, audience string, ids []int64) error {
+	return s.inTx(ctx, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `UPDATE posts SET audience = $2 WHERE id = $1`, postID, audience); err != nil {
+			return err
+		}
+		if audience == "list" {
+			return setAudience(ctx, tx, postID, author, ids)
+		}
+		_, err := tx.Exec(ctx, `DELETE FROM post_audience WHERE post_id = $1`, postID)
+		return err
+	})
+}
+
+// PostAudience — список выбранных зрителей (только для автора).
+func (s *Store) PostAudience(ctx context.Context, postID int64) ([]int64, error) {
+	rows, err := s.pool.Query(ctx, `SELECT user_id FROM post_audience WHERE post_id = $1 ORDER BY user_id`, postID)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[int64])
 }
 
 func setHashtags(ctx context.Context, tx pgx.Tx, postID int64, tags []string) error {
@@ -480,4 +655,45 @@ func (s *Store) Replies(ctx context.Context, viewer, rootID, after int64, limit 
 	return s.queryComments(ctx, commentSelect+`
 		AND cm.parent_id = $2 AND cm.id > $3
 		ORDER BY cm.id LIMIT $4`, viewer, rootID, after, limit)
+}
+
+// CheckPostAttachments — предварительная проверка вложений и аудитории
+// отложенного поста (при публикации всё проверяется ещё раз).
+func (s *Store) CheckPostAttachments(ctx context.Context, author int64, np NewPost) error {
+	var ok bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT (SELECT count(*) FROM media WHERE id = ANY($2::uuid[]) AND owner_id = $1) = cardinality($2::uuid[])
+		   AND (SELECT count(*) FROM tracks WHERE id = ANY($3::uuid[]) AND removed_at IS NULL) = cardinality($3::uuid[])
+		   AND (SELECT count(*) FROM videos WHERE id = ANY($4::uuid[]) AND status = 'ready') = cardinality($4::uuid[])
+		   AND (SELECT count(*) FROM documents WHERE id = ANY($5::uuid[]) AND owner_id = $1
+		          AND deleted_at IS NULL AND hidden_at IS NULL) = cardinality($5::uuid[])`,
+		author, nonNil(np.MediaIDs), nonNil(np.TrackIDs), nonNil(np.VideoIDs), nonNil(np.DocumentIDs)).Scan(&ok)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrBadMedia
+	}
+	if np.Audience != "list" {
+		return nil
+	}
+	var friends int
+	if err := s.pool.QueryRow(ctx, `
+		SELECT count(*) FROM unnest($2::bigint[]) AS u
+		WHERE EXISTS (SELECT 1 FROM follows x WHERE x.follower_id = $1 AND x.followee_id = u)
+		  AND EXISTS (SELECT 1 FROM follows y WHERE y.follower_id = u AND y.followee_id = $1)`,
+		author, np.AudienceIDs).Scan(&friends); err != nil {
+		return err
+	}
+	if friends != len(np.AudienceIDs) {
+		return ErrNotFriends
+	}
+	return nil
+}
+
+func nonNil(ids []string) []string {
+	if ids == nil {
+		return []string{}
+	}
+	return ids
 }

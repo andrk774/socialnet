@@ -31,11 +31,13 @@ var scopeInfo = map[string]string{
 	"communities":   "Сообщества: просмотр, вступление",
 	"stories":       "Истории",
 	"events":        "Мероприятия",
+	"docs":          "Документы: загрузка и скачивание",
+	"bookmarks":     "Закладки",
 	"offline":       "Доступ в любое время (токен без срока действия)",
 }
 
 // Боту сообщества доступны только эти права.
-var botScopes = []string{"messages", "wall", "photos"}
+var botScopes = []string{"messages", "wall", "photos", "docs"}
 
 // scopeRoutes: какой scope открывает какой маршрут. Всё, чего здесь нет —
 // безопасность аккаунта, сессии, пароль, 2FA, кошелёк, ключи E2E, настройки,
@@ -57,6 +59,16 @@ var scopeRoutes = map[string][]string{
 		"DELETE /api/v1/comments/{id}", "GET /api/v1/comments/{id}/replies",
 		"GET /api/v1/users/{id}/posts", "GET /api/v1/feed", "GET /api/v1/hashtags/{tag}/posts",
 		"GET /api/v1/communities/{id}/posts",
+		"GET /api/v1/posts/{id}/audience", "POST /api/v1/posts/{id}/poll/votes", "DELETE /api/v1/posts/{id}/poll/votes",
+		"GET /api/v1/posts/{id}/poll/options/{oid}/voters",
+		"GET /api/v1/scheduled-posts", "PATCH /api/v1/scheduled-posts/{sid}", "DELETE /api/v1/scheduled-posts/{sid}",
+	},
+	"docs": {
+		"POST /api/v1/documents", "GET /api/v1/documents", "PATCH /api/v1/documents/{did}",
+		"DELETE /api/v1/documents/{did}", "GET /api/v1/documents/{did}/download",
+	},
+	"bookmarks": {
+		"GET /api/v1/bookmarks", "PUT /api/v1/bookmarks/{kind}/{target}", "DELETE /api/v1/bookmarks/{kind}/{target}",
 	},
 	"photos": {"POST /api/v1/media", "DELETE /api/v1/media/{id}"},
 	"messages": {
@@ -103,6 +115,7 @@ var botDenied = map[string]bool{
 	"POST /api/v1/conversations/{id}/members":           true,
 	"PUT /api/v1/conversations/{id}/members/{uid}/role": true,
 	"GET /api/v1/feed":                                  true,
+	"POST /api/v1/posts/{id}/poll/votes":                true,
 }
 
 var routeScope = func() map[string]string {
