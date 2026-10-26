@@ -50,6 +50,12 @@ type Config struct {
 	// Адрес для сообщений об уязвимостях (security.txt).
 	SecurityContact string
 
+	// Оператор персональных данных — подставляется в юридические документы.
+	LegalOperator string // «ИП Иванов Иван Иванович» или «ООО „…“»
+	LegalINN      string
+	LegalAddress  string
+	LegalEmail    string // для запросов субъектов ПДн и отзыва согласия
+
 	// Ключи VAPID для Web Push (команда `api gen-vapid`). Пусто = push выключен.
 	VAPIDPublic  string
 	VAPIDPrivate string
@@ -145,6 +151,10 @@ func Load() (Config, error) {
 	c.SMTPPassword = os.Getenv("SMTP_PASSWORD")
 	c.MailFrom = getenv("MAIL_FROM", "Socialnet <no-reply@localhost>")
 	c.SecurityContact = getenv("SECURITY_CONTACT", "security@localhost")
+	c.LegalOperator = strings.TrimSpace(os.Getenv("LEGAL_OPERATOR"))
+	c.LegalINN = strings.TrimSpace(os.Getenv("LEGAL_INN"))
+	c.LegalAddress = strings.TrimSpace(os.Getenv("LEGAL_ADDRESS"))
+	c.LegalEmail = strings.TrimSpace(os.Getenv("LEGAL_EMAIL"))
 	if c.DocsDisabled, err = boolean("DOCS_DISABLED", false); err != nil {
 		return c, err
 	}

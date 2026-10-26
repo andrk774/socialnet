@@ -4,7 +4,7 @@
 export interface UserCard { id: number; username: string; first_name: string; last_name: string; avatar_url: string | null }
 export interface Self extends UserCard {
   email: string; email_verified: boolean; status_text: string; city: string; about: string;
-  role: "user" | "moderator" | "admin"; two_factor_enabled: boolean;
+  role: "user" | "moderator" | "admin"; two_factor_enabled: boolean; consent_required: boolean;
 }
 export interface Photo { id: string; url: string; thumb_url: string }
 export interface PostTrack { id: string; title: string; artist: string; duration_sec: number; url: string }
@@ -131,7 +131,7 @@ export async function verify2FA(mfa_token: string, code: string) {
   setToken(r.access_token);
 }
 
-export async function register(fields: { email: string; username: string; password: string; first_name: string; last_name: string }) {
+export async function register(fields: { email: string; username: string; password: string; first_name: string; last_name: string; age_confirmed: boolean; accept_terms: boolean; pd_consent: boolean }) {
   const r = await api<{ access_token: string }>("POST", "/auth/register", fields);
   setToken(r.access_token);
 }

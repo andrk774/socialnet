@@ -122,19 +122,20 @@ func (s *Store) UserByUsername(ctx context.Context, username string) (*User, err
 	return scanUser(s.pool.QueryRow(ctx, `SELECT `+userCols+` FROM users WHERE username = $1`, username))
 }
 
-// AuthInfo — минимум, нужный на каждый запрос: роль, бан и жива ли сессия.
-func (s *Store) AuthInfo(ctx context.Context, id int64, sid string) (role string, banned, sessionOK bool, err error) {
+// AuthInfo — минимум, нужный на каждый запрос: роль, бан, жива ли сессия
+// и какую редакцию юридических документов принял пользователь.
+func (s *Store) AuthInfo(ctx context.Context, id int64, sid string) (role string, banned, sessionOK bool, legalRev int, err error) {
 	var bannedAt *time.Time
 	err = s.pool.QueryRow(ctx, `
-		SELECT u.role, u.banned_at,
+		SELECT u.role, u.banned_at, u.legal_rev,
 		       EXISTS (SELECT 1 FROM refresh_tokens t
 		               WHERE t.user_id = u.id AND t.session_id = $2::uuid
 		                 AND t.revoked_at IS NULL AND t.expires_at > now())
-		FROM users u WHERE u.id = $1`, id, sid).Scan(&role, &bannedAt, &sessionOK)
+		FROM users u WHERE u.id = $1 AND u.deleted_at IS NULL`, id, sid).Scan(&role, &bannedAt, &legalRev, &sessionOK)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", false, false, ErrNotFound
+		return "", false, false, 0, ErrNotFound
 	}
-	return role, bannedAt != nil, sessionOK, err
+	return role, bannedAt != nil, sessionOK, legalRev, err
 }
 
 type ProfileUpdate struct {

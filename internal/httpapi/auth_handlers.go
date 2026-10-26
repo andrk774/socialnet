@@ -28,6 +28,7 @@ type registerRequest struct {
 	Password  string `json:"password"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
+	consentRequest
 }
 
 type loginRequest struct {
@@ -51,6 +52,7 @@ func validPassword(p string) bool {
 
 func (req *registerRequest) validate() map[string]string {
 	errs := map[string]string{}
+	req.consentRequest.validate(errs)
 
 	req.Email = normalizeEmail(req.Email)
 	if addr, err := mail.ParseAddress(req.Email); err != nil || addr.Address != req.Email || len(req.Email) > 254 {
@@ -110,6 +112,10 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := s.recordConsent(r, user.ID); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	s.log.Info("user registered", "user_id", user.ID)
 	s.event(r, user.ID, "register")
 	s.sendVerification(r, user)

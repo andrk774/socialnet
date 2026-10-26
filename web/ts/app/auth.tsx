@@ -1,12 +1,14 @@
 import { h } from "../vendor/preact/index.js";
 import { useState } from "../vendor/preact/hooks.js";
 import { login, register, verify2FA } from "./api.js";
+import { ConsentChecks, noConsents } from "./legal.js";
 import { ErrorLine } from "./ui.js";
 
 export function AuthPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [mfa, setMfa] = useState<string | null>(null);
   const [f, setF] = useState({ email: "", password: "", username: "", first_name: "", last_name: "", code: "" });
+  const [consents, setConsents] = useState(noConsents);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const field = (k: keyof typeof f) => ({ value: f[k], onInput: (e: Event) => setF({ ...f, [k]: (e.target as HTMLInputElement).value }) });
@@ -17,7 +19,7 @@ export function AuthPage() {
     try {
       if (mfa) await verify2FA(mfa, f.code.trim());
       else if (mode === "login") { const r = await login(f.email, f.password); if (r.mfa_token) setMfa(r.mfa_token); }
-      else await register({ email: f.email, password: f.password, username: f.username, first_name: f.first_name, last_name: f.last_name });
+      else await register({ email: f.email, password: f.password, username: f.username, first_name: f.first_name, last_name: f.last_name, ...consents });
     } catch (err) { setError(err); } finally { setBusy(false); }
   }
 
@@ -43,6 +45,7 @@ export function AuthPage() {
             {mode === "register" && <label>Имя пользователя<input {...field("username")} autoComplete="username" pattern="[A-Za-z0-9_]{3,32}" required title="3–32 символа: латиница, цифры, _" /></label>}
             <label>Почта<input {...field("email")} type="email" autoComplete="email" required /></label>
             <label>Пароль<input {...field("password")} type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} maxLength={128} required /></label>
+            {mode === "register" && <ConsentChecks value={consents} onChange={setConsents} />}
           </fieldset>
         )}
         <ErrorLine error={error} />
@@ -56,6 +59,7 @@ export function AuthPage() {
           </button>
         </p>
       )}
+      <p class="legal-links muted"><a href="/legal/terms">Соглашение</a> · <a href="/legal/privacy">Персональные данные</a></p>
     </main>
   );
 }

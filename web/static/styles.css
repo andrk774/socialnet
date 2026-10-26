@@ -357,7 +357,7 @@ a.primary.button-link, a.primary.button-link:hover { color: #fff; }
 .hike-form { max-width: 36rem; }
 .row-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0 .75rem; }
 label.check { display: flex; gap: .5rem; align-items: center; color: var(--ink); }
-label.check input { width: auto; margin: 0; }
+label.check input { width: auto; margin: 0; accent-color: var(--malachite); }
 
 /* ---------- попутчики ---------- */
 .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0 .75rem; align-items: end; margin-bottom: 1rem; }
@@ -371,3 +371,18 @@ label.check input { width: auto; margin: 0; }
 .ad-body { margin: .5rem 0; white-space: pre-line; overflow-wrap: anywhere; }
 .ad .reply { display: grid; gap: .25rem; max-width: 36rem; }
 .ad .reply button { justify-self: start; }
+
+/* ---------- документы и согласия ---------- */
+.consents { display: grid; gap: .25rem; margin: .5rem 0; }
+.consents label.check { align-items: flex-start; font-size: var(--step--1); margin-bottom: .35rem; }
+.consents label.check input { margin-top: .2rem; flex: none; }
+.legal-links { text-align: center; margin-top: 1rem; }
+.consent-gate p { max-width: 36rem; }
+.danger-zone { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.danger-zone p { max-width: 60ch; }
+body.legal-page { background: var(--surface, #fff); }
+.legal { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; line-height: 1.6; }
+.legal h1 { margin-bottom: .25rem; }
+.legal h2 { margin-top: 1.75rem; font-size: var(--step-1, 1.2rem); }
+.legal ul { padding-left: 1.25rem; }
+.legal-nav { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: var(--step--1); }

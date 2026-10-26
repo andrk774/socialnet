@@ -4,6 +4,7 @@ import { Page, Post, UserCard, del, fullName, get, post } from "./api.js";
 import { Composer, PostList, PostView } from "./posts.js";
 import { query } from "./router.js";
 import { Avatar, Empty, ErrorLine, Loading, Time, UserLink, duration, useLoad } from "./ui.js";
+import { DeleteAccount } from "./legal.js";
 
 // ---------- лента, запись, хэштег ----------
 
@@ -258,6 +259,13 @@ export function SettingsPage() {
           ))}
         </ul>
       )}
+      <h2>Документы</h2>
+      <ul class="plain-list">
+        <li><a href="/legal/terms">Пользовательское соглашение</a></li>
+        <li><a href="/legal/privacy">Политика обработки персональных данных</a></li>
+        <li><a href="/legal/consent">Согласие на обработку персональных данных</a></li>
+      </ul>
+      <DeleteAccount />
     </section>
   );
 }

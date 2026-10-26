@@ -4,6 +4,7 @@ import { del, fullName, get, post } from "./api.js";
 import { Composer, PostList, PostView } from "./posts.js";
 import { query } from "./router.js";
 import { Avatar, Empty, ErrorLine, Loading, Time, UserLink, duration, useLoad } from "./ui.js";
+import { DeleteAccount } from "./legal.js";
 // ---------- лента, запись, хэштег ----------
 export function FeedPage() {
     return (h("section", null,
@@ -236,7 +237,16 @@ export function SettingsPage() {
                 h("strong", null, a.name),
                 h("br", null),
                 h("span", { class: "muted" }, a.scopes.join(", "))),
-            h("button", { class: "ghost", onClick: () => act(() => del(`/users/me/authorized-apps/${a.app_id}`), apps.reload) }, "\u041E\u0442\u043E\u0437\u0432\u0430\u0442\u044C \u0434\u043E\u0441\u0442\u0443\u043F"))))))));
+            h("button", { class: "ghost", onClick: () => act(() => del(`/users/me/authorized-apps/${a.app_id}`), apps.reload) }, "\u041E\u0442\u043E\u0437\u0432\u0430\u0442\u044C \u0434\u043E\u0441\u0442\u0443\u043F")))))),
+        h("h2", null, "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B"),
+        h("ul", { class: "plain-list" },
+            h("li", null,
+                h("a", { href: "/legal/terms" }, "\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u043E\u0435 \u0441\u043E\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435")),
+            h("li", null,
+                h("a", { href: "/legal/privacy" }, "\u041F\u043E\u043B\u0438\u0442\u0438\u043A\u0430 \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0438 \u043F\u0435\u0440\u0441\u043E\u043D\u0430\u043B\u044C\u043D\u044B\u0445 \u0434\u0430\u043D\u043D\u044B\u0445")),
+            h("li", null,
+                h("a", { href: "/legal/consent" }, "\u0421\u043E\u0433\u043B\u0430\u0441\u0438\u0435 \u043D\u0430 \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0443 \u043F\u0435\u0440\u0441\u043E\u043D\u0430\u043B\u044C\u043D\u044B\u0445 \u0434\u0430\u043D\u043D\u044B\u0445"))),
+        h(DeleteAccount, null)));
 }
 export function OAuthPage() {
     const params = new URLSearchParams(location.search);

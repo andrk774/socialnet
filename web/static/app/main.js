@@ -7,6 +7,7 @@ import { CommunitiesPage, CommunityPage, FeedPage, MusicPage, NotificationsPage,
 import { ProfilePage } from "./profile.js";
 import { EventPage, HikeForm, HikesPage } from "./hikes.js";
 import { CompanionsPage } from "./companions.js";
+import { ConsentGate } from "./legal.js";
 import { AdminPage } from "./admin.js";
 import { BookmarksPage, DocumentsPage, ScheduledPage } from "./library.js";
 import { on, startRealtime, stopRealtime } from "./realtime.js";
@@ -85,6 +86,8 @@ function Shell() {
     }, []);
     if (!user)
         return h(Loading, null);
+    if (user.consent_required && !path.startsWith("/settings"))
+        return h(ConsentGate, null);
     const active = (href) => (href === "/" ? path === "/" : path.startsWith(href));
     return (h("div", { class: "shell" },
         h("header", { class: "topbar" },
