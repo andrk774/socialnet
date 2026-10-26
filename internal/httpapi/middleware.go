@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"golang.org/x/time/rate"
 
 	"socialnet/internal/store"
@@ -184,10 +185,16 @@ func (l *ipRateLimiter) cleanup() {
 	}
 }
 
+// clientIP: адрес, определённый по X-Forwarded-For (при TRUST_PROXY), иначе
+// адрес TCP-соединения. При TRUST_PROXY без годного XFF берётся адрес
+// соединения — то есть самого прокси: лимит станет общим, но не обойдённым.
 func clientIP(r *http.Request) string {
+	if ip := middleware.GetClientIP(r.Context()); ip != "" {
+		return ip
+	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr // после middleware.RealIP здесь уже голый IP
+		return r.RemoteAddr
 	}
 	return host
 }

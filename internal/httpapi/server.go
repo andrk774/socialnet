@@ -159,9 +159,12 @@ func (s *Server) Router() http.Handler {
 
 	r.Use(middleware.RequestID)
 	if s.cfg.TrustProxy {
-		// Берём IP клиента из X-Forwarded-For только за своим Nginx,
-		// иначе любой сможет подставить чужой IP и обойти rate limit.
-		r.Use(middleware.RealIP)
+		// IP клиента из X-Forwarded-For — только за своим Nginx, и только тот
+		// адрес, который дописал наш прокси (справа налево, пропуская свои
+		// подсети). True-Client-IP, X-Real-IP и левые записи XFF присылает сам
+		// клиент — им не верим, иначе подменой IP обходится лимит на перебор.
+		// (middleware.RealIP верил им — GHSA-3fxj-6jh8-hvhx, GHSA-rjr7-jggh-pgcp.)
+		r.Use(middleware.ClientIPFromXFF(s.cfg.TrustedProxies...))
 	}
 	r.Use(s.instrument)
 	r.Use(middleware.Recoverer)

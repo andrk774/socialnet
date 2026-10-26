@@ -398,7 +398,8 @@ AWS SigV4; имитации ЮKassa и S3 с проверкой подписи �
 | `TOTP_ENC_KEY` | из `JWT_SECRET` | ключ шифрования секретов 2FA, 64 hex-символа |
 | `ACCESS_TOKEN_TTL` / `REFRESH_TOKEN_TTL` | `15m` / `720h` | сроки токенов |
 | `COOKIE_SECURE` | `true` | `false` только для локальной разработки по http |
-| `TRUST_PROXY` | `false` | `true`, если перед API стоит ваш Nginx |
+| `TRUST_PROXY` | `false` | `true`, если перед API стоит ваш Nginx: IP клиента берётся из `X-Forwarded-For` |
+| `TRUSTED_PROXIES` | пусто | подсети ваших прокси через запятую (`10.0.0.0/8,172.16.0.0/12`), если их несколько; пусто — один Nginx, берётся последний адрес, который он дописал |
 | `AUTH_RATE_PER_MIN` / `AUTH_RATE_BURST` | `10` / `20` | лимит `/auth/*` с одного IP |
 | `APP_URL` | `http://localhost:3000` | адрес фронтенда для ссылок в письмах |
 | `ALLOWED_ORIGINS` | пусто | домены фронтенда для WebSocket |
@@ -419,6 +420,8 @@ AWS SigV4; имитации ЮKassa и S3 с проверкой подписи �
 ## На сервер
 
 1. Поставьте перед API Nginx или Caddy с HTTPS, выставьте `TRUST_PROXY=true` и `COOKIE_SECURE=true`.
+   В Nginx: `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`. Заголовкам `X-Real-IP`
+   и `True-Client-IP` API не верит: их может прислать сам клиент.
    Для WebSocket в Nginx нужны заголовки `Upgrade` и `Connection`.
 2. Порты 8080 и 5432 в compose слушают только `127.0.0.1`, наружу их не открывайте.
 3. Подключите настоящий SMTP и удалите сервис `mailpit`.
