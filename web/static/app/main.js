@@ -5,6 +5,7 @@ import { AuthPage } from "./auth.js";
 import { ChatPage, ConversationsPage, DirectPage } from "./messages.js";
 import { CommunitiesPage, CommunityPage, FeedPage, MusicPage, NotificationsPage, OAuthPage, PostPage, SearchPage, SettingsPage, TagPage, WalletPage } from "./pages.js";
 import { ProfilePage } from "./profile.js";
+import { EventPage, HikeForm, HikesPage } from "./hikes.js";
 import { AdminPage } from "./admin.js";
 import { BookmarksPage, DocumentsPage, ScheduledPage } from "./library.js";
 import { on, startRealtime, stopRealtime } from "./realtime.js";
@@ -31,6 +32,12 @@ function routes(path, onRead, myId) {
         return h(NotificationsPage, { onRead: onRead });
     if (match("/communities", path))
         return h(CommunitiesPage, null);
+    if (match("/hikes/new", path))
+        return h(HikeForm, null);
+    if (match("/hikes", path))
+        return h(HikesPage, null);
+    if ((p = match("/events/:id", path)))
+        return h(EventPage, { id: +p.id });
     if ((p = match("/c/:slug", path)))
         return h(CommunityPage, { slug: p.slug });
     if (match("/music", path))
@@ -59,7 +66,7 @@ function routes(path, onRead, myId) {
             h("a", { href: "/" }, "\u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u0432 \u043B\u0435\u043D\u0442\u0443")));
 }
 const nav = [
-    ["/", "Лента"], ["/im", "Сообщения"], ["/notifications", "Уведомления"],
+    ["/", "Лента"], ["/hikes", "Походы"], ["/im", "Сообщения"], ["/notifications", "Уведомления"],
     ["/communities", "Сообщества"], ["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"],
     ["/scheduled", "Отложенные"], ["/wallet", "Кошелёк"], ["/settings", "Безопасность"],
 ];

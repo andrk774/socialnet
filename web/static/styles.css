@@ -327,3 +327,34 @@ body.no-scroll { overflow: hidden; }
 .track-pick { display: inline-flex; flex-wrap: wrap; gap: .25rem; align-items: center; max-width: 100%; }
 .track-pick select { width: auto; padding: .4rem .35rem; font-size: var(--step--1); }
 @media (max-width: 520px) { .route-graphics { grid-template-columns: 1fr; } }
+
+/* ---------- походы ---------- */
+.page-head { display: flex; justify-content: space-between; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.page-head h1 { margin-bottom: .5rem; }
+a.button-link { display: inline-block; text-decoration: none; }
+a.primary.button-link, a.primary.button-link:hover { color: #fff; }
+.inline-field { display: inline-flex; align-items: center; gap: .5rem; }
+.inline-field select { width: auto; margin: 0; }
+.hike-list { list-style: none; padding: 0; margin: 0; display: grid; gap: .5rem; }
+.hike-item { border: 1px solid var(--line); border-radius: var(--radius-m); padding: .75rem 1rem; background: var(--surface); }
+.hike-title { font-weight: 650; font-size: var(--step-0); }
+.hike-meta { display: flex; flex-wrap: wrap; gap: .25rem 1rem; margin-top: .25rem; font-size: var(--step--1); color: var(--ink-2); }
+.hike-meta .pill { margin-left: 0; }
+.difficulty { white-space: nowrap; color: var(--ink); }
+.difficulty.d4, .difficulty.d5 { color: var(--garnet); }
+.pill.st-going { background: var(--malachite); color: #fff; }
+.pill.st-waitlist, .pill.st-pending { background: color-mix(in srgb, var(--band) 35%, var(--surface)); color: var(--ink); }
+.event-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .5rem 0 1rem; }
+.event-actions .pill { margin-left: 0; font-size: var(--step--1); line-height: 1.8rem; padding: 0 .75rem; }
+.event-actions .join { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-end; flex: 1 1 100%; }
+.event-actions .join label { flex: 1 1 18rem; margin: 0; }
+.event-text { margin: 1rem 0; max-width: 65ch; }
+.gear ul { columns: 2 14rem; padding-left: 1.25rem; margin: .25rem 0 1rem; }
+.people { list-style: none; padding: 0; margin: 0 0 1rem; display: grid; gap: .5rem; }
+.people li { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.people .grow { flex: 1 1 12rem; min-width: 0; }
+.people .link { margin-left: auto; }
+.hike-form { max-width: 36rem; }
+.row-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0 .75rem; }
+label.check { display: flex; gap: .5rem; align-items: center; color: var(--ink); }
+label.check input { width: auto; margin: 0; }

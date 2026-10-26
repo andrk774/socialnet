@@ -1196,6 +1196,13 @@
       "type": "string",
       "format": "date-time"
      },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "event",
+       "hike"
+      ]
+     },
      "title": {
       "type": "string"
      },
@@ -1209,6 +1216,35 @@
       "type": "string",
       "format": "date-time"
      },
+     "difficulty": {
+      "type": "integer",
+      "enum": [
+       1,
+       2,
+       3,
+       4,
+       5
+      ],
+      "nullable": true
+     },
+     "capacity": {
+      "type": "integer",
+      "format": "int64",
+      "nullable": true
+     },
+     "gear": {
+      "type": "string"
+     },
+     "route_id": {
+      "type": "string",
+      "nullable": true
+     },
+     "meeting_point": {
+      "type": "string"
+     },
+     "approval": {
+      "type": "boolean"
+     },
      "going_count": {
       "type": "integer",
       "format": "int64"
@@ -1217,13 +1253,27 @@
       "type": "integer",
       "format": "int64"
      },
+     "pending_count": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "waitlist_count": {
+      "type": "integer",
+      "format": "int64"
+     },
      "my_status": {
       "type": "string",
       "enum": [
        "going",
-       "maybe"
+       "maybe",
+       "pending",
+       "waitlist"
       ],
       "nullable": true
+     },
+     "my_waitlist_position": {
+      "type": "integer",
+      "format": "int64"
      },
      "created_at": {
       "type": "string",
@@ -1233,13 +1283,42 @@
     "required": [
      "id",
      "creator_id",
+     "kind",
      "title",
      "description",
      "place",
      "starts_at",
+     "difficulty",
+     "capacity",
+     "gear",
+     "route_id",
+     "meeting_point",
+     "approval",
      "going_count",
      "maybe_count",
+     "pending_count",
+     "waitlist_count",
      "my_status",
+     "created_at"
+    ]
+   },
+   "Application": {
+    "type": "object",
+    "properties": {
+     "user": {
+      "$ref": "#/components/schemas/UserCard"
+     },
+     "note": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    },
+    "required": [
+     "user",
+     "note",
      "created_at"
     ]
    },
@@ -1261,6 +1340,10 @@
       "format": "int64"
      },
      "comment_id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "event_id": {
       "type": "integer",
       "format": "int64"
      },
@@ -6533,6 +6616,13 @@
        "schema": {
         "type": "object",
         "properties": {
+         "kind": {
+          "type": "string",
+          "enum": [
+           "event",
+           "hike"
+          ]
+         },
          "title": {
           "type": "string"
          },
@@ -6548,11 +6638,41 @@
          },
          "ends_at": {
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "nullable": true
          },
          "community_id": {
           "type": "integer",
           "format": "int64"
+         },
+         "difficulty": {
+          "type": "integer",
+          "enum": [
+           1,
+           2,
+           3,
+           4,
+           5
+          ],
+          "nullable": true
+         },
+         "capacity": {
+          "type": "integer",
+          "format": "int64",
+          "nullable": true
+         },
+         "gear": {
+          "type": "string"
+         },
+         "route_id": {
+          "type": "string",
+          "nullable": true
+         },
+         "meeting_point": {
+          "type": "string"
+         },
+         "approval": {
+          "type": "boolean"
          }
         }
        }
@@ -6681,6 +6801,13 @@
        "schema": {
         "type": "object",
         "properties": {
+         "kind": {
+          "type": "string",
+          "enum": [
+           "event",
+           "hike"
+          ]
+         },
          "title": {
           "type": "string"
          },
@@ -6696,11 +6823,41 @@
          },
          "ends_at": {
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "nullable": true
          },
          "community_id": {
           "type": "integer",
           "format": "int64"
+         },
+         "difficulty": {
+          "type": "integer",
+          "enum": [
+           1,
+           2,
+           3,
+           4,
+           5
+          ],
+          "nullable": true
+         },
+         "capacity": {
+          "type": "integer",
+          "format": "int64",
+          "nullable": true
+         },
+         "gear": {
+          "type": "string"
+         },
+         "route_id": {
+          "type": "string",
+          "nullable": true
+         },
+         "meeting_point": {
+          "type": "string"
+         },
+         "approval": {
+          "type": "boolean"
          }
         }
        }
@@ -6731,12 +6888,147 @@
     }
    }
   },
+  "/api/v1/events/{id}/applications": {
+   "get": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Заявки на участие (организатор)",
+    "operationId": "get_api_v1_events_id_applications",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Application"
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/events/{id}/applications/{uid}": {
+   "post": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Принять или отклонить заявку; принятый без мест встаёт в очередь",
+    "operationId": "post_api_v1_events_id_applications_uid",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     },
+     {
+      "name": "uid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "approve": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "approve"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "status": {
+           "type": "string",
+           "enum": [
+            "going",
+            "waitlist",
+            "rejected"
+           ]
+          }
+         },
+         "required": [
+          "status"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/events/{id}/attendees": {
    "get": {
     "tags": [
      "events"
     ],
-    "summary": "Участники: ?status=going|maybe",
+    "summary": "Участники: ?status=going|maybe|waitlist",
     "operationId": "get_api_v1_events_id_attendees",
     "parameters": [
      {
@@ -6790,12 +7082,56 @@
     }
    }
   },
+  "/api/v1/events/{id}/attendees/{uid}": {
+   "delete": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Убрать участника (организатор)",
+    "operationId": "delete_api_v1_events_id_attendees_uid",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     },
+     {
+      "name": "uid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/events/{id}/rsvp": {
    "delete": {
     "tags": [
      "events"
     ],
-    "summary": "Не пойду",
+    "summary": "Не пойду (место — первому в очереди)",
     "operationId": "delete_api_v1_events_id_rsvp",
     "parameters": [
      {
@@ -6828,7 +7164,7 @@
     "tags": [
      "events"
     ],
-    "summary": "Пойду / Возможно",
+    "summary": "Пойду / Возможно. Поход: место, лист ожидания (мест нет) или заявка организатору (approval); «возможно» нельзя",
     "operationId": "post_api_v1_events_id_rsvp",
     "parameters": [
      {
@@ -6854,6 +7190,9 @@
            "going",
            "maybe"
           ]
+         },
+         "note": {
+          "type": "string"
          }
         },
         "required": [
@@ -6864,8 +7203,29 @@
      }
     },
     "responses": {
-     "204": {
-      "description": "Успешно"
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "status": {
+           "type": "string",
+           "enum": [
+            "going",
+            "maybe",
+            "pending",
+            "waitlist"
+           ]
+          }
+         },
+         "required": [
+          "status"
+         ]
+        }
+       }
+      }
      },
      "default": {
       "description": "Ошибка",
@@ -7076,6 +7436,48 @@
          "required": [
           "items",
           "next_cursor"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/hikes": {
+   "get": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Ближайшие походы: ?max_difficulty=1..5",
+    "operationId": "get_api_v1_hikes",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Event"
+           }
+          }
+         },
+         "required": [
+          "items"
          ]
         }
        }

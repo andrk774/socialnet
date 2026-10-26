@@ -34,11 +34,13 @@ export function TagPage({ tag }: { tag: string }) {
 
 // ---------- уведомления ----------
 
-interface Notification { id: number; type: string; actor?: UserCard; post_id?: number; created_at: string; read: boolean }
+interface Notification { id: number; type: string; actor?: UserCard; post_id?: number; event_id?: number; created_at: string; read: boolean }
 const notifText: Record<string, string> = {
   like: "оценил(а) вашу запись", comment: "прокомментировал(а) запись", reply: "ответил(а) на комментарий",
   mention: "упомянул(а) вас", friend_request: "хочет добавить вас в друзья", friend_accept: "принял(а) заявку в друзья",
   gift: "отправил(а) вам подарок", transfer: "перевёл(а) вам монеты", donation: "поддержал(а) сообщество", join_request: "просит вступить в сообщество", video_ready: "Видео обработано и опубликовано",
+  hike_application: "подал(а) заявку в поход", hike_approved: "принял(а) вашу заявку в поход", hike_rejected: "отклонил(а) заявку в поход",
+  hike_removed: "убрал(а) вас из похода", event_seat: "Освободилось место — вы в походе",
 };
 
 export function NotificationsPage({ onRead }: { onRead: () => void }) {
@@ -55,7 +57,7 @@ export function NotificationsPage({ onRead }: { onRead: () => void }) {
             <li key={n.id} class={n.read ? "" : "unread"}>
               {n.actor && <Avatar user={n.actor} size={32} />}
               <span>
-                {n.actor && <UserLink user={n.actor} />} {n.post_id ? <a href={`/p/${n.post_id}`}>{notifText[n.type] ?? n.type}</a> : notifText[n.type] ?? n.type}
+                {n.actor && <UserLink user={n.actor} />} {n.post_id ? <a href={`/p/${n.post_id}`}>{notifText[n.type] ?? n.type}</a> : n.event_id ? <a href={`/events/${n.event_id}`}>{notifText[n.type] ?? n.type}</a> : notifText[n.type] ?? n.type}
                 <br /><Time iso={n.created_at} />
               </span>
             </li>

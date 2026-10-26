@@ -400,6 +400,10 @@ func (s *Server) Router() http.Handler {
 				r.Post("/events/{id}/rsvp", s.handleRSVP)
 				r.Delete("/events/{id}/rsvp", s.handleCancelRSVP)
 				r.Get("/events/{id}/attendees", s.handleAttendees)
+				r.Delete("/events/{id}/attendees/{uid}", s.handleRemoveAttendee)
+				r.Get("/events/{id}/applications", s.handleApplications)
+				r.Post("/events/{id}/applications/{uid}", s.handleDecideApplication)
+				r.Get("/hikes", s.handleHikes)
 
 				// API для разработчиков: приложения, согласие, боты, Callback API
 				r.Get("/oauth/authorize", s.handleAuthorizeInfo)
