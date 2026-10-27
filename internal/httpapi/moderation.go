@@ -26,7 +26,7 @@ func (s *Server) handleCreateReport(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Reason = strings.TrimSpace(req.Reason)
 	errs := map[string]string{}
-	oneOf(errs, "target_type", &req.TargetType, "post", "comment", "user", "community", "track", "video", "document", "route", "companion", "route_point")
+	oneOf(errs, "target_type", &req.TargetType, "post", "comment", "user", "community", "track", "video", "document", "route", "companion", "route_point", "article")
 	var targetUUID *string
 	if req.TargetType == "track" || req.TargetType == "video" || req.TargetType == "document" || req.TargetType == "route" {
 		u := strings.ToLower(req.TargetUUID)
@@ -61,6 +61,12 @@ func (s *Server) handleCreateReport(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.TargetType == "companion" { // объявление — только видимое (не от заблокированных)
 		if _, err := s.store.CompanionAd(r.Context(), me, req.TargetID); err != nil {
+			writeError(w, http.StatusNotFound, "not_found", "target not found")
+			return
+		}
+	}
+	if req.TargetType == "article" { // статья — только видимая
+		if _, err := s.store.Article(r.Context(), me, req.TargetID); err != nil {
 			writeError(w, http.StatusNotFound, "not_found", "target not found")
 			return
 		}
@@ -332,7 +338,7 @@ func (s *Server) handleSetHidden(hidden bool) http.HandlerFunc {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		typ := map[string]string{"posts": "post", "comments": "comment", "communities": "community", "companions": "companion", "route-points": "route_point"}[chi.URLParam(r, "type")]
+		typ := map[string]string{"posts": "post", "comments": "comment", "communities": "community", "companions": "companion", "route-points": "route_point", "articles": "article"}[chi.URLParam(r, "type")]
 		id, ok := pathID(w, r, "id")
 		if !ok || typ == "" {
 			if ok {

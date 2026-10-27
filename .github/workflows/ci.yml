@@ -207,6 +207,7 @@ jobs:
           - { pkg: ./internal/backup, fn: FuzzDecrypt }
           - { pkg: ./internal/yookassa, fn: FuzzParseKopecks }
           - { pkg: ./internal/gpx, fn: FuzzParse }
+          - { pkg: ./internal/markup, fn: FuzzParse }
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6

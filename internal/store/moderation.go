@@ -62,6 +62,8 @@ func (s *Store) TargetAuthor(ctx context.Context, typ string, id int64) (int64, 
 		q = `SELECT author_id FROM companion_ads WHERE id = $1 AND hidden_at IS NULL`
 	case "route_point":
 		q = `SELECT author_id FROM route_points WHERE id = $1 AND hidden_at IS NULL`
+	case "article":
+		q = `SELECT author_id FROM articles WHERE id = $1 AND hidden_at IS NULL AND status = 'published'`
 	default:
 		return 0, ErrNotFound
 	}
@@ -184,6 +186,8 @@ func (s *Store) SetHidden(ctx context.Context, typ string, id int64, hidden bool
 		table = "companion_ads"
 	case "route_point":
 		table = "route_points"
+	case "article":
+		table = "articles"
 	default:
 		return ErrNotFound
 	}

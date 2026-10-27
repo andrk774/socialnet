@@ -475,3 +475,28 @@ a.link { text-decoration: none; }
 .pager { display: flex; justify-content: space-between; }
 .publish { margin: .25rem 0; }
 .publish .stack { max-width: 36rem; }
+
+/* ---------- статьи ---------- */
+.article-list { list-style: none; padding: 0; margin: 0 0 1rem; display: grid; gap: .75rem; }
+.article-card { display: flex; gap: .75rem; align-items: flex-start; border: 1px solid var(--line); border-radius: var(--radius-m); padding: .75rem; background: var(--surface); }
+.article-card img { border-radius: var(--radius-s); object-fit: cover; flex: none; }
+.article-card .grow { flex: 1; min-width: 0; }
+.article-title { font-weight: 650; font-size: var(--step-0); overflow-wrap: anywhere; }
+.article-card .muted, .article-excerpt { margin: .25rem 0 0; }
+.article-excerpt { overflow-wrap: anywhere; }
+.article { max-width: 46rem; }
+.article h1 { overflow-wrap: anywhere; }
+.article-cover { width: 100%; max-height: 22rem; object-fit: cover; border-radius: var(--radius-m); margin-bottom: .75rem; }
+.article-meta { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.article-body { line-height: 1.65; font-size: 1.05rem; overflow-wrap: anywhere; }
+.article-body h2 { margin-top: 1.75rem; }
+.article-body figure { margin: 1.25rem 0; }
+.article-body figure img { width: 100%; height: auto; max-height: 80vh; object-fit: contain; border-radius: var(--radius-s); }
+.article-body figcaption { font-size: var(--step--1); color: var(--ink-2); margin-top: .35rem; }
+.article-body blockquote { margin: 1rem 0; padding: .25rem 1rem; border-left: 4px solid var(--band); color: var(--ink-2); }
+.article-body hr { border: 0; border-top: 1px solid var(--line); margin: 1.5rem 0; }
+.article-editor { max-width: 46rem; }
+.article-editor textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .95rem; line-height: 1.5; }
+.preview-box { border: 1px dashed var(--line); border-radius: var(--radius-s); padding: .5rem 1rem; min-height: 10rem; }
+.file-chip { margin: 0; cursor: pointer; }
+.cover-preview { border-radius: var(--radius-s); object-fit: cover; }

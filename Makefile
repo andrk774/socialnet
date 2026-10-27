@@ -46,7 +46,7 @@ openapi:       ## пересобрать api/openapi.json после измен�
 fuzz:          ## короткий фаззинг всех целей (по 30 с)
 	@for t in "textparse FuzzExtract" "media FuzzExif" "media FuzzProcess" "av FuzzSniff" \
 	          "webpush FuzzDecrypt" "webpush FuzzValidateEndpoint" "auth FuzzVerifyPassword" \
-	          "auth FuzzParseAccess" "httpapi FuzzCleanText" "gpx FuzzParse"; do \
+	          "auth FuzzParseAccess" "httpapi FuzzCleanText" "gpx FuzzParse markup FuzzParse"; do \
 		set -- $$t; go test ./internal/$$1 -run '^$$' -fuzz "^$$2$$" -fuzztime 30s || exit 1; done
 
 # Фронтенд: TypeScript → web/static/app (результат хранится в репозитории)
