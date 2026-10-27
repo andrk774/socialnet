@@ -22,7 +22,7 @@ export interface Route {
   id: string; owner_id: number; title: string; distance_m: number; gain_m: number; loss_m: number;
   min_ele: number | null; max_ele: number | null; duration_sec: number; moving_sec: number; points: number;
   hidden_ends_m: number; bbox: [number, number, number, number]; preview: [number, number][];
-  profile: { d: number; e: number }[]; gpx_url: string; created_at: string;
+  profile: { d: number; e: number }[]; gpx_url: string; public: boolean; public_note: string; created_at: string;
   detail?: [number, number][][]; waypoints?: { lat: number; lon: number; ele?: number; name: string }[]; marks?: Mark[];
 }
 export type MarkKind = "spring" | "camp" | "ford" | "danger" | "view" | "other";

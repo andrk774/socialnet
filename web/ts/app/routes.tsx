@@ -4,7 +4,7 @@
 import { h } from "../vendor/preact/index.js";
 import { useEffect, useLayoutEffect, useRef, useState } from "../vendor/preact/hooks.js";
 import * as L from "../vendor/leaflet/leaflet-src.esm.js";
-import { del, get, Mark, MarkKind, post, Route, saveFile, upload } from "./api.js";
+import { del, get, Mark, MarkKind, patch, post, Route, saveFile, upload } from "./api.js";
 import { useMe } from "./session.js";
 import { WeatherToggle } from "./weather.js";
 import { isSaved, offlineSupported, removeOffline, saveOffline } from "./offline.js";
@@ -56,6 +56,7 @@ export function hours(sec: number): string {
 }
 
 export function RouteCard({ route }: { route: Route }) {
+  const me = useMe();
   const [error, setError] = useState<unknown>(null);
   const [map, setMap] = useState(false);
   const [canMap, setCanMap] = useState(false);
@@ -103,6 +104,7 @@ export function RouteCard({ route }: { route: Route }) {
         <TrackSketch points={route.preview} />
         {route.profile.length > 1 && <ElevationProfile profile={route.profile} />}
       </div>
+      {me?.id === route.owner_id && <Publish route={route} />}
       {canWeather && route.preview.length > 0 && <WeatherToggle lat={route.preview[0][0]} lon={route.preview[0][1]} elevation={route.max_ele} />}
       {route.hidden_ends_m > 0 && <p class="muted route-note">Первые и последние {route.hidden_ends_m} м скрыты автором.</p>}
       <ErrorLine error={error} />
@@ -352,5 +354,30 @@ function AddMark({ route, picked, onDone }: { route: Route; picked: [number, num
         <button type="button" class="ghost" onClick={() => onDone(false)}>Отмена</button>
       </div>
     </form>
+  );
+}
+
+// Publish — владелец открывает маршрут в каталоге /trails (без входа).
+function Publish({ route }: { route: Route }) {
+  const [pub, setPub] = useState(route.public);
+  const [note, setNote] = useState(route.public_note);
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const save = async (next: boolean) => {
+    setError(null);
+    try { const r = await patch<Route>(`/routes/${route.id}`, { public: next, public_note: note }); setPub(r.public); setOpen(false); } catch (e) { setError(e); }
+  };
+  return (
+    <div class="publish">
+      {pub ? <p class="muted">В открытом каталоге: <a href={`/trails/${route.id}`}>страница маршрута</a> · <button class="link" onClick={() => save(false)}>Убрать из каталога</button></p>
+        : !open ? <button class="link" onClick={() => setOpen(true)}>Открыть в каталоге маршрутов…</button> : (
+          <div class="stack">
+            <p class="hint">Трек, точки и описание увидят все, в том числе без входа и поисковики. Начало и конец остаются скрытыми ({route.hidden_ends_m} м).</p>
+            <label>Описание для каталога<textarea rows={3} maxLength={2000} value={note} onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)} placeholder="Откуда стартовать, где вода, когда лучше идти" /></label>
+            <div class="row"><button class="primary" onClick={() => save(true)}>Открыть для всех</button><button class="ghost" onClick={() => setOpen(false)}>Отмена</button></div>
+          </div>
+        )}
+      <ErrorLine error={error} />
+    </div>
   );
 }

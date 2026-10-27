@@ -45,6 +45,8 @@ type Route struct {
 	Waypoints   []RouteWaypoint `json:"waypoints,omitempty"`
 	Marks       []RoutePoint    `json:"marks,omitempty"` // точки от ходивших: родники, стоянки…
 	GPXURL      string          `json:"gpx_url"`
+	Public      bool            `json:"public"`      // в открытом каталоге /trails
+	PublicNote  string          `json:"public_note"` // описание для каталога
 	CreatedAt   time.Time       `json:"created_at"`
 	seq         int64
 }
@@ -55,7 +57,7 @@ func RouteGPXURL(id string) string { return "/api/v1/routes/" + id + "/gpx" }
 
 const routeCols = `r.id::text, r.owner_id, r.title, r.distance_m, r.gain_m, r.loss_m, r.min_ele, r.max_ele,
 	r.duration_sec, r.moving_sec, r.points, r.hidden_ends_m, r.min_lat, r.min_lon, r.max_lat, r.max_lon,
-	r.preview, r.profile, r.created_at, r.seq`
+	r.preview, r.profile, r.created_at, r.seq, r.public, r.public_note`
 
 func scanRoutes(rows pgx.Rows, withDetail bool) ([]Route, error) {
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (Route, error) {
@@ -64,38 +66,42 @@ func scanRoutes(rows pgx.Rows, withDetail bool) ([]Route, error) {
 		var preview, profile, detail, wps []byte
 		dest := []any{&r.ID, &r.OwnerID, &r.Title, &r.DistanceM, &r.GainM, &r.LossM, &minEle, &maxEle,
 			&r.DurationSec, &r.MovingSec, &r.Points, &r.HiddenEndsM, &r.BBox[0], &r.BBox[1], &r.BBox[2], &r.BBox[3],
-			&preview, &profile, &r.CreatedAt, &r.seq}
+			&preview, &profile, &r.CreatedAt, &r.seq, &r.Public, &r.PublicNote}
 		if withDetail {
 			dest = append(dest, &detail, &wps)
 		}
 		if err := row.Scan(dest...); err != nil {
 			return r, err
 		}
-		if minEle != nil {
-			v := float64(*minEle)
-			r.MinEle = &v
-		}
-		if maxEle != nil {
-			v := float64(*maxEle)
-			r.MaxEle = &v
-		}
-		if err := json.Unmarshal(preview, &r.Preview); err != nil {
-			return r, err
-		}
-		if err := json.Unmarshal(profile, &r.Profile); err != nil {
-			return r, err
-		}
-		if withDetail {
-			if err := json.Unmarshal(detail, &r.Detail); err != nil {
-				return r, err
-			}
-			if err := json.Unmarshal(wps, &r.Waypoints); err != nil {
-				return r, err
-			}
-		}
-		r.GPXURL = RouteGPXURL(r.ID)
-		return r, nil
+		return r, fillRoute(&r, minEle, maxEle, preview, profile, detail, wps)
 	})
+}
+
+func fillRoute(r *Route, minEle, maxEle *float32, preview, profile, detail, wps []byte) error {
+	if minEle != nil {
+		v := float64(*minEle)
+		r.MinEle = &v
+	}
+	if maxEle != nil {
+		v := float64(*maxEle)
+		r.MaxEle = &v
+	}
+	if err := json.Unmarshal(preview, &r.Preview); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(profile, &r.Profile); err != nil {
+		return err
+	}
+	if detail != nil {
+		if err := json.Unmarshal(detail, &r.Detail); err != nil {
+			return err
+		}
+		if err := json.Unmarshal(wps, &r.Waypoints); err != nil {
+			return err
+		}
+	}
+	r.GPXURL = RouteGPXURL(r.ID)
+	return nil
 }
 
 type NewRoute struct {
@@ -184,6 +190,82 @@ func (s *Store) RenameRoute(ctx context.Context, id string, owner int64, title s
 	return err
 }
 
+// SetRoutePublic: владелец показывает маршрут в открытом каталоге или убирает.
+func (s *Store) SetRoutePublic(ctx context.Context, id string, owner int64, public bool, note string) error {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE routes SET public = $3, public_note = $4,
+		       public_at = CASE WHEN $3 THEN COALESCE(public_at, now()) ELSE NULL END
+		WHERE id = $1::uuid AND owner_id = $2 AND deleted_at IS NULL`, id, owner, public, note)
+	if err == nil && tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return err
+}
+
+// PublicRoute — маршрут из каталога с автором (без входа).
+type PublicRoute struct {
+	Route
+	Author   UserCard
+	PublicAt time.Time
+}
+
+const publicWhere = ` r.public AND r.deleted_at IS NULL AND r.hidden_at IS NULL AND u.banned_at IS NULL`
+
+func (s *Store) scanPublic(ctx context.Context, withDetail bool, sql string, args ...any) ([]PublicRoute, error) {
+	cols := routeCols
+	if withDetail {
+		cols += `, r.detail, r.waypoints`
+	}
+	rows, err := s.pool.Query(ctx, `SELECT `+cols+`, `+cardCols+`, r.public_at FROM routes r JOIN users u ON u.id = r.owner_id WHERE`+publicWhere+sql, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PublicRoute
+	for rows.Next() {
+		var pr PublicRoute
+		var minEle, maxEle *float32
+		var preview, profile, detail, wps []byte
+		var avatar *string
+		dest := []any{&pr.ID, &pr.OwnerID, &pr.Title, &pr.DistanceM, &pr.GainM, &pr.LossM, &minEle, &maxEle,
+			&pr.DurationSec, &pr.MovingSec, &pr.Points, &pr.HiddenEndsM, &pr.BBox[0], &pr.BBox[1], &pr.BBox[2], &pr.BBox[3],
+			&preview, &profile, &pr.CreatedAt, &pr.seq, &pr.Public, &pr.PublicNote}
+		if withDetail {
+			dest = append(dest, &detail, &wps)
+		}
+		dest = append(dest, &pr.Author.ID, &pr.Author.Username, &pr.Author.FirstName, &pr.Author.LastName, &avatar, &pr.PublicAt)
+		if err := rows.Scan(dest...); err != nil {
+			return nil, err
+		}
+		if err := fillRoute(&pr.Route, minEle, maxEle, preview, profile, detail, wps); err != nil {
+			return nil, err
+		}
+		pr.Author.AvatarURL = MediaURL(avatar, "thumb")
+		out = append(out, pr)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) PublicRoutes(ctx context.Context, limit, offset int) ([]PublicRoute, error) {
+	return s.scanPublic(ctx, false, ` ORDER BY r.public_at DESC, r.id LIMIT $1 OFFSET $2`, limit, offset)
+}
+
+func (s *Store) PublicRouteByID(ctx context.Context, id string) (*PublicRoute, error) {
+	list, err := s.scanPublic(ctx, true, ` AND r.id = $1::uuid`, id)
+	if err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, ErrNotFound
+	}
+	return &list[0], nil
+}
+
+// PublicRouteIDs — для sitemap.xml.
+func (s *Store) PublicRouteIDs(ctx context.Context, limit int) ([]PublicRoute, error) {
+	return s.scanPublic(ctx, false, ` ORDER BY r.public_at DESC LIMIT $1`, limit)
+}
+
 func (s *Store) DeleteRoute(ctx context.Context, id string, owner int64) error {
 	tag, err := s.pool.Exec(ctx, `UPDATE routes SET deleted_at = now() WHERE id = $1::uuid AND owner_id = $2 AND deleted_at IS NULL`,
 		id, owner)
@@ -203,6 +285,7 @@ func (s *Store) RouteAccess(ctx context.Context, viewer int64, id string) (bool,
 		               JOIN users a ON a.id = p.author_id
 		               LEFT JOIN communities c ON c.id = p.community_id
 		               WHERE pr.route_id = $2::uuid AND `+postVisible+`)
+		    OR EXISTS (SELECT 1 FROM routes r JOIN users u ON u.id = r.owner_id WHERE r.id = $2::uuid AND`+publicWhere+`)
 		    OR EXISTS (SELECT 1 FROM events e LEFT JOIN communities c ON c.id = e.community_id
 		               WHERE e.route_id = $2::uuid AND `+eventVisible+`)`, viewer, id).Scan(&ok)
 	return ok, err

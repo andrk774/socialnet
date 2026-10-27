@@ -695,6 +695,12 @@
      "gpx_url": {
       "type": "string"
      },
+     "public": {
+      "type": "boolean"
+     },
+     "public_note": {
+      "type": "string"
+     },
      "created_at": {
       "type": "string",
       "format": "date-time"
@@ -760,6 +766,8 @@
      "preview",
      "profile",
      "gpx_url",
+     "public",
+     "public_note",
      "created_at"
     ]
    },
@@ -10955,7 +10963,7 @@
     "tags": [
      "routes"
     ],
-    "summary": "Переименовать",
+    "summary": "Название; public — показать в открытом каталоге /trails (без входа и поисковикам)",
     "operationId": "patch_api_v1_routes_rid",
     "parameters": [
      {
@@ -10976,11 +10984,14 @@
         "properties": {
          "title": {
           "type": "string"
+         },
+         "public": {
+          "type": "boolean"
+         },
+         "public_note": {
+          "type": "string"
          }
-        },
-        "required": [
-         "title"
-        ]
+        }
        }
       }
      }
@@ -15122,6 +15133,70 @@
     }
    }
   },
+  "/robots.txt": {
+   "get": {
+    "tags": [
+     "service"
+    ],
+    "summary": "robots.txt: в поиск — каталог и документы",
+    "operationId": "get_robots_txt",
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "Текст",
+      "content": {
+       "text/plain": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sitemap.xml": {
+   "get": {
+    "tags": [
+     "service"
+    ],
+    "summary": "Карта сайта: каталог и документы",
+    "operationId": "get_sitemap_xml",
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "Текст",
+      "content": {
+       "text/plain": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/sw.js": {
    "get": {
     "tags": [
@@ -15196,6 +15271,81 @@
         "schema": {
          "type": "string",
          "format": "binary"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/trails": {
+   "get": {
+    "tags": [
+     "service"
+    ],
+    "summary": "Открытый каталог маршрутов (HTML без входа): ?page=",
+    "operationId": "get_trails",
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "Текст",
+      "content": {
+       "text/plain": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/trails/{id}": {
+   "get": {
+    "tags": [
+     "service"
+    ],
+    "summary": "Страница маршрута (HTML); {id}.gpx — очищенный GPX",
+    "operationId": "get_trails_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "Текст",
+      "content": {
+       "text/plain": {
+        "schema": {
+         "type": "string"
         }
        }
       }

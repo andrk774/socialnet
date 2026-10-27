@@ -58,6 +58,7 @@ type Server struct {
 	tileLimiter    limiter
 	weather        *weatherCache // nil — прогноз выключен
 	weatherLimiter limiter
+	publicLimiter  limiter
 	yookassa       *yookassa.Client // nil — покупка монет выключена
 	m              *serverMetrics
 	static         map[string]staticFile // встроенный фронтенд
@@ -191,6 +192,10 @@ func (s *Server) Router() http.Handler {
 
 	r.Get("/.well-known/security.txt", s.handleSecurityTxt)
 	r.Get("/legal/{doc}", s.handleLegalPage)
+	r.Get("/trails", s.handleTrails)
+	r.Get("/trails/{id}", s.handleTrail)
+	r.Get("/robots.txt", s.handleRobots)
+	r.Get("/sitemap.xml", s.handleSitemap)
 	r.Get("/api/v1/openapi.json", s.handleOpenAPI)
 	if !s.cfg.DocsDisabled {
 		r.Handle("/docs/*", docsHandler())

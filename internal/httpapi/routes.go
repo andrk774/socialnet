@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 
@@ -247,31 +248,62 @@ func (s *Server) handleMyRoutes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, list(items, p.Limit, store.Route.Cursor))
 }
 
+// handleRenameRoute: PATCH /routes/{rid} — название и открытый каталог.
 func (s *Server) handleRenameRoute(w http.ResponseWriter, r *http.Request) {
 	id, ok := routeID(w, r)
 	if !ok {
 		return
 	}
 	var req struct {
-		Title string `json:"title"`
+		Title      *string `json:"title"`
+		Public     *bool   `json:"public"`      // показать в открытом каталоге /trails
+		PublicNote *string `json:"public_note"` // описание для каталога
 	}
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	title := cleanText(req.Title, 120)
-	if title == "" {
-		writeFieldErrors(w, http.StatusUnprocessableEntity, "validation_failed", "invalid input",
-			map[string]string{"title": "1-120 characters"})
-		return
-	}
-	err := s.store.RenameRoute(r.Context(), id, userIDFrom(r.Context()), title)
-	if errors.Is(err, store.ErrNotFound) {
+	me := userIDFrom(r.Context())
+	cur, err := s.store.Route(r.Context(), id, false)
+	if errors.Is(err, store.ErrNotFound) || err == nil && cur.OwnerID != me {
 		writeError(w, http.StatusNotFound, "not_found", "route not found")
 		return
 	}
 	if err != nil {
 		s.internalError(w, r, err)
 		return
+	}
+	errs := map[string]string{}
+	title := cur.Title
+	if req.Title != nil {
+		if title = cleanText(*req.Title, 120); title == "" {
+			errs["title"] = "1-120 characters"
+		}
+	}
+	public, note := cur.Public, cur.PublicNote
+	if req.Public != nil {
+		public = *req.Public
+	}
+	if req.PublicNote != nil {
+		note = strings.TrimSpace(*req.PublicNote)
+		if utf8.RuneCountInString(note) > 2000 {
+			errs["public_note"] = "max 2000 characters"
+		}
+	}
+	if len(errs) > 0 {
+		writeFieldErrors(w, http.StatusUnprocessableEntity, "validation_failed", "invalid input", errs)
+		return
+	}
+	if title != cur.Title {
+		if err := s.store.RenameRoute(r.Context(), id, me, title); err != nil {
+			s.internalError(w, r, err)
+			return
+		}
+	}
+	if public != cur.Public || note != cur.PublicNote {
+		if err := s.store.SetRoutePublic(r.Context(), id, me, public, note); err != nil {
+			s.internalError(w, r, err)
+			return
+		}
 	}
 	route, err := s.store.Route(r.Context(), id, false)
 	if err != nil {
