@@ -28,7 +28,9 @@ const (
 	captchaUnavailable
 )
 
-func (s *Server) captchaEnabled() bool { return s.cfg.CaptchaSiteKey != "" && s.cfg.CaptchaSecret != "" }
+func (s *Server) captchaEnabled() bool {
+	return s.cfg.CaptchaSiteKey != "" && s.cfg.CaptchaSecret != ""
+}
 
 func (s *Server) checkCaptcha(ctx context.Context, token, ip string) captchaResult {
 	token = strings.TrimSpace(token)
