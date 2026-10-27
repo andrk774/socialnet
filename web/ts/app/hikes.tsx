@@ -127,7 +127,8 @@ export function EventPage({ id }: { id: number }) {
           {e.my_status === "pending" ? "Отозвать заявку" : e.my_status === "waitlist" ? "Выйти из очереди" : "Не пойду"}
         </button>}
         <a class="ghost button-link" href={`/events/${id}/print`}>Лист для печати</a>
-        {isOrganizer && me.plus && <button class="ghost" onClick={() => saveFile(`/events/${id}/participants.csv`, `участники-${id}.csv`).catch(setError)}>Список группы (CSV)</button>}
+        <button class="ghost" onClick={() => saveFile(`/api/v1/events/${id}/calendar.ics`, `${e.title}.ics`).catch(setError)}>В календарь</button>
+        {isOrganizer && me.plus && <button class="ghost" onClick={() => saveFile(`/api/v1/events/${id}/participants.csv`, `участники-${id}.csv`).catch(setError)}>Список группы (CSV)</button>}
         {isOrganizer && <button class="ghost" onClick={() => setEditing(true)}>Изменить</button>}
         {isOrganizer && <button class="ghost danger" onClick={() => confirm("Удалить поход? Участники его больше не увидят.") && act(async () => { await del(`/events/${id}`); navigate("/hikes"); })}>Удалить</button>}
       </div>

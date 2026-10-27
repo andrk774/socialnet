@@ -9212,6 +9212,48 @@
     }
    }
   },
+  "/api/v1/events/{id}/calendar.ics": {
+   "get": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Мероприятие файлом iCalendar: добавить в календарь телефона, с напоминаниями",
+    "operationId": "get_api_v1_events_id_calendar_ics",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Текст",
+      "content": {
+       "text/plain": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/events/{id}/contacts": {
    "get": {
     "tags": [

@@ -312,6 +312,13 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await bob.page.locator("li.ride", { hasText: "свободно 1 из 2" }).waitFor();
   await anna.page.reload();
   await anna.page.locator("li.ride").getByText("Вы едете").waitFor();
+  // в календарь: файл .ics с началом похода
+  {
+    const [dl] = await Promise.all([anna.page.waitForEvent("download"), anna.page.getByRole("button", { name: "В календарь" }).click()]);
+    const ics = (await import("node:fs")).readFileSync(await dl.path(), "utf8");
+    assert.match(ics, /BEGIN:VEVENT[\s\S]*DTSTART:\d{8}T\d{6}Z/, "ics has the start");
+    assert.ok(dl.suggestedFilename().endsWith(".ics"), dl.suggestedFilename());
+  }
   // лист для печати: карта, профиль, точки с координатами, снаряжение, 112
   await anna.page.getByRole("link", { name: "Лист для печати" }).click();
   await anna.page.locator(".print-sheet .route-map path.map-route").waitFor({ state: "attached" });

@@ -444,6 +444,7 @@ func (s *Server) Router() http.Handler {
 				r.Post("/plus/buy", s.handleBuyPlus)
 				r.Patch("/plus", s.handlePlusSettings)
 				r.Get("/events/{id}/participants.csv", s.handleParticipantsCSV)
+				r.Get("/events/{id}/calendar.ics", s.handleEventICS)
 				r.Get("/antennas", s.handleAntennas)
 				r.Post("/antennas", s.handleCreateAntenna)
 				r.Put("/antennas/{id}", s.handleUpdateAntenna)

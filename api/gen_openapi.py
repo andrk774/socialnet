@@ -442,6 +442,7 @@ r("GET", A + "/plus", "wallet", "Подписка «Плюс»: состояни
 r("POST", A + "/plus/buy", "wallet", "Купить или продлить на 30 дней за монеты (ключ идемпотентности обязателен)",
   obj(idempotency_key=str_), {"allOf": [plus_s, obj(replayed=bool_, balance=int_)]}, 201)
 r("PATCH", A + "/plus", "wallet", "Автопродление", obj(auto_renew=bool_), plus_s)
+r("GET", A + "/events/{id}/calendar.ics", "events", "Мероприятие файлом iCalendar: добавить в календарь телефона, с напоминаниями", resp="text")
 r("GET", A + "/events/{id}/participants.csv", "events", "Список группы CSV для регистрации в МЧС (организатору с «Плюсом»)", resp="text")
 r("POST", A + "/articles", "wall", "Статья: разметка ## ### - 1. > --- **жирный** *курсив* [ссылка](https://…) ![подпись](media:UUID); фото и маршрут — свои",
   art, S("Article"), 201)
