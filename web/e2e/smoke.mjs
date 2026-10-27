@@ -220,6 +220,17 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await card.getByLabel("Описание для каталога").fill("Старт от Белого ключа, вода у родника");
   await card.getByRole("button", { name: "Открыть для всех" }).click();
   await card.getByRole("link", { name: "страница маршрута" }).waitFor();
+  {
+    // гость без входа и без JavaScript видит маршрут в каталоге
+    const guest = await anna.ctx.browser().newContext({ locale: "ru-RU", javaScriptEnabled: false });
+    const g = await guest.newPage();
+    assert.equal((await g.goto(base + "/trails")).status(), 200, "trails catalog");
+    await g.getByRole("link", { name: "Двуглавая сопка" }).first().click();
+    await g.getByRole("heading", { name: "Двуглавая сопка" }).waitFor();
+    await g.getByText("Старт от Белого ключа").waitFor();
+    await g.screenshot({ path: `${shots}/18-trail.png`, fullPage: true });
+    await guest.close();
+  }
   const dl = anna.page.waitForEvent("download");
   await card.getByRole("button", { name: "Скачать GPX" }).click();
   const gpxFile = await (await import("node:fs")).readFileSync(await (await dl).path(), "utf8");

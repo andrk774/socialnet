@@ -143,6 +143,7 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 		vulnLimiter:    lim("vuln", 5.0/3600, 5), // 5 отчётов в час с IP
 		tileLimiter:    lim("tile", 20, 400),     // карта грузит десятки тайлов разом
 		weatherLimiter: lim("weather", 1, 30),    // прогноз: 60 в минуту
+		publicLimiter:  lim("public", 5, 60),     // открытый каталог и карта сайта, с IP
 
 		vapid:      vapid,
 		pushClient: webpush.SafeClient(),
