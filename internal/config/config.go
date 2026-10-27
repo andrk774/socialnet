@@ -92,7 +92,13 @@ type Config struct {
 	MetricsToken string // необязательный Bearer-токен
 
 	// Резервные копии (`api backup-loop`).
-	BackupDir  string // папка для копий; "" — только S3
+	BackupDir string // папка для копий; "" — только S3
+	// Внешнее хранилище для копий (другой поставщик или регион): если сервер
+	// пропадёт вместе с дисками, копии и медиафайлы останутся там.
+	OffsiteEndpoint, OffsiteRegion, OffsiteBucket, OffsiteAccessKey, OffsiteSecretKey string
+	OffsitePathStyle                                                                  bool
+	BackupMedia                                                                       bool // шифрованная копия папки медиа (если медиа не в S3)
+
 	BackupKey  []byte // BACKUP_ENC_KEY, 64 hex-символа: шифрование AES-256-GCM
 	BackupKeep int
 	BackupHour int  // час запуска, UTC
@@ -180,6 +186,28 @@ func Load() (Config, error) {
 	}
 	if c.BackupS3, err = boolean("BACKUP_S3", false); err != nil {
 		return c, err
+	}
+	c.OffsiteEndpoint = strings.TrimRight(os.Getenv("BACKUP_S3_ENDPOINT"), "/")
+	c.OffsiteRegion = getenv("BACKUP_S3_REGION", "ru-1")
+	c.OffsiteBucket = os.Getenv("BACKUP_S3_BUCKET")
+	c.OffsiteAccessKey = os.Getenv("BACKUP_S3_ACCESS_KEY")
+	c.OffsiteSecretKey = os.Getenv("BACKUP_S3_SECRET_KEY")
+	if c.OffsitePathStyle, err = boolean("BACKUP_S3_PATH_STYLE", true); err != nil {
+		return c, err
+	}
+	if c.BackupMedia, err = boolean("BACKUP_MEDIA", true); err != nil {
+		return c, err
+	}
+	if c.OffsiteEndpoint != "" {
+		if c.OffsiteBucket == "" || c.OffsiteAccessKey == "" || c.OffsiteSecretKey == "" {
+			return c, errors.New("BACKUP_S3_BUCKET, BACKUP_S3_ACCESS_KEY and BACKUP_S3_SECRET_KEY are required with BACKUP_S3_ENDPOINT")
+		}
+		if !strings.HasPrefix(c.OffsiteEndpoint, "https://") && !strings.HasPrefix(c.OffsiteEndpoint, "http://") {
+			return c, errors.New("BACKUP_S3_ENDPOINT must be an http(s) URL")
+		}
+		if os.Getenv("BACKUP_ENC_KEY") == "" {
+			return c, errors.New("BACKUP_S3_ENDPOINT requires BACKUP_ENC_KEY: copies must not leave the server unencrypted")
+		}
 	}
 	c.MetricsToken = os.Getenv("METRICS_TOKEN")
 	c.S3Endpoint = strings.TrimRight(os.Getenv("S3_ENDPOINT"), "/")

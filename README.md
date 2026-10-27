@@ -438,26 +438,32 @@ AWS SigV4; имитации ЮKassa и S3 с проверкой подписи �
 
 ## На сервер
 
-1. Поставьте перед API Nginx или Caddy с HTTPS, выставьте `TRUST_PROXY=true` и `COOKIE_SECURE=true`.
-   В Nginx: `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`. Заголовкам `X-Real-IP`
-   и `True-Client-IP` API не верит: их может прислать сам клиент.
-   Для WebSocket в Nginx нужны заголовки `Upgrade` и `Connection`.
-2. Порты 8080 и 5432 в compose слушают только `127.0.0.1`, наружу их не открывайте.
-3. Подключите настоящий SMTP и удалите сервис `mailpit`.
-4. Задайте отдельный `TOTP_ENC_KEY` и храните его вместе с бэкапами.
-5. Сервис `backup` раз в сутки снимает копию базы, шифрует, проверяет восстановлением во
-   временную базу и пишет итог в метрику `socialnet_backup` (алерт — если копии нет больше 26 часов).
-   Восстановление: `docker compose run --rm backup restore /backups/<файл> --yes`.
-   Медиа держите в S3 с версионированием или бэкапьте том `media`.
-6. URL уведомлений ЮKassa в личном кабинете: `https://<домен>/api/v1/payments/yookassa`;
-   включите события `payment.succeeded`, `payment.canceled` и `refund.succeeded`.
-   Возврат списывает монеты пропорционально возвращённой сумме; если их уже
-   потратили, остаток становится долгом — тратить монеты нельзя, пока новые
-   поступления его не погасят.
-7. Видео, обработанные до появления MP4, досоздаются командой
-   `docker compose run --rm api backfill-mp4` (задачи выполнит воркер).
-8. Видео тяжёлое: следите за местом на диске и при нагрузке запускайте больше воркеров
-   (`docker compose up -d --scale worker=3`) — очередь сама распределит задачи.
+Пошаговая инструкция для VPS Timeweb Cloud — [deploy/README.md](deploy/README.md). Коротко:
+
+```bash
+scp deploy/setup-server.sh root@IP:/root/ && ssh root@IP bash /root/setup-server.sh домен почта
+# заполнить /opt/socialnet/.env: SMTP_*, LEGAL_*, BACKUP_S3_*
+sudo -iu socialnet /opt/socialnet/deploy/update.sh   # и запуск, и каждое обновление
+```
+
+- `docker-compose.prod.yml` поверх основного: Caddy с автоматическим HTTPS (Let's Encrypt,
+  HTTP/3, HSTS) — единственное, что открыто наружу; API и база без опубликованных портов;
+  `COOKIE_SECURE=true`; реальный IP клиента — только из заголовка Caddy (`TRUSTED_PROXIES`
+  на фиксированную подсеть), подставной `X-Forwarded-For` от клиента отбрасывается; Mailpit выключен.
+- `deploy/setup-server.sh`: обновления и автообновления, Docker (по желанию — зеркало Docker Hub),
+  ufw (22/80/443), fail2ban, swap, вход по SSH только по ключу, ключ развёртывания для
+  закрытого репозитория, `.env` со случайными секретами.
+- `deploy/update.sh`: `git pull --ff-only` → копия базы до миграций → сборка → `up --wait` →
+  проверка `https://домен/health`; при сбое — подсказка, как вернуть прежний код.
+- Внешние копии (`BACKUP_S3_*`, другой регион или поставщик): дампы базы и шифрованная
+  синхронизация папки медиа; без `BACKUP_ENC_KEY` наружу ничего не уходит. Восстановление —
+  `api restore <файл> --yes` и `api restore-media`.
+- `deploy/prod_check.py` проверяет боевую конфигурацию; в CI — на `DOMAIN=localhost` с локальным
+  центром сертификации Caddy.
+- URL уведомлений ЮKassa: `https://<домен>/api/v1/payments/yookassa`; события `payment.succeeded`,
+  `payment.canceled`, `refund.succeeded`.
+- Видео, обработанные до появления MP4: `docker compose run --rm api backfill-mp4`.
+  При нагрузке — больше воркеров: `--scale worker=3`.
 
 ## Масштабирование
 

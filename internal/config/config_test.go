@@ -41,6 +41,8 @@ func TestLoadErrors(t *testing.T) {
 		"tile url not http":    {"TILE_URL": "file:///etc/{z}/{x}/{y}"},
 		"tile url no xyz":      {"TILE_URL": "https://tiles.example/map.png"},
 		"bad tile zoom":        {"TILE_MAX_ZOOM": "25"},
+		"offsite without key":  {"BACKUP_S3_ENDPOINT": "https://s3.example", "BACKUP_S3_BUCKET": "b", "BACKUP_S3_ACCESS_KEY": "a", "BACKUP_S3_SECRET_KEY": "s"},
+		"offsite no bucket":    {"BACKUP_S3_ENDPOINT": "https://s3.example", "BACKUP_ENC_KEY": strings.Repeat("ab", 32)},
 	} {
 		t.Run(name, func(t *testing.T) {
 			base(t)
