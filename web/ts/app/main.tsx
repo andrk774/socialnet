@@ -15,6 +15,7 @@ import { RidesPage } from "./rides.js";
 import { AntennasPage } from "./antennas.js";
 import { PlusPage } from "./plus.js";
 import { FundraisersPage } from "./fundraisers.js";
+import { ForgotPasswordPage, ResetPasswordPage, VerifyEmailPage } from "./accountlinks.js";
 import { AdminPage } from "./admin.js";
 import { BookmarksPage, DocumentsPage, ScheduledPage } from "./library.js";
 import { on, startRealtime, stopRealtime } from "./realtime.js";
@@ -129,6 +130,7 @@ function VerifyBanner({ email }: { email: string }) {
 
 function App() {
   const [state, setState] = useState<"loading" | "in" | "out">("loading");
+  const lp = usePath().split("?")[0];
   useEffect(() => {
     const off = onAuthChange(async (inNow) => {
       if (inNow) { await loadMe().catch(() => {}); startRealtime(); setState("in"); }
@@ -138,6 +140,10 @@ function App() {
     refresh().then((ok) => { if (!ok && !signedIn()) setState("out"); });
     return () => { off(); };
   }, []);
+  // ссылки из писем и восстановление пароля — без входа
+  if (lp === "/verify-email") return <VerifyEmailPage />;
+  if (lp === "/reset-password") return <ResetPasswordPage />;
+  if (lp === "/forgot-password" && state !== "in") return <ForgotPasswordPage />;
   if (state === "loading") return <Loading />;
   // без сети войти нельзя, но сохранённые маршруты доступны
   if (state === "out" && (!navigator.onLine || location.pathname === "/offline")) return <main class="content offline-only"><OfflinePage /><p><a href="/">Войти</a></p></main>;

@@ -63,8 +63,9 @@ type Server struct {
 	m              *serverMetrics
 	static         map[string]staticFile // встроенный фронтенд
 	sw             []byte                // сервис-воркер со списком файлов оболочки
-	redis          *redisx.Client        // nil — один экземпляр, всё в памяти
-	instance       string                // id экземпляра для шины событий
+	captchaClient  *http.Client
+	redis          *redisx.Client // nil — один экземпляр, всё в памяти
+	instance       string         // id экземпляра для шины событий
 
 	// callbackInsecure — только для тестов: разрешает http:// и локальный сервер.
 	callbackInsecure bool
@@ -170,6 +171,7 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 	srv.initMetrics()
 	srv.static = loadStatic()
 	srv.sw = buildServiceWorker(srv.static)
+	srv.captchaClient = &http.Client{Timeout: 5 * time.Second}
 	return srv, nil
 }
 

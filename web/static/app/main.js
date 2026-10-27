@@ -15,6 +15,7 @@ import { RidesPage } from "./rides.js";
 import { AntennasPage } from "./antennas.js";
 import { PlusPage } from "./plus.js";
 import { FundraisersPage } from "./fundraisers.js";
+import { ForgotPasswordPage, ResetPasswordPage, VerifyEmailPage } from "./accountlinks.js";
 import { AdminPage } from "./admin.js";
 import { BookmarksPage, DocumentsPage, ScheduledPage } from "./library.js";
 import { on, startRealtime, stopRealtime } from "./realtime.js";
@@ -154,6 +155,7 @@ function VerifyBanner({ email }) {
 }
 function App() {
     const [state, setState] = useState("loading");
+    const lp = usePath().split("?")[0];
     useEffect(() => {
         const off = onAuthChange(async (inNow) => {
             if (inNow) {
@@ -172,6 +174,13 @@ function App() {
             setState("out"); });
         return () => { off(); };
     }, []);
+    // ссылки из писем и восстановление пароля — без входа
+    if (lp === "/verify-email")
+        return h(VerifyEmailPage, null);
+    if (lp === "/reset-password")
+        return h(ResetPasswordPage, null);
+    if (lp === "/forgot-password" && state !== "in")
+        return h(ForgotPasswordPage, null);
     if (state === "loading")
         return h(Loading, null);
     // без сети войти нельзя, но сохранённые маршруты доступны

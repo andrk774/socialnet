@@ -172,18 +172,18 @@ r("POST", A + "/users/me/consents", "auth", "Принять действующу
 r("DELETE", A + "/users/me", "auth", "Удалить аккаунт и отозвать согласие на обработку ПДн: публикации удаляются, аккаунт обезличивается",
   obj(password=str_), code=204)
 r("GET", A + "/client-config", "service", "Что включено на сервере (карта: адрес тайлов, атрибуция, максимальный масштаб)", auth=False,
-  resp=obj(map=obj(enabled=bool_, tiles=str_, attribution=str_, max_zoom=int_), weather=obj(enabled=bool_)))
+  resp=obj(map=obj(enabled=bool_, tiles=str_, attribution=str_, max_zoom=int_), weather=obj(enabled=bool_), captcha=obj(enabled=bool_, site_key=str_)))
 r("GET", "/tiles/{z}/{x}/{y}", "service", "Тайл карты через кеширующий прокси ({y} с суффиксом .png); 404 — карта выключена или неверные координаты", auth=False, resp="binary")
 # --- аккаунт ---
 r("POST", A + "/auth/register", "auth", "Регистрация (18+; три отдельные отметки: возраст, соглашение и политика, согласие на обработку ПДн)",
   obj(email=str_, username=str_, password=str_, age_confirmed=bool_, accept_terms=bool_, pd_consent=bool_,
-      **{"first_name?": str_, "last_name?": str_}), S("Auth"), 201, auth=False)
+      **{"first_name?": str_, "last_name?": str_, "captcha_token?": str_}), S("Auth"), 201, auth=False)
 r("POST", A + "/auth/login", "auth", "Вход (шаг 1). При 2FA вернёт mfa_token", obj(email=str_, password=str_), {"oneOf": [S("Auth"), S("MFARequired")]}, auth=False)
 r("POST", A + "/auth/2fa/verify", "auth", "Вход (шаг 2): код 2FA или резервный код", obj(mfa_token=str_, **{"code?": str_, "backup_code?": str_}), S("Auth"), auth=False)
 r("POST", A + "/auth/refresh", "auth", "Новый access-токен по refresh-cookie", resp=S("Auth"), auth=False)
 r("POST", A + "/auth/logout", "auth", "Выход", code=204, auth=False)
 r("POST", A + "/auth/email/verify", "auth", "Подтвердить email токеном из письма", obj(token=str_), code=204, auth=False)
-r("POST", A + "/auth/password/forgot", "auth", "Запросить сброс пароля (всегда 202)", obj(email=str_), obj(message=str_), 202, auth=False)
+r("POST", A + "/auth/password/forgot", "auth", "Запросить сброс пароля (всегда 202)", obj(email=str_, **{"captcha_token?": str_}), obj(message=str_), 202, auth=False)
 r("POST", A + "/auth/password/reset", "auth", "Сбросить пароль токеном из письма", obj(token=str_, password=str_), code=204, auth=False)
 r("POST", A + "/users/me/email/verification", "auth", "Отправить письмо подтверждения ещё раз", code=202)
 r("POST", A + "/users/me/password", "auth", "Сменить пароль", obj(current_password=str_, new_password=str_), code=204)

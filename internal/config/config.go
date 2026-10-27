@@ -87,6 +87,9 @@ type Config struct {
 	TileAttribution string
 	TileMaxZoom     int
 
+	// Яндекс SmartCaptcha: ключи из консоли Yandex Cloud. Пусто — выключена.
+	CaptchaSiteKey, CaptchaSecret, CaptchaURL string
+
 	// PLUS_PRICE — цена подписки «Плюс» в монетах за 30 дней.
 	PlusPrice int64
 
@@ -238,6 +241,12 @@ func Load() (Config, error) {
 		return c, errors.New("TILE_URL must be an http(s) URL template with {z}, {x} and {y}")
 	}
 	c.TileAttribution = getenv("TILE_ATTRIBUTION", "© участники OpenStreetMap")
+	c.CaptchaSiteKey = strings.TrimSpace(os.Getenv("CAPTCHA_SITE_KEY"))
+	c.CaptchaSecret = strings.TrimSpace(os.Getenv("CAPTCHA_SECRET"))
+	c.CaptchaURL = getenv("CAPTCHA_URL", "https://smartcaptcha.cloud.yandex.ru/validate")
+	if (c.CaptchaSiteKey == "") != (c.CaptchaSecret == "") {
+		return c, errors.New("set both CAPTCHA_SITE_KEY and CAPTCHA_SECRET, or neither")
+	}
 	c.PlusPrice = 199
 	if v := os.Getenv("PLUS_PRICE"); v != "" {
 		n, err := strconv.ParseInt(v, 10, 64)

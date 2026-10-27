@@ -527,3 +527,5 @@ img.emoji { vertical-align: -4px; object-fit: contain; display: inline-block; }
 .progress-bar { height: 100%; background: var(--malachite); border-radius: 999px; }
 .fundraisers { margin: 1rem 0; }
 .donations { margin-top: .5rem; }
+
+.captcha-box { min-height: 100px; margin: .5rem 0; }

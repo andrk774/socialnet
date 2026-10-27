@@ -1,13 +1,17 @@
 import { h } from "../vendor/preact/index.js";
-import { useState } from "../vendor/preact/hooks.js";
+import { useEffect, useRef, useState } from "../vendor/preact/hooks.js";
 import { login, register, verify2FA } from "./api.js";
 import { ConsentChecks, noConsents } from "./legal.js";
+import { Captcha, captchaSiteKey, tokenFrom } from "./captcha.js";
 import { ErrorLine } from "./ui.js";
 export function AuthPage() {
     const [mode, setMode] = useState("login");
     const [mfa, setMfa] = useState(null);
     const [f, setF] = useState({ email: "", password: "", username: "", first_name: "", last_name: "", code: "" });
     const [consents, setConsents] = useState(noConsents);
+    const [siteKey, setSiteKey] = useState("");
+    const captchaBox = useRef(null);
+    useEffect(() => { captchaSiteKey().then(setSiteKey); }, []);
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(false);
     const field = (k) => ({ value: f[k], onInput: (e) => setF({ ...f, [k]: e.target.value }) });
@@ -24,7 +28,7 @@ export function AuthPage() {
                     setMfa(r.mfa_token);
             }
             else
-                await register({ email: f.email, password: f.password, username: f.username, first_name: f.first_name, last_name: f.last_name, ...consents });
+                await register({ email: f.email, password: f.password, username: f.username, first_name: f.first_name, last_name: f.last_name, ...consents, captcha_token: tokenFrom(captchaBox.current) });
         }
         catch (err) {
             setError(err);
@@ -58,12 +62,15 @@ export function AuthPage() {
                 h("label", null,
                     "\u041F\u0430\u0440\u043E\u043B\u044C",
                     h("input", { ...field("password"), type: "password", autoComplete: mode === "login" ? "current-password" : "new-password", minLength: 8, maxLength: 128, required: true })),
-                mode === "register" && h(ConsentChecks, { value: consents, onChange: setConsents }))),
+                mode === "register" && h(ConsentChecks, { value: consents, onChange: setConsents }),
+                mode === "register" && h(Captcha, { siteKey: siteKey, box: captchaBox }))),
             h(ErrorLine, { error: error }),
             h("button", { class: "primary wide", disabled: busy }, mfa ? "Подтвердить" : mode === "login" ? "Войти" : "Создать аккаунт")),
         !mfa && (h("p", { class: "auth-switch" },
             mode === "login" ? "Ещё нет аккаунта? " : "Уже есть аккаунт? ",
             h("button", { class: "link", onClick: () => { setMode(mode === "login" ? "register" : "login"); setError(null); } }, mode === "login" ? "Зарегистрироваться" : "Войти"))),
+        mode === "login" && !mfa && h("p", { class: "auth-switch" },
+            h("a", { href: "/forgot-password" }, "\u0417\u0430\u0431\u044B\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C?")),
         h("p", { class: "legal-links muted" },
             h("a", { href: "/legal/terms" }, "\u0421\u043E\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435"),
             " \u00B7 ",
