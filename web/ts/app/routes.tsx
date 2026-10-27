@@ -4,7 +4,8 @@
 import { h } from "../vendor/preact/index.js";
 import { useEffect, useLayoutEffect, useRef, useState } from "../vendor/preact/hooks.js";
 import * as L from "../vendor/leaflet/leaflet-src.esm.js";
-import { get, Route, saveFile } from "./api.js";
+import { del, get, Mark, MarkKind, post, Route, saveFile, upload } from "./api.js";
+import { useMe } from "./session.js";
 import { isSaved, offlineSupported, removeOffline, saveOffline } from "./offline.js";
 import { ErrorLine, Loading } from "./ui.js";
 
@@ -89,7 +90,7 @@ export function RouteCard({ route }: { route: Route }) {
       <dl class="route-stats">
         {stats.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
       </dl>
-      {map && <RouteMap route={route} />}
+      {map && <MapPanel route={route} />}
       <div class="route-graphics">
         <TrackSketch points={route.preview} />
         {route.profile.length > 1 && <ElevationProfile profile={route.profile} />}
@@ -104,7 +105,11 @@ export function RouteCard({ route }: { route: Route }) {
 // в ленте у записи лишь упрощённая схема.
 // printMode — для листа маршрута: без кнопок, без перетаскивания, точки
 // подписаны номерами из таблицы.
-export function RouteMap({ route, printMode = false }: { route: Route; printMode?: boolean }) {
+export const markKinds: Record<MarkKind, string> = { spring: "Родник", camp: "Стоянка", ford: "Брод", danger: "Опасно", view: "Вид", other: "Другое" };
+
+export function RouteMap({ route, printMode = false, onPick, picked }: {
+  route: Route; printMode?: boolean; onPick?: (lat: number, lon: number) => void; picked?: [number, number] | null;
+}) {
   const box = useRef<HTMLDivElement>(null);
   const [full, setFull] = useState(false);
   const [detail, setDetail] = useState<Route | null>(route.detail ? route : null);
@@ -112,8 +117,12 @@ export function RouteMap({ route, printMode = false }: { route: Route; printMode
   const mapRef = useRef<L.LeafletMap | null>(null);
 
   useEffect(() => {
-    if (!detail) get<Route>(`/routes/${route.id}`).then(setDetail, setError);
-  }, [route.id]);
+    if (route.detail) setDetail(route);
+    else get<Route>(`/routes/${route.id}`).then(setDetail, setError);
+  }, [route]);
+  const pickRef = useRef(onPick);
+  pickRef.current = onPick;
+  const pickLayer = useRef<L.LayerGroup | null>(null);
 
   useEffect(() => {
     if (!detail || !box.current) return;
@@ -135,6 +144,14 @@ export function RouteMap({ route, printMode = false }: { route: Route; printMode
         if (printMode) p.bindTooltip(label(String(i + 1)), { direction: "top", permanent: true });
         else if (wp.name) p.bindTooltip(label(wp.name), { direction: "top" });
       });
+      const offset = detail.waypoints?.length ?? 0;
+      (detail.marks ?? []).forEach((mk, i) => {
+        const p = L.circleMarker([mk.lat, mk.lon], { className: `map-mark mark-${mk.kind}`, radius: 7, weight: 2, fillOpacity: 1 }).addTo(m!);
+        if (printMode) p.bindTooltip(label(String(offset + i + 1)), { direction: "top", permanent: true });
+        else p.bindTooltip(label(`${markKinds[mk.kind]}: ${mk.title}`), { direction: "top" });
+      });
+      pickLayer.current = L.layerGroup().addTo(m);
+      m.on("click", (ev) => pickRef.current?.(ev.latlng.lat, ev.latlng.lng));
       const first = segs[0][0], lastSeg = segs[segs.length - 1], last = lastSeg[lastSeg.length - 1];
       if (first) L.circleMarker(first, { className: "map-start", radius: 7, weight: 3, fillOpacity: 1 }).addTo(m).bindTooltip(label("Старт"));
       if (last) L.circleMarker(last, { className: "map-finish", radius: 7, weight: 3, fillOpacity: 1 }).addTo(m).bindTooltip(label("Финиш"));
@@ -142,8 +159,16 @@ export function RouteMap({ route, printMode = false }: { route: Route; printMode
       m.fitBounds([[s, w], [n, e]], { padding: [24, 24], maxZoom: 15 });
       mapRef.current = m;
     }, setError);
-    return () => { alive = false; m?.remove(); mapRef.current = null; };
+    return () => { alive = false; m?.remove(); mapRef.current = null; pickLayer.current = null; };
   }, [detail]);
+
+  // точка, выбранная щелчком для новой отметки
+  useEffect(() => {
+    const g = pickLayer.current;
+    if (!g) return;
+    g.clearLayers();
+    if (picked) L.circleMarker(picked, { className: "map-picked", radius: 8, weight: 3, fillOpacity: .4 }).addTo(g);
+  }, [picked, detail]);
 
   // сразу после отрисовки, а не в следующем кадре: Esc работает с первого мгновения
   useLayoutEffect(() => {
@@ -230,4 +255,93 @@ function niceStep(raw: number): number {
   const p = Math.pow(10, Math.floor(Math.log10(raw)));
   const n = raw / p;
   return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p;
+}
+
+// MapPanel — карта и точки от ходивших (родники, стоянки, броды…).
+function MapPanel({ route }: { route: Route }) {
+  const [detail, setDetail] = useState<Route | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [adding, setAdding] = useState(false);
+  const [picked, setPicked] = useState<[number, number] | null>(null);
+  const load = () => get<Route>(`/routes/${route.id}`).then(setDetail, setError);
+  useEffect(() => { load(); }, [route.id]);
+  if (error) return <ErrorLine error={error} />;
+  if (!detail) return <Loading />;
+  return (
+    <div class="map-panel">
+      <RouteMap route={detail} onPick={adding ? (lat, lon) => setPicked([lat, lon]) : undefined} picked={adding ? picked : null} />
+      <Marks route={detail} onChange={load} />
+      {!adding ? <button class="ghost" onClick={() => { setAdding(true); setPicked(null); }}>Отметить точку</button>
+        : <AddMark route={detail} picked={picked} onDone={(ok) => { setAdding(false); setPicked(null); if (ok) load(); }} />}
+    </div>
+  );
+}
+
+const dayFmt = new Intl.DateTimeFormat("ru", { day: "numeric", month: "long", year: "numeric" });
+
+function Marks({ route, onChange }: { route: Route; onChange: () => void }) {
+  const me = useMe()?.id;
+  const [error, setError] = useState<unknown>(null);
+  const marks = route.marks ?? [];
+  if (marks.length === 0) return null;
+  const run = (fn: () => Promise<unknown>) => { setError(null); fn().then(onChange, setError); };
+  return (
+    <section class="marks">
+      <h3>Точки на маршруте</h3>
+      <ul>
+        {marks.map((mk) => (
+          <li key={mk.id} class={`mark mark-${mk.kind}`}>
+            {mk.thumb_url && <a href={mk.photo_url!} target="_blank" rel="noopener"><img src={mk.thumb_url} alt="" width={64} height={64} loading="lazy" /></a>}
+            <div class="grow">
+              <span class="mark-kind">{markKinds[mk.kind]}</span> <strong>{mk.title}</strong>
+              {mk.note && <p>{mk.note}</p>}
+              <p class="muted">Проверено {dayFmt.format(new Date(mk.verified_on + "T12:00:00"))}{mk.checks > 0 ? ` · подтвердили: ${mk.checks}` : ""} · отметил(а) <a href={`/u/${mk.author.username}`}>{mk.author.first_name || mk.author.username}</a></p>
+              <div class="row tight">
+                <button class="link" disabled={mk.my_check && mk.verified_on === new Date().toISOString().slice(0, 10)} onClick={() => run(() => post(`/routes/${route.id}/marks/${mk.id}/check`))}>{mk.my_check ? "Снова на месте" : "На месте"}</button>
+                {(mk.author.id === me || route.owner_id === me) && <button class="link" onClick={() => run(() => del(`/routes/${route.id}/marks/${mk.id}`))}>Удалить</button>}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <ErrorLine error={error} />
+    </section>
+  );
+}
+
+function AddMark({ route, picked, onDone }: { route: Route; picked: [number, number] | null; onDone: (ok: boolean) => void }) {
+  const [f, setF] = useState({ kind: "spring" as MarkKind, title: "", note: "" });
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  async function submit(e: Event) {
+    e.preventDefault();
+    if (!picked) return;
+    setBusy(true); setError(null);
+    try {
+      const photo = file ? await upload<{ id: string }>("/media", file) : null;
+      await post<Mark>(`/routes/${route.id}/marks`, { ...f, lat: picked[0], lon: picked[1], photo_id: photo?.id ?? null });
+      onDone(true);
+    } catch (err) { setError(err); } finally { setBusy(false); }
+  }
+  return (
+    <form class="stack add-mark" onSubmit={submit}>
+      <p class="hint">{picked ? `Место: ${picked[0].toFixed(5)}, ${picked[1].toFixed(5)}` : "Щёлкните по карте рядом с треком, где находится точка"}</p>
+      <div class="row-2">
+        <label>Что это
+          <select value={f.kind} onChange={(e) => setF({ ...f, kind: (e.target as HTMLSelectElement).value as MarkKind })}>
+            {(Object.keys(markKinds) as MarkKind[]).map((k) => <option key={k} value={k}>{markKinds[k]}</option>)}
+          </select>
+        </label>
+        <label>Название<input value={f.title} required maxLength={80} onInput={(e) => setF({ ...f, title: (e.target as HTMLInputElement).value })} placeholder="Родник у тропы" /></label>
+      </div>
+      <label>Заметка<textarea rows={2} maxLength={1000} value={f.note} onInput={(e) => setF({ ...f, note: (e.target as HTMLTextAreaElement).value })} placeholder="Течёт ли в августе, где лучше ставить палатки" /></label>
+      <label>Фото<input type="file" accept="image/jpeg,image/png" onChange={(e) => setFile((e.target as HTMLInputElement).files?.[0] ?? null)} /></label>
+      <ErrorLine error={error} />
+      <div class="row">
+        <button class="primary" disabled={!picked || busy}>Сохранить точку</button>
+        <button type="button" class="ghost" onClick={() => onDone(false)}>Отмена</button>
+      </div>
+    </form>
+  );
 }

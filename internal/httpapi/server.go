@@ -293,6 +293,9 @@ func (s *Server) Router() http.Handler {
 				r.Patch("/routes/{rid}", s.handleRenameRoute)
 				r.Delete("/routes/{rid}", s.handleDeleteRoute)
 				r.Get("/routes/{rid}/gpx", s.handleRouteGPX)
+				r.Post("/routes/{rid}/marks", s.handleAddMark)
+				r.Post("/routes/{rid}/marks/{pid}/check", s.handleCheckMark)
+				r.Delete("/routes/{rid}/marks/{pid}", s.handleDeleteMark)
 
 				// уведомления
 				r.Get("/notifications", s.handleNotifications)

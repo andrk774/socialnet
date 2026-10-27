@@ -43,6 +43,7 @@ type Route struct {
 	Profile     []ProfilePoint  `json:"profile"`
 	Detail      [][]LatLon      `json:"detail,omitempty"`
 	Waypoints   []RouteWaypoint `json:"waypoints,omitempty"`
+	Marks       []RoutePoint    `json:"marks,omitempty"` // точки от ходивших: родники, стоянки…
 	GPXURL      string          `json:"gpx_url"`
 	CreatedAt   time.Time       `json:"created_at"`
 	seq         int64

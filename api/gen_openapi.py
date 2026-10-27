@@ -58,7 +58,11 @@ schemas = {
                  min_ele=nullable(num), max_ele=nullable(num), duration_sec=int_, moving_sec=int_, points=int_,
                  hidden_ends_m=enum_int(0, 200, 500, 1000), bbox=arr(num), preview=arr(arr(num)),
                  profile=arr(obj(d=num, e=num)), gpx_url=str_, created_at=dt,
-                 **{"detail?": arr(arr(arr(num))), "waypoints?": arr(obj(lat=num, lon=num, name=str_, **{"ele?": num}))}),
+                 **{"detail?": arr(arr(arr(num))), "waypoints?": arr(obj(lat=num, lon=num, name=str_, **{"ele?": num})),
+                    "marks?": arr(S("RouteMark"))}),
+    "RouteMark": obj(id=int_, route_id=uuid, author=S("UserCard"), kind=enum("spring", "camp", "ford", "danger", "view", "other"),
+                     lat=num, lon=num, title=str_, note=str_, photo_url=nullable(str_), thumb_url=nullable(str_),
+                     verified_on={"type": "string", "format": "date"}, checks=int_, my_check=bool_, created_at=dt),
     "Poll": obj(id=int_, question=str_, multiple=bool_, anonymous=bool_, closes_at=nullable(dt), closed=bool_,
                 voters_count=int_, results_hidden=bool_, my_votes=arr(int_),
                 options=arr(obj(id=int_, text=str_, votes=nullable(int_)))),
@@ -223,6 +227,11 @@ r("GET", A + "/routes/{rid}", "routes", "Маршрут с подробной г
 r("PATCH", A + "/routes/{rid}", "routes", "Переименовать", obj(title=str_), S("Route"))
 r("DELETE", A + "/routes/{rid}", "routes", "Удалить (пропадёт из записей)", code=204)
 r("GET", A + "/routes/{rid}/gpx", "routes", "Скачать очищенный GPX", resp="binary")
+r("POST", A + "/routes/{rid}/marks", "routes", "Отметить точку: родник, стоянка, брод, опасность, вид (не дальше 2 км от трека; фото — своё)",
+  obj(kind=enum("spring", "camp", "ford", "danger", "view", "other"), lat=num, lon=num, title=str_,
+      **{"note?": str_, "photo_id?": nullable(uuid)}), S("RouteMark"), 201)
+r("POST", A + "/routes/{rid}/marks/{pid}/check", "routes", "«На месте»: дата проверки — сегодня", resp=S("RouteMark"))
+r("DELETE", A + "/routes/{rid}/marks/{pid}", "routes", "Удалить (автор точки или владелец маршрута)", code=204)
 # --- закладки ---
 bookmark = obj(id=int_, kind=enum("post", "video", "track"), created_at=dt,
                **{"post?": S("Post"), "video?": S("Video"), "track?": S("Track")})
@@ -268,7 +277,7 @@ r("POST", A + "/media", "media", "Загрузить фото (JPEG/PNG/GIF до
 r("DELETE", A + "/media/{id}", "media", "Удалить фото", code=204)
 r("GET", "/media/{id}/{size}", "media", "Файл фото: size = full | thumb", auth=False, resp="binary")
 # --- безопасность / модерация ---
-r("POST", A + "/reports", "moderation", "Пожаловаться", obj(target_type=enum("post", "comment", "user", "community", "track", "video", "document", "route", "companion"), **{"target_id?": int_, "target_uuid?": uuid}, reason=str_), obj(id=int_, status=str_), 201)
+r("POST", A + "/reports", "moderation", "Пожаловаться", obj(target_type=enum("post", "comment", "user", "community", "track", "video", "document", "route", "companion", "route_point"), **{"target_id?": int_, "target_uuid?": uuid}, reason=str_), obj(id=int_, status=str_), 201)
 r("GET", A + "/mod/reports", "moderation", "Очередь жалоб (модератор)", resp=lst(S("Report")))
 r("POST", A + "/mod/reports/{id}/resolve", "moderation", "Решение по жалобе", obj(action=enum("dismiss", "hide", "ban"), **{"note?": str_}), code=204)
 r("POST", A + "/mod/users/{id}/ban", "moderation", "Забанить", obj(**{"reason?": str_}), code=204)

@@ -4,7 +4,7 @@
 import { Fragment, h } from "../vendor/preact/index.js";
 import { get, Route } from "./api.js";
 import { HikeEvent, difficulties } from "./hikes.js";
-import { ElevationProfile, hours, km, RouteMap } from "./routes.js";
+import { ElevationProfile, hours, km, markKinds, RouteMap } from "./routes.js";
 import { ErrorLine, Loading, useLoad } from "./ui.js";
 
 const dateFmt = new Intl.DateTimeFormat("ru", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -76,6 +76,10 @@ export function PrintPage({ routeId, eventId }: { routeId?: string; eventId?: nu
             {(r.waypoints ?? []).map((w, i) => (
               <tr key={i}><td>{i + 1}</td><td>{w.name || "—"}</td><td>{coords(w.lat, w.lon)}<br /><span class="muted">{w.lat.toFixed(5)}, {w.lon.toFixed(5)}</span></td>
                 <td>{w.ele !== undefined && w.ele !== null ? `${nf0.format(w.ele)} м` : "—"}</td><td>{km(alongTrack(segs, [w.lat, w.lon]))}</td></tr>
+            ))}
+            {(r.marks ?? []).map((mk, i) => (
+              <tr key={"m" + mk.id}><td>{(r.waypoints?.length ?? 0) + i + 1}</td><td><strong>{markKinds[mk.kind]}:</strong> {mk.title}{mk.note && <><br /><span class="muted">{mk.note}</span></>}<br /><span class="muted">проверено {mk.verified_on}</span></td>
+                <td>{coords(mk.lat, mk.lon)}<br /><span class="muted">{mk.lat.toFixed(5)}, {mk.lon.toFixed(5)}</span></td><td>—</td><td>{km(alongTrack(segs, [mk.lat, mk.lon]))}</td></tr>
             ))}
             {finish && <tr><td>Ф</td><td>Финиш</td><td>{coords(finish[0], finish[1])}</td><td>—</td><td>{km(r.distance_m)}</td></tr>}
           </tbody>
