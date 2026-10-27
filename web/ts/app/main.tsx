@@ -9,6 +9,7 @@ import { EventPage, HikeForm, HikesPage } from "./hikes.js";
 import { CompanionsPage } from "./companions.js";
 import { ConsentGate } from "./legal.js";
 import { PrintPage } from "./print.js";
+import { OfflinePage } from "./offlinepage.js";
 import { AdminPage } from "./admin.js";
 import { BookmarksPage, DocumentsPage, ScheduledPage } from "./library.js";
 import { on, startRealtime, stopRealtime } from "./realtime.js";
@@ -33,6 +34,7 @@ function routes(path: string, onRead: () => void, myId: number): ComponentChildr
   if ((p = match("/events/:id", path))) return <EventPage id={+p.id} />;
   if ((p = match("/events/:id/print", path))) return <PrintPage eventId={+p.id} />;
   if ((p = match("/routes/:id/print", path))) return <PrintPage routeId={p.id} />;
+  if (match("/offline", path)) return <OfflinePage />;
   if ((p = match("/c/:slug", path))) return <CommunityPage slug={p.slug} />;
   if (match("/music", path)) return <MusicPage userId={myId} />;
   if (match("/wallet", path)) return <WalletPage />;
@@ -49,7 +51,7 @@ function routes(path: string, onRead: () => void, myId: number): ComponentChildr
 const nav: [string, string][] = [
   ["/", "Лента"], ["/hikes", "Походы"], ["/companions", "Попутчики"], ["/im", "Сообщения"], ["/notifications", "Уведомления"],
   ["/communities", "Сообщества"], ["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"],
-  ["/scheduled", "Отложенные"], ["/wallet", "Кошелёк"], ["/settings", "Безопасность"],
+  ["/scheduled", "Отложенные"], ["/offline", "Офлайн"], ["/wallet", "Кошелёк"], ["/settings", "Безопасность"],
 ];
 
 function Shell() {
@@ -124,7 +126,13 @@ function App() {
     return () => { off(); };
   }, []);
   if (state === "loading") return <Loading />;
+  // без сети войти нельзя, но сохранённые маршруты доступны
+  if (state === "out" && (!navigator.onLine || location.pathname === "/offline")) return <main class="content offline-only"><OfflinePage /><p><a href="/">Войти</a></p></main>;
   return state === "in" ? <Shell /> : <AuthPage />;
 }
 
 render(<App />, document.getElementById("app")!);
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("service worker", e));
+}

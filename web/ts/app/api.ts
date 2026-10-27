@@ -137,7 +137,11 @@ export async function register(fields: { email: string; username: string; passwo
 }
 
 export async function logout() {
-  try { await api("POST", "/auth/logout"); } finally { setToken(null); }
+  try { await api("POST", "/auth/logout"); } finally {
+    setToken(null);
+    // маршруты, сохранённые для офлайна, не остаются на чужом устройстве
+    if (typeof caches !== "undefined") { await caches.delete("sn-offline-routes").catch(() => false); await caches.delete("sn-offline-tiles").catch(() => false); }
+  }
 }
 
 export async function upload<T>(path: string, file: File, fields: Record<string, string> = {}): Promise<T> {

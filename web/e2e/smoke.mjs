@@ -180,6 +180,23 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await anna.page.locator(".leaflet-tooltip", { hasText: "Родник" }).waitFor();
   assert.equal(await anna.page.locator(".leaflet-tooltip img").count(), 0, "waypoint name rendered as text");
   await anna.page.screenshot({ path: `${shots}/13-map.png`, fullPage: true });
+  // офлайн: маршрут с тайлами сохраняется на устройстве и открывается без сети
+  await anna.page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
+  await card.getByRole("button", { name: "Сохранить офлайн" }).click();
+  await card.getByRole("button", { name: "Сохранён офлайн ✓" }).waitFor({ timeout: 60000 });
+  {
+    const off = await anna.ctx.newPage();
+    await off.goto(base + "/offline");
+    await off.getByText("Двуглавая сопка").first().waitFor();
+    await anna.ctx.setOffline(true);
+    await off.reload();
+    await off.getByText("Нет связи").waitFor();
+    await off.getByRole("button", { name: "Открыть" }).first().click();
+    await off.locator("img.leaflet-tile-loaded").first().waitFor();
+    await off.screenshot({ path: `${shots}/17-offline.png`, fullPage: true });
+    await anna.ctx.setOffline(false);
+    await off.close();
+  }
   await card.getByRole("button", { name: "Во весь экран" }).click();
   await anna.page.locator(".route-map-full").waitFor();
   await anna.page.waitForFunction(() => document.body.classList.contains("no-scroll"));

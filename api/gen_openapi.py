@@ -142,6 +142,8 @@ SCOPES = {"profile": "Профиль, друзья, поиск", "friends": "З�
 # --- служебные ---
 r("GET", "/health", "service", "Проверка живости", resp=obj(status=str_), auth=False)
 r("GET", "/.well-known/security.txt", "service", "security.txt (RFC 9116)", auth=False, resp="text")
+r("GET", "/sw.js", "service", "Сервис-воркер (офлайн-режим приложения)", auth=False, resp="text")
+r("GET", "/manifest.webmanifest", "service", "Манифест веб-приложения", auth=False, resp="json")
 r("GET", A + "/openapi.json", "service", "Эта спецификация", auth=False, resp="json")
 legal_doc = obj(key=enum("terms", "privacy", "consent"), title=str_, version=str_, url=str_)
 r("GET", A + "/legal", "service", "Юридические документы и текущая редакция", auth=False, resp=obj(revision=int_, documents=arr(legal_doc)))

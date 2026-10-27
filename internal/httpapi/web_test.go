@@ -48,6 +48,20 @@ func TestFrontendServing(t *testing.T) {
 	if resp, _ := http.DefaultClient.Do(req); resp.StatusCode != 304 {
 		t.Fatalf("etag revalidation: %d", resp.StatusCode)
 	}
+	// сервис-воркер с корня: список файлов оболочки подставлен, версия есть
+	resp, err := http.Get(ts.URL + "/sw.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sw, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 || !strings.Contains(string(sw), `"/static/app/main.js"`) || strings.Contains(string(sw), "__ASSETS__") ||
+		strings.Contains(string(sw), "__VERSION__") || strings.Contains(string(sw), "index.html") || resp.Header.Get("Cache-Control") != "no-cache" {
+		t.Fatalf("sw.js: %d %v %.300s", resp.StatusCode, resp.Header, sw)
+	}
+	if resp, _ := http.Get(ts.URL + "/manifest.webmanifest"); resp.StatusCode != 200 || resp.Header.Get("Content-Type") != "application/manifest+json" {
+		t.Fatalf("manifest: %d %v", resp.StatusCode, resp.Header)
+	}
 	// API не превращается в index.html, исходники и типы не отдаются
 	for path, want := range map[string]int{"/api/v1/nope": 404, "/static/../go.mod": 404, "/static/vendor/preact/index.d.ts": 404, "/static/nope.js": 404} {
 		resp, _ := http.Get(ts.URL + path)

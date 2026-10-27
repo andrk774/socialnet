@@ -423,3 +423,8 @@ body.legal-page { background: var(--surface, #fff); }
   .leaflet-control-container .leaflet-control-zoom { display: none; }
   a { color: inherit; text-decoration: none; }
 }
+
+/* ---------- офлайн ---------- */
+.offline-only { max-width: 48rem; margin: 0 auto; padding: 1rem; }
+.offline .route-profile { max-width: 36rem; }
+.offline .plain-list li { display: flex; flex-wrap: wrap; gap: .25rem .5rem; }

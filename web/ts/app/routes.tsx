@@ -5,13 +5,26 @@ import { h } from "../vendor/preact/index.js";
 import { useEffect, useLayoutEffect, useRef, useState } from "../vendor/preact/hooks.js";
 import * as L from "../vendor/leaflet/leaflet-src.esm.js";
 import { get, Route, saveFile } from "./api.js";
+import { isSaved, offlineSupported, removeOffline, saveOffline } from "./offline.js";
 import { ErrorLine, Loading } from "./ui.js";
 
 interface MapConfig { enabled: boolean; tiles: string; attribution: string; max_zoom: number }
 let mapConfig: Promise<MapConfig> | null = null;
+const CONFIG_KEY = "/offline/client-config.json";
+
+// loadMapConfig: настройки карты с сервера; без сети — сохранённые вместе с
+// офлайн-маршрутами (иначе карта без связи не построится).
 export function loadMapConfig(): Promise<MapConfig> {
-  mapConfig ??= get<{ map: MapConfig }>("/client-config").then((c) => c.map).catch((e) => {
+  mapConfig ??= get<{ map: MapConfig }>("/client-config").then((c) => {
+    if (typeof caches !== "undefined") {
+      caches.open("sn-offline-routes").then((cache) => cache.match(CONFIG_KEY).then((hit) =>
+        hit ? cache.put(CONFIG_KEY, new Response(JSON.stringify(c.map))) : undefined)).catch(() => {});
+    }
+    return c.map;
+  }).catch(async (e) => {
     mapConfig = null; // в следующий раз спросим снова
+    const hit = typeof caches !== "undefined" ? await caches.open("sn-offline-routes").then((c) => c.match(CONFIG_KEY)) : undefined;
+    if (hit) return (await hit.json()) as MapConfig;
     throw e;
   });
   return mapConfig;
@@ -39,7 +52,20 @@ export function RouteCard({ route }: { route: Route }) {
   const [error, setError] = useState<unknown>(null);
   const [map, setMap] = useState(false);
   const [canMap, setCanMap] = useState(false);
-  useEffect(() => { loadMapConfig().then((c) => setCanMap(c.enabled), () => setCanMap(false)); }, []);
+  const [maxZoom, setMaxZoom] = useState(15);
+  const [offline, setOffline] = useState<"no" | "yes" | string>("no"); // строка — ход загрузки
+  useEffect(() => {
+    loadMapConfig().then((c) => { setCanMap(c.enabled); setMaxZoom(c.max_zoom); }, () => setCanMap(false));
+    if (offlineSupported()) isSaved(route.id).then((ok) => setOffline(ok ? "yes" : "no"), () => {});
+  }, []);
+  const toggleOffline = async () => {
+    setError(null);
+    try {
+      if (offline === "yes") { await removeOffline(route.id); setOffline("no"); return; }
+      await saveOffline(route.id, maxZoom, (d, t) => setOffline(t ? `${Math.round((d / t) * 100)}%` : "…"));
+      setOffline("yes");
+    } catch (e) { setError(e); setOffline("no"); }
+  };
   const stats: [string, string][] = [["Расстояние", km(route.distance_m)]];
   if (route.max_ele !== null) {
     stats.push(["Набор", `↑ ${nf0.format(route.gain_m)} м`], ["Сброс", `↓ ${nf0.format(route.loss_m)} м`]);
@@ -54,6 +80,8 @@ export function RouteCard({ route }: { route: Route }) {
         <strong class="route-title">{route.title}</strong>
         <span class="route-actions">
           {canMap && <button class="link" aria-expanded={map} onClick={() => setMap(!map)}>{map ? "Скрыть карту" : "Показать на карте"}</button>}
+          {offlineSupported() && <button class="link" disabled={offline !== "no" && offline !== "yes"} onClick={toggleOffline}>
+            {offline === "yes" ? "Сохранён офлайн ✓" : offline === "no" ? "Сохранить офлайн" : `Сохраняю… ${offline}`}</button>}
           <a class="link" href={`/routes/${route.id}/print`}>Печать</a>
           <button class="link" onClick={() => saveFile(route.gpx_url, `${route.title}.gpx`).catch(setError)}>Скачать GPX</button>
         </span>
