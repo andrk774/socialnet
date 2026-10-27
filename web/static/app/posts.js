@@ -4,6 +4,7 @@ import { api, del, fileSize, fullName, get, patch, post, put, saveFile, upload }
 import { me } from "./session.js";
 import { RouteCard, km } from "./routes.js";
 import { Avatar, Empty, ErrorLine, Loading, RichText, Time, UserLink, duration, useLoad } from "./ui.js";
+import { ReportButton } from "./report.js";
 const reactions = [
     ["like", "👍", "Нравится"], ["love", "❤️", "Люблю"], ["haha", "😄", "Смешно"],
     ["wow", "😮", "Ого"], ["sad", "😢", "Грустно"], ["angry", "😠", "Возмутительно"],
@@ -357,7 +358,8 @@ export function PostView({ initial, onDelete }) {
                 "\u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438",
                 p.comments_count > 0 ? ` ${p.comments_count}` : ""),
             h("button", { class: p.bookmarked ? "chip active" : "chip", "aria-pressed": p.bookmarked, onClick: bookmark }, p.bookmarked ? "В закладках" : "В закладки"),
-            mine && !p.community && (h("select", { class: "chip-select", "aria-label": "\u041A\u0442\u043E \u0432\u0438\u0434\u0438\u0442 \u0437\u0430\u043F\u0438\u0441\u044C", value: p.audience, onChange: (e) => { const el = e.target; changeAudience(el.value, el); } }, Object.keys(audienceLabel).filter((a) => a !== "list" || p.audience === "list").map((a) => h("option", { key: a, value: a }, audienceLabel[a]))))),
+            mine && !p.community && (h("select", { class: "chip-select", "aria-label": "\u041A\u0442\u043E \u0432\u0438\u0434\u0438\u0442 \u0437\u0430\u043F\u0438\u0441\u044C", value: p.audience, onChange: (e) => { const el = e.target; changeAudience(el.value, el); } }, Object.keys(audienceLabel).filter((a) => a !== "list" || p.audience === "list").map((a) => h("option", { key: a, value: a }, audienceLabel[a])))),
+            !mine && h(ReportButton, { target: { type: "post", id: p.id }, cls: "chip" })),
         h(ErrorLine, { error: error }),
         open && h(Comments, { post: p, onCount: (n) => setP({ ...p, comments_count: n }) })));
 }

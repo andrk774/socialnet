@@ -120,6 +120,20 @@ type Report struct {
 	HandledBy  *int64     `json:"handled_by,omitempty"`
 	CreatedAt  time.Time  `json:"created_at"`
 	HandledAt  *time.Time `json:"handled_at,omitempty"`
+	// Target — что именно обжаловано, чтобы модератор решал, не открывая
+	// объект отдельно; nil — объект удалён.
+	Target *ReportTarget `json:"target,omitempty"`
+}
+
+// ReportTarget — краткое содержимое объекта жалобы. Ref — куда вести
+// ссылку: пост комментария, маршрут точки, адрес сообщества.
+type ReportTarget struct {
+	Title    string `json:"title"`
+	Snippet  string `json:"snippet"`
+	AuthorID int64  `json:"author_id"`
+	Author   string `json:"author"` // username
+	Hidden   bool   `json:"hidden"`
+	Ref      string `json:"ref,omitempty"`
 }
 
 func (s *Store) Report(ctx context.Context, id int64) (*Report, error) {
@@ -140,8 +154,11 @@ func (s *Store) Reports(ctx context.Context, status string, after int64, limit i
 func (s *Store) reports(ctx context.Context, where string, arg any, after int64, limit int) ([]Report, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT r.id, u.id, u.username, u.first_name, u.last_name, u.avatar_media_id::text,
-		       r.target_type, r.target_id, r.target_uuid::text, r.reason, r.status, r.handled_by, r.created_at, r.handled_at
+		       r.target_type, r.target_id, r.target_uuid::text, r.reason, r.status, r.handled_by, r.created_at, r.handled_at,
+		       t.title, t.snippet, t.author_id, t.hidden, t.ref, au.username
 		FROM reports r JOIN users u ON u.id = r.reporter_id
+		LEFT JOIN LATERAL (`+reportTargetSQL+`) t ON true
+		LEFT JOIN users au ON au.id = t.author_id
 		WHERE `+where+` AND r.id > $2 ORDER BY r.id LIMIT $3`, arg, after, limit)
 	if err != nil {
 		return nil, err
@@ -150,16 +167,62 @@ func (s *Store) reports(ctx context.Context, where string, arg any, after int64,
 	out := []Report{}
 	for rows.Next() {
 		var r Report
-		var avatar *string
+		var avatar, title, snippet, ref, authorName *string
+		var author *int64
+		var hidden *bool
 		if err := rows.Scan(&r.ID, &r.Reporter.ID, &r.Reporter.Username, &r.Reporter.FirstName, &r.Reporter.LastName,
-			&avatar, &r.TargetType, &r.TargetID, &r.TargetUUID, &r.Reason, &r.Status, &r.HandledBy, &r.CreatedAt, &r.HandledAt); err != nil {
+			&avatar, &r.TargetType, &r.TargetID, &r.TargetUUID, &r.Reason, &r.Status, &r.HandledBy, &r.CreatedAt, &r.HandledAt,
+			&title, &snippet, &author, &hidden, &ref, &authorName); err != nil {
 			return nil, err
+		}
+		if author != nil {
+			r.Target = &ReportTarget{Title: *title, Snippet: *snippet, AuthorID: *author, Author: *authorName, Hidden: *hidden}
+			if ref != nil {
+				r.Target.Ref = *ref
+			}
 		}
 		r.Reporter.AvatarURL = MediaURL(avatar, "thumb")
 		out = append(out, r)
 	}
 	return out, rows.Err()
 }
+
+// reportTargetSQL — по одной ветке на тип жалобы; срабатывает ровно та,
+// что совпала по target_type. Удалённые объекты (deleted_at) не находятся.
+const reportTargetSQL = `
+	SELECT ''::text AS title, left(p.text, 300) AS snippet, p.author_id, p.hidden_at IS NOT NULL AS hidden, NULL::text AS ref
+	  FROM posts p WHERE r.target_type = 'post' AND p.id = r.target_id AND p.deleted_at IS NULL
+	UNION ALL
+	SELECT '', left(c.text, 300), c.author_id, c.hidden_at IS NOT NULL, c.post_id::text
+	  FROM comments c WHERE r.target_type = 'comment' AND c.id = r.target_id AND c.deleted_at IS NULL
+	UNION ALL
+	SELECT cm.name, left(cm.description, 300), cm.owner_id, cm.hidden_at IS NOT NULL, cm.slug
+	  FROM communities cm WHERE r.target_type = 'community' AND cm.id = r.target_id
+	UNION ALL
+	SELECT x.username, trim(x.first_name || ' ' || x.last_name), x.id, x.banned_at IS NOT NULL, NULL
+	  FROM users x WHERE r.target_type = 'user' AND x.id = r.target_id
+	UNION ALL
+	SELECT a.title, a.region || ': ' || left(a.body, 300), a.author_id, a.hidden_at IS NOT NULL, NULL
+	  FROM companion_ads a WHERE r.target_type = 'companion' AND a.id = r.target_id
+	UNION ALL
+	SELECT ar.title, left(ar.body, 300), ar.author_id, ar.hidden_at IS NOT NULL, ar.id::text
+	  FROM articles ar WHERE r.target_type = 'article' AND ar.id = r.target_id
+	UNION ALL
+	SELECT rp.title, left(rp.note, 300), rp.author_id, rp.hidden_at IS NOT NULL, rp.route_id::text
+	  FROM route_points rp WHERE r.target_type = 'route_point' AND rp.id = r.target_id
+	UNION ALL
+	SELECT rt.title, left(rt.public_note, 300), rt.owner_id, rt.hidden_at IS NOT NULL, rt.id::text
+	  FROM routes rt WHERE r.target_type = 'route' AND rt.id = r.target_uuid AND rt.deleted_at IS NULL
+	UNION ALL
+	SELECT tr.title, tr.artist, tr.uploader_id, tr.removed_at IS NOT NULL, NULL
+	  FROM tracks tr WHERE r.target_type = 'track' AND tr.id = r.target_uuid
+	UNION ALL
+	SELECT v.title, left(v.description, 300), v.owner_id, v.status = 'removed', NULL
+	  FROM videos v WHERE r.target_type = 'video' AND v.id = r.target_uuid
+	UNION ALL
+	SELECT d.title || '.' || d.ext, '', d.owner_id, d.hidden_at IS NOT NULL, NULL
+	  FROM documents d WHERE r.target_type = 'document' AND d.id = r.target_uuid AND d.deleted_at IS NULL
+	LIMIT 1`
 
 // CloseReports закрывает все открытые жалобы на объект одним решением.
 func (s *Store) CloseReports(ctx context.Context, typ string, target int64, targetUUID *string, moderator int64, status string) error {

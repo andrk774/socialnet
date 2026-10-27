@@ -7,6 +7,7 @@ import { navigate } from "./router.js";
 import { RouteCard } from "./routes.js";
 import { useMe } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, UserLink, useLoad } from "./ui.js";
+import { ReportButton } from "./report.js";
 
 interface Span { t: "text" | "b" | "i" | "a"; text: string; href?: string }
 interface Block { kind: "h2" | "h3" | "p" | "ul" | "ol" | "quote" | "hr" | "img"; spans?: Span[]; items?: Span[][]; media_id?: string; caption?: string }
@@ -104,6 +105,7 @@ export function ArticlePage({ id }: { id: number }) {
       <ErrorLine error={error} />
       <ArticleBody blocks={art.blocks ?? []} />
       {route.data && <section><h2>Маршрут</h2><RouteCard route={route.data} /></section>}
+      {!mine && me && <p class="row"><ReportButton target={{ type: "article", id: art.id }} /></p>}
     </article>
   );
 }

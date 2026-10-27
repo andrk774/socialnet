@@ -4,6 +4,7 @@ import { UserCard, api, fullName, get, post } from "./api.js";
 import { PostList, Composer } from "./posts.js";
 import { navigate } from "./router.js";
 import { Avatar, ErrorLine, Loading, useLoad } from "./ui.js";
+import { ReportButton } from "./report.js";
 
 interface Profile extends UserCard {
   closed: boolean; plus?: boolean; status_text?: string; city?: string; about?: string;
@@ -46,6 +47,7 @@ export function ProfilePage({ username }: { username: string }) {
           <div class="profile-actions">
             <button class={rel === "none" || rel === "request_received" ? "primary" : "ghost"} onClick={friend}>{friendLabel[rel]}</button>
             {u.relationship.can_write && <button class="ghost" onClick={() => navigate(`/im/u/${u.id}`)}>Написать</button>}
+            <ReportButton target={{ type: "user", id: u.id }} cls="ghost" />
           </div>
         )}
       </header>

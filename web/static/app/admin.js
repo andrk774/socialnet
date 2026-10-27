@@ -234,7 +234,51 @@ function UserCardView({ id }) {
                     e.user_agent)),
             h(Time, { iso: e.created_at }))))))));
 }
-const targetLabel = { post: "Запись", comment: "Комментарий", user: "Пользователь", community: "Сообщество", track: "Трек", video: "Видео", document: "Документ" };
+const targetLabel = {
+    post: "Запись", comment: "Комментарий", user: "Пользователь", community: "Сообщество", track: "Трек", video: "Видео",
+    document: "Документ", companion: "Объявление о попутчиках", article: "Статья", route_point: "Точка на маршруте", route: "Маршрут",
+};
+// путь /mod/{type}/{id}/hide|unhide для каждого типа жалобы
+const modPath = {
+    post: "posts", comment: "comments", community: "communities", track: "tracks", video: "videos", document: "documents",
+    companion: "companions", article: "articles", route_point: "route-points", route: "routes",
+};
+// reportLink — куда смотреть объект целиком; null — отдельной страницы нет.
+export function reportLink(r) {
+    const ref = r.target?.ref;
+    switch (r.target_type) {
+        case "post": return `/p/${r.target_id}`;
+        case "comment": return ref ? `/p/${ref}` : null;
+        case "user": return `/admin?tab=users&user=${r.target_id}`;
+        case "community": return ref ? `/c/${encodeURIComponent(ref)}` : null;
+        case "article": return `/articles/${r.target_id}`;
+        case "companion": return "/companions";
+        case "route": return r.target_uuid ? `/trails/${r.target_uuid}` : null;
+        case "route_point": return ref ? `/trails/${ref}` : null;
+        default: return null;
+    }
+}
+function ReportCard({ r }) {
+    const label = targetLabel[r.target_type] ?? r.target_type;
+    const link = reportLink(r);
+    const t = r.target;
+    // маршруты — серверные страницы каталога, не SPA
+    const external = r.target_type === "route" || r.target_type === "route_point";
+    return (h("div", { class: "report-target" },
+        h("div", null,
+            link ? h("a", { href: link, target: external ? "_blank" : undefined, rel: external ? "noopener" : undefined }, label) : h("span", null, label),
+            " ",
+            h("span", { class: "muted" }, r.target_uuid ?? `#${r.target_id}`),
+            t?.hidden && h("span", { class: "badge" }, r.target_type === "user" ? "заблокирован" : "скрыто"),
+            !t && h("span", { class: "badge" }, "\u0443\u0434\u0430\u043B\u0435\u043D\u043E")),
+        t?.title && h("strong", null, t.title),
+        t?.snippet && h("p", { class: "report-snippet" }, t.snippet),
+        t && r.target_type !== "user" && h("span", { class: "muted" },
+            "\u0430\u0432\u0442\u043E\u0440: ",
+            h("a", { href: `/admin?tab=users&user=${t.author_id}` },
+                "@",
+                t.author))));
+}
 function ReportsTab() {
     const [status, setStatus] = useState("open");
     const list = useLoad(() => get(`/mod/reports?status=${status}&limit=50`), [status]);
@@ -245,18 +289,7 @@ function ReportsTab() {
             return;
         post(`/mod/reports/${r.id}/resolve`, { action, note }).then(list.reload, setError);
     };
-    const target = (r) => r.target_type === "post" ? h("a", { href: `/p/${r.target_id}` },
-        targetLabel.post,
-        " #",
-        r.target_id) :
-        r.target_type === "user" ? h("a", { href: `/admin?tab=users&user=${r.target_id}` },
-            targetLabel.user,
-            " #",
-            r.target_id) :
-            h("span", null,
-                targetLabel[r.target_type] ?? r.target_type,
-                " ",
-                r.target_uuid ?? `#${r.target_id}`);
+    const setHidden = (r, hidden) => post(`/mod/${modPath[r.target_type]}/${r.target_uuid ?? r.target_id}/${hidden ? "hide" : "unhide"}`).then(list.reload, setError);
     return (h(Fragment, null,
         h("div", { class: "row" },
             h("label", { for: "rep-status" }, "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C"),
@@ -265,10 +298,10 @@ function ReportsTab() {
                 h("option", { value: "resolved" }, "\u0420\u0435\u0448\u0451\u043D\u043D\u044B\u0435"),
                 h("option", { value: "dismissed" }, "\u041E\u0442\u043A\u043B\u043E\u043D\u0451\u043D\u043D\u044B\u0435"))),
         h(ErrorLine, { error: error ?? list.error }),
-        !list.data ? h(Loading, null) : list.data.items.length === 0 ? h(Empty, null, "\u0416\u0430\u043B\u043E\u0431 \u043D\u0435\u0442.") : (h("ul", { class: "plain-list reports" }, list.data.items.map((r) => (h("li", { key: r.id },
+        !list.data ? h(Loading, null) : list.data.items.length === 0 ? h(Empty, null, "\u0416\u0430\u043B\u043E\u0431 \u043D\u0435\u0442.") : (h("ul", { class: "plain-list reports" }, list.data.items.map((r) => (h("li", { key: r.id, "data-type": r.target_type },
             h("span", null,
-                target(r),
-                " \u2014 \u00AB",
+                h(ReportCard, { r: r }),
+                "\u00AB",
                 r.reason,
                 "\u00BB",
                 h("br", null),
@@ -277,10 +310,13 @@ function ReportsTab() {
                     fullName(r.reporter),
                     " \u00B7 ",
                     h(Time, { iso: r.created_at }))),
-            r.status === "open" && (h("span", { class: "row tight" },
-                h("button", { class: "ghost", onClick: () => resolve(r, "dismiss") }, "\u041E\u0442\u043A\u043B\u043E\u043D\u0438\u0442\u044C"),
-                r.target_type !== "user" && h("button", { class: "ghost", onClick: () => resolve(r, "hide") }, "\u0421\u043A\u0440\u044B\u0442\u044C"),
-                h("button", { class: "ghost danger", onClick: () => resolve(r, "ban") }, "\u0411\u0430\u043D \u0430\u0432\u0442\u043E\u0440\u0430"))))))))));
+            h("span", { class: "row tight" },
+                r.status === "open" && h("button", { class: "ghost", onClick: () => resolve(r, "dismiss") }, "\u041E\u0442\u043A\u043B\u043E\u043D\u0438\u0442\u044C"),
+                r.status === "open" && r.target_type !== "user" && r.target && !r.target.hidden && h("button", { class: "ghost", onClick: () => resolve(r, "hide") }, "\u0421\u043A\u0440\u044B\u0442\u044C"),
+                r.status !== "open" && r.target && r.target_type !== "user" && modPath[r.target_type] && (r.target.hidden
+                    ? h("button", { class: "ghost", onClick: () => setHidden(r, false) }, "\u0412\u0435\u0440\u043D\u0443\u0442\u044C")
+                    : h("button", { class: "ghost", onClick: () => setHidden(r, true) }, "\u0421\u043A\u0440\u044B\u0442\u044C")),
+                r.status === "open" && r.target && h("button", { class: "ghost danger", onClick: () => resolve(r, "ban") }, "\u0411\u0430\u043D \u0430\u0432\u0442\u043E\u0440\u0430")))))))));
 }
 const ruleLabel = {
     login_bruteforce: "Перебор пароля", password_spray: "Перебор по многим аккаунтам", token_reuse: "Повтор refresh-токена",
