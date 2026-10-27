@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
@@ -235,6 +236,11 @@ func (s *Server) handleGetRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	route.Marks = marks
+	today := time.Now().In(uralTime)
+	if route.Notices, err = s.store.NoticesFor(r.Context(), route.BBox, today, today); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, route)
 }
 

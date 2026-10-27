@@ -274,6 +274,18 @@ func (s *Server) handleGetEvent(w http.ResponseWriter, r *http.Request) {
 		}
 		e.ChatID = chat
 		s.reviewState(r, e)
+		if e.RouteID != nil {
+			if rt, err := s.store.RouteBBox(r.Context(), *e.RouteID); err == nil {
+				end := e.StartsAt
+				if e.EndsAt != nil {
+					end = *e.EndsAt
+				}
+				if e.Notices, err = s.store.NoticesFor(r.Context(), rt, e.StartsAt.In(uralTime), end.In(uralTime)); err != nil {
+					s.internalError(w, r, err)
+					return
+				}
+			}
+		}
 	}
 	writeJSON(w, http.StatusOK, e)
 }

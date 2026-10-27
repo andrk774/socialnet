@@ -2,6 +2,7 @@
 # Дополнительно:
 #   docker compose --profile s3 up         — локальное S3 (SeaweedFS) для медиа и копий
 #   docker compose --profile monitoring up — Prometheus + Grafana (http://127.0.0.1:3001)
+#   docker compose --profile tiles up      — свой тайл-сервер карты (deploy/TILES.md)
 services:
   db:
     image: postgres:17-alpine
@@ -233,6 +234,24 @@ services:
       - "127.0.0.1:3001:3000"
     networks: [default, backend]
 
+  # Свой тайл-сервер (профиль tiles): растровые тайлы OpenStreetMap,
+  # отрисованные у себя. Первый запуск — импорт области, см. deploy/TILES.md.
+  # Включить в карте: TILE_URL=http://tiles/tile/{z}/{x}/{y}.png
+  tiles:
+    image: overv/openstreetmap-tile-server:${TILES_VERSION:-2.3.0}
+    profiles: [tiles]
+    restart: unless-stopped
+    command: ["run"]
+    environment:
+      THREADS: ${TILES_THREADS:-2}
+      OSM2PGSQL_EXTRA_ARGS: ${TILES_OSM2PGSQL_ARGS:--C 2048}
+    volumes:
+      - tilesdb:/data/database
+      - tilescache:/data/tiles
+    shm_size: 256m
+    # default — только для импорта (скачать выгрузку области с Geofabrik)
+    networks: [backend, default]
+
 networks:
   default:
   backend:
@@ -245,3 +264,5 @@ volumes:
   s3data:
   promdata:
   grafanadata:
+  tilesdb:
+  tilescache:

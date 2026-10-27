@@ -313,6 +313,7 @@ func (s *Server) Router() http.Handler {
 				r.Post("/routes/{rid}/marks/{pid}/check", s.handleCheckMark)
 				r.Delete("/routes/{rid}/marks/{pid}", s.handleDeleteMark)
 				r.Get("/routes/{rid}/reviews", s.handleRouteReviews)
+				r.Get("/notices", s.handleNotices)
 				r.Post("/routes/{rid}/reviews", s.handleReviewRoute)
 				r.Delete("/routes/{rid}/reviews", s.handleDeleteRouteReview)
 
@@ -518,6 +519,9 @@ func (s *Server) Router() http.Handler {
 					r.Post("/{type}/{id}/hide", s.handleSetHidden(true))
 					r.Post("/{type}/{id}/unhide", s.handleSetHidden(false))
 					r.Get("/log", s.handleModLog)
+					r.Post("/notices", s.handleCreateNotice)
+					r.Patch("/notices/{id}", s.handleUpdateNotice)
+					r.Delete("/notices/{id}", s.handleDeleteNotice)
 				})
 				r.Route("/admin", func(r chi.Router) {
 					r.Use(requireRole("admin"))

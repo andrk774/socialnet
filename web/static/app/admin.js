@@ -8,9 +8,10 @@ import { fullName, get, post, put } from "./api.js";
 import { navigate, query } from "./router.js";
 import { me } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, Time, useLoad } from "./ui.js";
+import { NoticesTab } from "./notices.js";
 const tabs = [
     ["stats", "Сводка", true], ["users", "Пользователи", true], ["reports", "Жалобы", false],
-    ["alerts", "Тревоги", true], ["audit", "Журнал", true],
+    ["notices", "Предупреждения", false], ["alerts", "Тревоги", true], ["audit", "Журнал", true],
 ];
 export function AdminPage() {
     const isAdmin = me()?.role === "admin";
@@ -25,6 +26,7 @@ export function AdminPage() {
         tab === "stats" && isAdmin && h(StatsTab, null),
         tab === "users" && isAdmin && (user ? h(UserCardView, { id: +user }) : h(UsersTab, null)),
         tab === "reports" && h(ReportsTab, null),
+        tab === "notices" && h(NoticesTab, null),
         tab === "alerts" && isAdmin && h(AlertsTab, null),
         tab === "audit" && isAdmin && h(AuditTab, null)));
 }

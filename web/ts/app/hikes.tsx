@@ -10,6 +10,7 @@ import { Rides } from "./rides.js";
 import { useMe } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, RichText, Time, UserLink, useLoad } from "./ui.js";
 import { Review, ReviewForm } from "./reviews.js";
+import { AreaNotice, NoticeBanner } from "./notices.js";
 
 export interface HikeEvent {
   id: number; creator_id: number; community?: { id: number; slug: string; name: string }; kind: "event" | "hike";
@@ -18,7 +19,7 @@ export interface HikeEvent {
   going_count: number; maybe_count: number; pending_count: number; waitlist_count: number;
   my_status: "going" | "maybe" | "pending" | "waitlist" | null; my_waitlist_position?: number;
   control_at: string | null; returned_at: string | null; alert_sent: boolean; created_at: string; chat_id?: number;
-  can_review?: boolean; my_review?: Review | null;
+  can_review?: boolean; my_review?: Review | null; notices?: AreaNotice[];
 }
 interface Contact { id: number; name: string; email: string; created_at: string }
 interface Application { user: UserCard; note: string; created_at: string }
@@ -136,6 +137,7 @@ export function EventPage({ id }: { id: number }) {
         {isOrganizer && <button class="ghost danger" onClick={() => confirm("Удалить поход? Участники его больше не увидят.") && act(async () => { await del(`/events/${id}`); navigate("/hikes"); })}>Удалить</button>}
       </div>
       <ErrorLine error={error} />
+      <NoticeBanner notices={e.notices} />
       {e.can_review && <section class="hike-review"><h2>Как прошёл поход?</h2>
         <ReviewForm path={`/events/${id}/review`} initial={e.my_review ?? null} label="Оцените поход и организатора" onSaved={ev.reload} /></section>}
 

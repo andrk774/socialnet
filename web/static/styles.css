@@ -578,3 +578,19 @@ img.emoji { vertical-align: -4px; object-fit: contain; display: inline-block; }
 .star-input input:focus-visible + span { outline: 2px solid var(--malachite); outline-offset: 2px; border-radius: 4px; }
 .organizer-reviews { margin: .8rem 0; }
 .organizer-reviews summary { cursor: pointer; }
+
+/* предупреждения на территории */
+.notices { display: grid; gap: .5rem; margin: .8rem 0; }
+.notice { padding: .7rem .9rem; border-radius: var(--radius-m); border-left: 4px solid #C98A0B; background: #FFF6E0; color: #4A3A12; }
+.notice p { margin: .3rem 0 0; }
+.notice-fire { border-left-color: #C2410C; background: #FFEDE3; color: #5A2208; }
+.notice-closure { border-left-color: var(--garnet); background: #FBE9EC; color: #5A1220; }
+.notice a { color: inherit; }
+.notice-form .row label { min-width: 0; }
+.notice-form input[inputmode="decimal"] { width: 6.5rem; }
+.notices-admin li.past { opacity: .6; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .notice { background: #3A3016; color: #F3E3B8; }
+  :root:not([data-theme="light"]) .notice-fire { background: #43230F; color: #F8D4BE; }
+  :root:not([data-theme="light"]) .notice-closure { background: #41161E; color: #F5C9D1; }
+}

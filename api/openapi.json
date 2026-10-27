@@ -755,6 +755,12 @@
       "items": {
        "$ref": "#/components/schemas/RouteMark"
       }
+     },
+     "notices": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/AreaNotice"
+      }
      }
     },
     "required": [
@@ -1405,6 +1411,12 @@
      },
      "my_review": {
       "$ref": "#/components/schemas/Review"
+     },
+     "notices": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/AreaNotice"
+      }
      }
     },
     "required": [
@@ -2204,6 +2216,61 @@
     "required": [
      "avg",
      "count"
+    ]
+   },
+   "AreaNotice": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "fire",
+       "closure",
+       "flood",
+       "other"
+      ]
+     },
+     "title": {
+      "type": "string"
+     },
+     "body": {
+      "type": "string"
+     },
+     "source_url": {
+      "type": "string"
+     },
+     "bbox": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      }
+     },
+     "starts_on": {
+      "type": "string"
+     },
+     "ends_on": {
+      "type": "string",
+      "nullable": true
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    },
+    "required": [
+     "id",
+     "kind",
+     "title",
+     "body",
+     "source_url",
+     "bbox",
+     "starts_on",
+     "ends_on",
+     "updated_at"
     ]
    },
    "ModAction": {
@@ -10822,6 +10889,210 @@
     }
    }
   },
+  "/api/v1/mod/notices": {
+   "post": {
+    "tags": [
+     "moderation"
+    ],
+    "summary": "Добавить предупреждение: противопожарный режим, закрытая тропа…",
+    "operationId": "post_api_v1_mod_notices",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "kind": {
+          "type": "string",
+          "enum": [
+           "fire",
+           "closure",
+           "flood",
+           "other"
+          ]
+         },
+         "title": {
+          "type": "string"
+         },
+         "body": {
+          "type": "string"
+         },
+         "source_url": {
+          "type": "string"
+         },
+         "ends_on": {
+          "type": "string",
+          "nullable": true
+         },
+         "bbox": {
+          "type": "array",
+          "items": {
+           "type": "number"
+          }
+         },
+         "starts_on": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "kind",
+         "title",
+         "bbox",
+         "starts_on"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AreaNotice"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/mod/notices/{id}": {
+   "delete": {
+    "tags": [
+     "moderation"
+    ],
+    "summary": "Удалить предупреждение",
+    "operationId": "delete_api_v1_mod_notices_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "moderation"
+    ],
+    "summary": "Изменить предупреждение",
+    "operationId": "patch_api_v1_mod_notices_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "kind": {
+          "type": "string",
+          "enum": [
+           "fire",
+           "closure",
+           "flood",
+           "other"
+          ]
+         },
+         "title": {
+          "type": "string"
+         },
+         "body": {
+          "type": "string"
+         },
+         "source_url": {
+          "type": "string"
+         },
+         "ends_on": {
+          "type": "string",
+          "nullable": true
+         },
+         "bbox": {
+          "type": "array",
+          "items": {
+           "type": "number"
+          }
+         },
+         "starts_on": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "kind",
+         "title",
+         "bbox",
+         "starts_on"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AreaNotice"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/mod/reports": {
    "get": {
     "tags": [
@@ -11086,6 +11357,48 @@
     "responses": {
      "204": {
       "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/notices": {
+   "get": {
+    "tags": [
+     "routes"
+    ],
+    "summary": "Действующие предупреждения на территории (?all=1 — и прошедшие)",
+    "operationId": "get_api_v1_notices",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/AreaNotice"
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
      },
      "default": {
       "description": "Ошибка",

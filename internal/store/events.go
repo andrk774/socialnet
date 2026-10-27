@@ -36,6 +36,7 @@ type Event struct {
 	CreatedAt    time.Time     `json:"created_at"`
 	ChatID       *int64        `json:"chat_id,omitempty"` // чат похода, если вы в нём
 	CanReview    bool          `json:"can_review,omitempty"`
+	Notices      []AreaNotice  `json:"notices,omitempty"` // предупреждения на маршруте в дни похода
 	MyReview     *Review       `json:"my_review,omitempty"`
 }
 

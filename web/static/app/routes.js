@@ -11,6 +11,7 @@ import { isSaved, offlineSupported, removeOffline, saveOffline } from "./offline
 import { ErrorLine, Loading } from "./ui.js";
 import { ReportButton } from "./report.js";
 import { RouteReviews } from "./reviews.js";
+import { NoticeBanner } from "./notices.js";
 let mapConfig = null;
 let clientConfig = null;
 export function loadClientConfig() {
@@ -273,6 +274,7 @@ function MapPanel({ route }) {
     if (!detail)
         return h(Loading, null);
     return (h("div", { class: "map-panel" },
+        h(NoticeBanner, { notices: detail.notices }),
         h(RouteMap, { route: detail, onPick: adding ? (lat, lon) => setPicked([lat, lon]) : undefined, picked: adding ? picked : null }),
         h(Marks, { route: detail, onChange: load }),
         detail.public && h(RouteReviews, { routeId: detail.id, ownerId: detail.owner_id }),

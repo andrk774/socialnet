@@ -121,7 +121,8 @@ var trailsListTpl = template.Must(template.New("list").Parse(trailsHead + `
 var trailTpl = template.Must(template.New("trail").Parse(trailsHead + `
 <h1>{{.R.Title}}</h1>
 <p class="muted">Автор {{.Author}} · открыт {{.Since}}{{with .Rating}} · оценка {{.}}{{end}}</p>
-<dl class="facts route-stats">
+{{range .Notices}}<div class="notice notice-{{.Kind}}" role="note"><strong>{{.Label}}: {{.Title}}</strong> <span class="muted">· {{.Period}}</span>{{if .Body}}<p>{{.Body}}</p>{{end}}{{if .URL}} <a href="{{.URL}}" rel="noopener noreferrer">Источник</a>{{end}}</div>
+{{end}}<dl class="facts route-stats">
 <div><dt>Расстояние</dt><dd>{{.Distance}}</dd></div>
 {{if .HasEle}}<div><dt>Набор / сброс</dt><dd>↑ {{.Gain}} м / ↓ {{.Loss}} м</dd></div>
 <div><dt>Высоты</dt><dd>{{.MinEle}}–{{.MaxEle}} м</dd></div>{{end}}
@@ -283,6 +284,15 @@ func (s *Server) handleTrail(w http.ResponseWriter, r *http.Request) {
 	}
 	if pr.MovingSec > 0 {
 		data["Moving"] = fmt.Sprintf("%d ч %d мин", pr.MovingSec/3600, pr.MovingSec%3600/60)
+	}
+	today := time.Now().In(uralTime)
+	if ns, err := s.store.NoticesFor(r.Context(), pr.BBox, today, today); err == nil {
+		type noticeView struct{ Kind, Label, Title, Period, Body, URL string }
+		var nv []noticeView
+		for _, n := range ns {
+			nv = append(nv, noticeView{Kind: n.Kind, Label: noticeKindText[n.Kind], Title: n.Title, Period: noticePeriod(n), Body: n.Body, URL: n.SourceURL})
+		}
+		data["Notices"] = nv
 	}
 	if rt, err := s.store.RouteRating(r.Context(), pr.ID); err == nil && rt.Count > 0 {
 		data["Rating"] = fmt.Sprintf("%.1f из 5 (%d)", rt.Avg, rt.Count)
