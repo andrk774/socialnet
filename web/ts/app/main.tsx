@@ -22,6 +22,7 @@ import { on, startRealtime, stopRealtime } from "./realtime.js";
 import { match, navigate, query, usePath } from "./router.js";
 import { loadMe, setMe, useMe } from "./session.js";
 import { Avatar, ErrorLine, Loading } from "./ui.js";
+import { RecordPage } from "./record.js";
 
 function routes(path: string, onRead: () => void, myId: number): ComponentChildren {
   let p;
@@ -41,6 +42,7 @@ function routes(path: string, onRead: () => void, myId: number): ComponentChildr
   if ((p = match("/events/:id/print", path))) return <PrintPage eventId={+p.id} />;
   if ((p = match("/routes/:id/print", path))) return <PrintPage routeId={p.id} />;
   if (match("/offline", path)) return <OfflinePage />;
+  if (match("/record", path)) return <RecordPage />;
   if (match("/articles", path)) return <ArticlesPage />;
   if (match("/rides", path)) return <RidesPage />;
   if (match("/feeds", path)) return <AntennasPage />;
@@ -66,7 +68,7 @@ function routes(path: string, onRead: () => void, myId: number): ComponentChildr
 // телефоне — нижняя панель из главных разделов и экран «Ещё».
 type NavItem = [string, string];
 const navGroups: [string, NavItem[]][] = [
-  ["Походы", [["/hikes", "Походы"], ["/companions", "Попутчики"], ["/rides", "Подвоз"], ["/articles", "Статьи"], ["/fundraisers", "Сборы"], ["/offline", "Офлайн"]]],
+  ["Походы", [["/hikes", "Походы"], ["/record", "Записать трек"], ["/companions", "Попутчики"], ["/rides", "Подвоз"], ["/articles", "Статьи"], ["/fundraisers", "Сборы"], ["/offline", "Офлайн"]]],
   ["Общение", [["/", "Лента"], ["/feeds", "Мои ленты"], ["/im", "Сообщения"], ["/notifications", "Уведомления"], ["/communities", "Сообщества"]]],
   ["Моё", [["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"], ["/scheduled", "Отложенные"],
     ["/wallet", "Кошелёк"], ["/plus", "Плюс"], ["/settings", "Безопасность"]]],
