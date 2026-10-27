@@ -92,6 +92,26 @@ func TestFrontendE2E(t *testing.T) {
 	t.Cleanup(tiles.Close)
 	srv.cfg.TileURL, srv.cfg.TileMaxZoom, srv.cfg.TileAttribution = tiles.URL+"/{z}/{x}/{y}.png", 17, "© тестовая карта"
 	srv.tiles = newTileProxy(t.TempDir())
+	// прогноз без интернета: 10 дней от сегодня, на шестой день — гроза
+	meteo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		var days, codes, tmax, tmin, pr, prob, wind, gust []string
+		for i := range 10 {
+			days = append(days, `"`+time.Now().AddDate(0, 0, i).Format("2006-01-02")+`"`)
+			code, g := "2", "8"
+			if i == 5 {
+				code, g = "95", "22"
+			}
+			codes, gust = append(codes, code), append(gust, g)
+			tmax, tmin, pr, prob, wind = append(tmax, "6.5"), append(tmin, "-2"), append(pr, "1.2"), append(prob, "40"), append(wind, "5")
+		}
+		j := func(v []string) string { return "[" + strings.Join(v, ",") + "]" }
+		_, _ = w.Write([]byte(`{"elevation":1150,"daily":{"time":` + j(days) + `,"weather_code":` + j(codes) +
+			`,"temperature_2m_max":` + j(tmax) + `,"temperature_2m_min":` + j(tmin) + `,"precipitation_sum":` + j(pr) +
+			`,"precipitation_probability_max":` + j(prob) + `,"wind_speed_10m_max":` + j(wind) + `,"wind_gusts_10m_max":` + j(gust) + `}}`))
+	}))
+	t.Cleanup(meteo.Close)
+	srv.cfg.WeatherURL = meteo.URL
+	srv.weather = newWeatherCache()
 	// видео для проверки плеера: воркер обрабатывает очередь в фоне
 	var clip string
 	if av.Available() {

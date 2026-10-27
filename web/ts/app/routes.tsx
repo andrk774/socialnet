@@ -6,11 +6,17 @@ import { useEffect, useLayoutEffect, useRef, useState } from "../vendor/preact/h
 import * as L from "../vendor/leaflet/leaflet-src.esm.js";
 import { del, get, Mark, MarkKind, post, Route, saveFile, upload } from "./api.js";
 import { useMe } from "./session.js";
+import { WeatherToggle } from "./weather.js";
 import { isSaved, offlineSupported, removeOffline, saveOffline } from "./offline.js";
 import { ErrorLine, Loading } from "./ui.js";
 
 interface MapConfig { enabled: boolean; tiles: string; attribution: string; max_zoom: number }
 let mapConfig: Promise<MapConfig> | null = null;
+let clientConfig: Promise<{ weather?: { enabled: boolean } }> | null = null;
+export function loadClientConfig(): Promise<{ weather?: { enabled: boolean } }> {
+  clientConfig ??= get<{ weather?: { enabled: boolean } }>("/client-config").catch((e) => { clientConfig = null; throw e; });
+  return clientConfig;
+}
 const CONFIG_KEY = "/offline/client-config.json";
 
 // loadMapConfig: настройки карты с сервера; без сети — сохранённые вместе с
@@ -55,7 +61,9 @@ export function RouteCard({ route }: { route: Route }) {
   const [canMap, setCanMap] = useState(false);
   const [maxZoom, setMaxZoom] = useState(15);
   const [offline, setOffline] = useState<"no" | "yes" | string>("no"); // строка — ход загрузки
+  const [canWeather, setCanWeather] = useState(false);
   useEffect(() => {
+    loadClientConfig().then((c) => setCanWeather(c.weather?.enabled ?? false), () => {});
     loadMapConfig().then((c) => { setCanMap(c.enabled); setMaxZoom(c.max_zoom); }, () => setCanMap(false));
     if (offlineSupported()) isSaved(route.id).then((ok) => setOffline(ok ? "yes" : "no"), () => {});
   }, []);
@@ -95,6 +103,7 @@ export function RouteCard({ route }: { route: Route }) {
         <TrackSketch points={route.preview} />
         {route.profile.length > 1 && <ElevationProfile profile={route.profile} />}
       </div>
+      {canWeather && route.preview.length > 0 && <WeatherToggle lat={route.preview[0][0]} lon={route.preview[0][1]} elevation={route.max_ele} />}
       {route.hidden_ends_m > 0 && <p class="muted route-note">Первые и последние {route.hidden_ends_m} м скрыты автором.</p>}
       <ErrorLine error={error} />
     </section>

@@ -4432,10 +4432,22 @@
             "attribution",
             "max_zoom"
            ]
+          },
+          "weather": {
+           "type": "object",
+           "properties": {
+            "enabled": {
+             "type": "boolean"
+            }
+           },
+           "required": [
+            "enabled"
+           ]
           }
          },
          "required": [
-          "map"
+          "map",
+          "weather"
          ]
         }
        }
@@ -14712,6 +14724,114 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/TxResult"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/weather": {
+   "get": {
+    "tags": [
+     "routes"
+    ],
+    "summary": "Прогноз на 10 дней (Open-Meteo через сервер, кеш час, район ~5 км): ?lat=&lon=&elevation=",
+    "operationId": "get_api_v1_weather",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "lat": {
+           "type": "number"
+          },
+          "lon": {
+           "type": "number"
+          },
+          "elevation": {
+           "type": "number",
+           "nullable": true
+          },
+          "source": {
+           "type": "string"
+          },
+          "fetched_at": {
+           "type": "string",
+           "format": "date-time"
+          },
+          "days": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "date": {
+              "type": "string",
+              "format": "date"
+             },
+             "code": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "t_max": {
+              "type": "number",
+              "nullable": true
+             },
+             "t_min": {
+              "type": "number",
+              "nullable": true
+             },
+             "precip_mm": {
+              "type": "number",
+              "nullable": true
+             },
+             "precip_prob": {
+              "type": "number",
+              "nullable": true
+             },
+             "wind_max": {
+              "type": "number",
+              "nullable": true
+             },
+             "gust_max": {
+              "type": "number",
+              "nullable": true
+             }
+            },
+            "required": [
+             "date",
+             "code",
+             "t_max",
+             "t_min",
+             "precip_mm",
+             "precip_prob",
+             "wind_max",
+             "gust_max"
+            ]
+           }
+          }
+         },
+         "required": [
+          "lat",
+          "lon",
+          "elevation",
+          "source",
+          "fetched_at",
+          "days"
+         ]
         }
        }
       }

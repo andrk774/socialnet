@@ -212,5 +212,6 @@ func (s *Server) handleClientConfig(w http.ResponseWriter, _ *http.Request) {
 			"attribution": s.cfg.TileAttribution,
 			"max_zoom":    s.cfg.TileMaxZoom,
 		},
+		"weather": map[string]any{"enabled": s.cfg.WeatherURL != ""},
 	})
 }

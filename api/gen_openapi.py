@@ -160,7 +160,7 @@ r("POST", A + "/users/me/consents", "auth", "Принять действующу
 r("DELETE", A + "/users/me", "auth", "Удалить аккаунт и отозвать согласие на обработку ПДн: публикации удаляются, аккаунт обезличивается",
   obj(password=str_), code=204)
 r("GET", A + "/client-config", "service", "Что включено на сервере (карта: адрес тайлов, атрибуция, максимальный масштаб)", auth=False,
-  resp=obj(map=obj(enabled=bool_, tiles=str_, attribution=str_, max_zoom=int_)))
+  resp=obj(map=obj(enabled=bool_, tiles=str_, attribution=str_, max_zoom=int_), weather=obj(enabled=bool_)))
 r("GET", "/tiles/{z}/{x}/{y}", "service", "Тайл карты через кеширующий прокси ({y} с суффиксом .png); 404 — карта выключена или неверные координаты", auth=False, resp="binary")
 # --- аккаунт ---
 r("POST", A + "/auth/register", "auth", "Регистрация (18+; три отдельные отметки: возраст, соглашение и политика, согласие на обработку ПДн)",
@@ -399,6 +399,10 @@ r("POST", A + "/events/{id}/contacts", "events", "Добавить довере�
   obj(name=str_, email=str_, consent=bool_), hike_contact, 201)
 r("DELETE", A + "/events/{id}/contacts/{cid}", "events", "Удалить контакт", code=204)
 r("POST", A + "/events/{id}/returned", "events", "Группа вернулась: контакты удаляются; если тревога уже ушла — им «отбой»", code=204)
+r("GET", A + "/weather", "routes", "Прогноз на 10 дней (Open-Meteo через сервер, кеш час, район ~5 км): ?lat=&lon=&elevation=",
+  resp=obj(lat=num, lon=num, elevation=nullable(num), source=str_, fetched_at=dt,
+           days=arr(obj(date={"type": "string", "format": "date"}, code=int_, t_max=nullable(num), t_min=nullable(num),
+                        precip_mm=nullable(num), precip_prob=nullable(num), wind_max=nullable(num), gust_max=nullable(num)))))
 r("GET", A + "/hikes", "events", "Ближайшие походы: ?max_difficulty=1..5", resp=obj(items=arr(S("Event"))))
 # --- журнал аудита и тревоги ---
 audit = obj(id=int_, actor_id=int_, actor_role=str_, action=str_, target=str_, **{"details?": {"type": "object"}},

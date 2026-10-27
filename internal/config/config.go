@@ -87,6 +87,9 @@ type Config struct {
 	TileAttribution string
 	TileMaxZoom     int
 
+	// WEATHER_URL — прогноз (API в формате Open-Meteo). Пусто — выключен.
+	WeatherURL string
+
 	// /metrics для Prometheus — на отдельном внутреннем адресе.
 	MetricsAddr  string // по умолчанию :9090; "off" — выключить
 	MetricsToken string // необязательный Bearer-токен
@@ -232,6 +235,13 @@ func Load() (Config, error) {
 		return c, errors.New("TILE_URL must be an http(s) URL template with {z}, {x} and {y}")
 	}
 	c.TileAttribution = getenv("TILE_ATTRIBUTION", "© участники OpenStreetMap")
+	c.WeatherURL = "https://api.open-meteo.com/v1/forecast"
+	if v, set := os.LookupEnv("WEATHER_URL"); set {
+		c.WeatherURL = strings.TrimRight(strings.TrimSpace(v), "/")
+	}
+	if c.WeatherURL != "" && !strings.HasPrefix(c.WeatherURL, "https://") && !strings.HasPrefix(c.WeatherURL, "http://") {
+		return c, errors.New("WEATHER_URL must be an http(s) URL")
+	}
 	c.TileMaxZoom = 17
 	if v := os.Getenv("TILE_MAX_ZOOM"); v != "" {
 		n, err := strconv.Atoi(v)
