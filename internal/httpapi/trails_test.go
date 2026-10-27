@@ -10,7 +10,6 @@ import (
 func TestPublicTrails(t *testing.T) {
 	ts, srv, _ := setupFull(t, 1000)
 	srv.uploadLimiter = newIPRateLimiter(100, 100)
-	srv.publicLimiter = newIPRateLimiter(1000, 1000)
 	srv.cfg.AppURL = "https://hike.example"
 	anna, bob, mod := register(t, ts, "anna"), register(t, ts, "bob"), register(t, ts, "moder")
 	_ = srv.store.SetRole(t.Context(), mod.ID, "moderator")
