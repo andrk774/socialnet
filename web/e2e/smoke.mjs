@@ -200,6 +200,7 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   const d = new Date(Date.now() + 5 * 864e5);
   const local = (x) => new Date(x.getTime() - x.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
   await anna.page.getByLabel("Начало").fill(local(d));
+  await anna.page.getByLabel("Контрольный срок возвращения").fill(local(new Date(d.getTime() + 30 * 36e5)));
   await anna.page.getByLabel("Сложность").selectOption({ label: "Средний" });
   await anna.page.getByLabel("Мест (с организатором)").fill("2");
   await anna.page.getByLabel("Место сбора").fill("Ж/д вокзал Златоуста, 7:00");
@@ -226,6 +227,9 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await anna.page.screenshot({ path: `${shots}/14-hike.png`, fullPage: true });
   await bob.page.reload();
   await bob.page.getByText("Вы идёте").waitFor();
+  await bob.page.getByRole("heading", { name: "Мои доверенные контакты" }).waitFor();
+  await anna.page.getByRole("button", { name: "Мы вернулись" }).click();
+  await anna.page.getByText(/группа вернулась/).waitFor();
   await bob.page.goto(base + "/notifications");
   await bob.page.getByRole("link", { name: "принял(а) вашу заявку в поход" }).waitFor();
 }

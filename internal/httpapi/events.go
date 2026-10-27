@@ -51,6 +51,7 @@ type eventRequest struct {
 	RouteID      opt[string]    `json:"route_id"`
 	MeetingPoint *string        `json:"meeting_point"`
 	Approval     *bool          `json:"approval"`
+	ControlAt    opt[time.Time] `json:"control_at"` // контрольный срок возвращения (поход)
 }
 
 // apply накладывает запрос на поля (при создании — на пустые) и проверяет итог.
@@ -119,8 +120,24 @@ func (req *eventRequest) apply(f *store.EventFields, creating bool) map[string]s
 	if req.Approval != nil {
 		f.Approval = *req.Approval
 	}
+	if req.ControlAt.Set {
+		f.ControlAt = req.ControlAt.V
+	}
+	if f.ControlAt != nil {
+		switch {
+		case !f.ControlAt.After(f.StartsAt):
+			errs["control_at"] = "must be after starts_at"
+		case f.ControlAt.Sub(f.StartsAt) > 30*24*time.Hour:
+			errs["control_at"] = "at most 30 days after starts_at"
+		}
+	}
 	if creating {
 		f.Kind = "event"
+		defer func() {
+			if f.ControlAt != nil && f.Kind != "hike" {
+				errs["control_at"] = "only for hikes"
+			}
+		}()
 		if req.Kind != nil {
 			f.Kind = *req.Kind
 		}
@@ -257,8 +274,15 @@ func (s *Server) handleUpdateEvent(w http.ResponseWriter, r *http.Request) {
 	}
 	f := store.EventFields{Kind: e.Kind, Title: e.Title, Description: e.Description, Place: e.Place,
 		StartsAt: e.StartsAt, EndsAt: e.EndsAt, Difficulty: e.Difficulty, Capacity: e.Capacity, Gear: e.Gear,
-		RouteID: e.RouteID, MeetingPoint: e.MeetingPoint, Approval: e.Approval}
+		RouteID: e.RouteID, MeetingPoint: e.MeetingPoint, Approval: e.Approval, ControlAt: e.ControlAt}
 	errs := req.apply(&f, false)
+	if req.ControlAt.Set && f.ControlAt != nil && e.Kind != "hike" {
+		errs["control_at"] = "only for hikes"
+	}
+	// тревога уже ушла: срок не двигаем, чтобы не рассылать письма повторно
+	if req.ControlAt.Set && e.AlertSent && !sameTime(e.ControlAt, f.ControlAt) {
+		errs["control_at"] = "the alert has already been sent; mark the group as returned instead"
+	}
 	me := userIDFrom(r.Context())
 	// новый маршрут — только свой; прежний можно оставить, кто бы ни правил
 	if f.RouteID != nil && errs["route_id"] == "" && (e.RouteID == nil || *e.RouteID != *f.RouteID) {
@@ -513,4 +537,8 @@ func (s *Server) handleCommunityEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func sameTime(a, b *time.Time) bool {
+	return a == nil && b == nil || a != nil && b != nil && a.Equal(*b)
 }

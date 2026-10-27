@@ -135,12 +135,61 @@ export function EventPage({ id }) {
         route.data && h("section", null,
             h("h2", null, "\u041C\u0430\u0440\u0448\u0440\u0443\u0442"),
             h(RouteCard, { route: route.data })),
+        e.kind === "hike" && e.control_at && h(Control, { e: e, canMark: e.my_status === "going" || isOrganizer, onChange: ev.reload }),
         isOrganizer && e.pending_count > 0 && h(Applications, { id: id, onChange: ev.reload }),
         h("h2", null, "\u0418\u0434\u0443\u0442"),
         going.data ? h(People, { list: going.data.items, canRemove: isOrganizer, creator: e.creator_id, onRemove: (u) => act(() => del(`/events/${id}/attendees/${u.id}`)) }) : h(Loading, null),
         queue.data && queue.data.items.length > 0 && h(Fragment, null,
             h("h2", null, "\u041B\u0438\u0441\u0442 \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u044F"),
             h(People, { list: queue.data.items, canRemove: isOrganizer, creator: e.creator_id, onRemove: (u) => act(() => del(`/events/${id}/attendees/${u.id}`)) }))));
+}
+// Control — контрольный срок: «вернулись» и доверенные контакты участника.
+function Control({ e, canMark, onChange }) {
+    const going = e.my_status === "going";
+    const contacts = useLoad(() => (going && !e.returned_at ? get(`/events/${e.id}/contacts`) : Promise.resolve({ items: [] })), [e.id, going, e.returned_at]);
+    const [f, setF] = useState({ name: "", email: "", consent: false });
+    const [error, setError] = useState(null);
+    const run = async (fn, after) => { setError(null); try {
+        await fn();
+        after();
+    }
+    catch (err) {
+        setError(err);
+    } };
+    const open = !e.returned_at;
+    return (h("section", { class: `control ${e.returned_at ? "ok" : e.alert_sent ? "alert" : ""}` },
+        h("h2", null, "\u041A\u043E\u043D\u0442\u0440\u043E\u043B\u044C\u043D\u044B\u0439 \u0441\u0440\u043E\u043A"),
+        h("p", null,
+            h("strong", null,
+                h("time", { dateTime: e.control_at }, when(e.control_at))),
+            e.returned_at ? h(Fragment, null,
+                " \u2014 \u0433\u0440\u0443\u043F\u043F\u0430 \u0432\u0435\u0440\u043D\u0443\u043B\u0430\u0441\u044C ",
+                h("time", { dateTime: e.returned_at }, when(e.returned_at)),
+                ".")
+                : e.alert_sent ? " — срок прошёл, доверенным контактам отправлены письма. Отметьте возвращение, как только будет связь." : null),
+        open && h("p", { class: "muted" }, "\u0415\u0441\u043B\u0438 \u043A \u0441\u0440\u043E\u043A\u0443 \u043D\u0438\u043A\u0442\u043E \u0438\u0437 \u0433\u0440\u0443\u043F\u043F\u044B \u043D\u0435 \u043D\u0430\u0436\u043C\u0451\u0442 \u00AB\u041C\u044B \u0432\u0435\u0440\u043D\u0443\u043B\u0438\u0441\u044C\u00BB, \u0434\u043E\u0432\u0435\u0440\u0435\u043D\u043D\u044B\u0435 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u044B \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u043E\u0432 \u043F\u043E\u043B\u0443\u0447\u0430\u0442 \u043F\u0438\u0441\u044C\u043C\u043E: \u0447\u0442\u043E \u0441\u043E\u043E\u0431\u0449\u0438\u0442\u044C \u043F\u043E \u043D\u043E\u043C\u0435\u0440\u0443 112. \u041A\u043E\u043D\u0442\u0430\u043A\u0442\u044B \u0432\u0438\u0434\u0438\u0442\u0435 \u0442\u043E\u043B\u044C\u043A\u043E \u0432\u044B; \u043E\u043D\u0438 \u0443\u0434\u0430\u043B\u044F\u044E\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u0432\u043E\u0437\u0432\u0440\u0430\u0449\u0435\u043D\u0438\u044F \u0438\u043B\u0438 \u0447\u0435\u0440\u0435\u0437 7 \u0434\u043D\u0435\u0439 \u043F\u043E\u0441\u043B\u0435 \u0441\u0440\u043E\u043A\u0430."),
+        open && canMark && h("button", { class: "primary", onClick: () => run(() => post(`/events/${e.id}/returned`), onChange) }, "\u041C\u044B \u0432\u0435\u0440\u043D\u0443\u043B\u0438\u0441\u044C"),
+        open && going && !e.alert_sent && contacts.data && (h("div", { class: "contacts" },
+            h("h3", null, "\u041C\u043E\u0438 \u0434\u043E\u0432\u0435\u0440\u0435\u043D\u043D\u044B\u0435 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u044B"),
+            contacts.data.items.length === 0 ? h("p", { class: "muted" }, "\u041F\u043E\u043A\u0430 \u043D\u0435\u0442. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u0442\u043E\u0433\u043E, \u043A\u0442\u043E \u0431\u0443\u0434\u0435\u0442 \u0437\u043D\u0430\u0442\u044C, \u0447\u0442\u043E \u0432\u044B \u0432 \u043F\u043E\u0445\u043E\u0434\u0435.") : (h("ul", { class: "people" }, contacts.data.items.map((c) => (h("li", { key: c.id },
+                h("span", { class: "grow" },
+                    c.name,
+                    " \u00B7 ",
+                    h("span", { class: "muted" }, c.email)),
+                h("button", { class: "link", onClick: () => run(() => del(`/events/${e.id}/contacts/${c.id}`), contacts.reload) }, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C")))))),
+            contacts.data.items.length < 3 && (h("form", { class: "stack", onSubmit: (x) => { x.preventDefault(); run(() => post(`/events/${e.id}/contacts`, f), () => { setF({ name: "", email: "", consent: false }); contacts.reload(); }); } },
+                h("div", { class: "row-2" },
+                    h("label", null,
+                        "\u041A\u0442\u043E \u044D\u0442\u043E",
+                        h("input", { value: f.name, required: true, maxLength: 80, placeholder: "\u041C\u0430\u043C\u0430", onInput: (x) => setF({ ...f, name: x.target.value }) })),
+                    h("label", null,
+                        "\u041F\u043E\u0447\u0442\u0430",
+                        h("input", { type: "email", value: f.email, required: true, onInput: (x) => setF({ ...f, email: x.target.value }) }))),
+                h("label", { class: "check" },
+                    h("input", { type: "checkbox", checked: f.consent, required: true, onChange: (x) => setF({ ...f, consent: x.target.checked }) }),
+                    " \u042D\u0442\u043E\u0442 \u0447\u0435\u043B\u043E\u0432\u0435\u043A \u0437\u043D\u0430\u0435\u0442 \u043E \u043F\u043E\u0445\u043E\u0434\u0435 \u0438 \u0441\u043E\u0433\u043B\u0430\u0441\u0435\u043D \u043F\u043E\u043B\u0443\u0447\u0438\u0442\u044C \u043F\u0438\u0441\u044C\u043C\u043E"),
+                h("button", { class: "ghost" }, "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u043A\u043E\u043D\u0442\u0430\u043A\u0442"))))),
+        h(ErrorLine, { error: error })));
 }
 function People({ list, canRemove, creator, onRemove }) {
     if (list.length === 0)
@@ -195,7 +244,7 @@ export function HikeForm({ initial, onDone }) {
         title: initial?.title ?? "", starts_at: localInput(initial?.starts_at), ends_at: localInput(initial?.ends_at),
         difficulty: initial?.difficulty ? String(initial.difficulty) : "", capacity: initial?.capacity ? String(initial.capacity) : "",
         meeting_point: initial?.meeting_point ?? "", gear: initial?.gear ?? "", description: initial?.description ?? "",
-        route_id: initial?.route_id ?? "", approval: initial?.approval ?? false,
+        route_id: initial?.route_id ?? "", approval: initial?.approval ?? false, control_at: localInput(initial?.control_at ?? undefined),
     });
     const [error, setError] = useState(null);
     const set = (k) => (e) => {
@@ -209,6 +258,7 @@ export function HikeForm({ initial, onDone }) {
             title: f.title, starts_at: new Date(f.starts_at).toISOString(), ends_at: f.ends_at ? new Date(f.ends_at).toISOString() : null,
             difficulty: f.difficulty ? +f.difficulty : null, capacity: f.capacity ? +f.capacity : null,
             meeting_point: f.meeting_point, gear: f.gear, description: f.description, route_id: f.route_id || null, approval: f.approval,
+            ...(initial?.alert_sent ? {} : { control_at: f.control_at ? new Date(f.control_at).toISOString() : null }),
         };
         try {
             if (initial) {
@@ -246,6 +296,10 @@ export function HikeForm({ initial, onDone }) {
                 h("label", null,
                     "\u041C\u0435\u0441\u0442 (\u0441 \u043E\u0440\u0433\u0430\u043D\u0438\u0437\u0430\u0442\u043E\u0440\u043E\u043C)",
                     h("input", { type: "number", min: 1, max: 500, value: f.capacity, onInput: set("capacity"), placeholder: "\u0431\u0435\u0437 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F" }))),
+            h("label", null,
+                "\u041A\u043E\u043D\u0442\u0440\u043E\u043B\u044C\u043D\u044B\u0439 \u0441\u0440\u043E\u043A \u0432\u043E\u0437\u0432\u0440\u0430\u0449\u0435\u043D\u0438\u044F",
+                h("input", { type: "datetime-local", value: f.control_at, disabled: initial?.alert_sent, onInput: set("control_at") }),
+                h("span", { class: "hint" }, "\u041D\u0435 \u043E\u0442\u043C\u0435\u0442\u0438\u0442\u0435\u0441\u044C \u043A \u044D\u0442\u043E\u043C\u0443 \u0432\u0440\u0435\u043C\u0435\u043D\u0438 \u2014 \u0434\u043E\u0432\u0435\u0440\u0435\u043D\u043D\u044B\u043C \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u0430\u043C \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u043E\u0432 \u0443\u0439\u0434\u0451\u0442 \u043F\u0438\u0441\u044C\u043C\u043E")),
             h("label", null,
                 "\u041C\u0435\u0441\u0442\u043E \u0441\u0431\u043E\u0440\u0430",
                 h("input", { value: f.meeting_point, maxLength: 300, onInput: set("meeting_point"), placeholder: "\u0416/\u0434 \u0432\u043E\u043A\u0437\u0430\u043B \u0417\u043B\u0430\u0442\u043E\u0443\u0441\u0442\u0430, 7:00" })),

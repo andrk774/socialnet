@@ -112,6 +112,8 @@ var scopeRoutes = map[string][]string{
 		"DELETE /api/v1/events/{id}", "POST /api/v1/events/{id}/rsvp", "DELETE /api/v1/events/{id}/rsvp",
 		"GET /api/v1/events/{id}/attendees", "DELETE /api/v1/events/{id}/attendees/{uid}",
 		"GET /api/v1/events/{id}/applications", "POST /api/v1/events/{id}/applications/{uid}", "GET /api/v1/hikes",
+		"GET /api/v1/events/{id}/contacts", "POST /api/v1/events/{id}/contacts", "DELETE /api/v1/events/{id}/contacts/{cid}",
+		"POST /api/v1/events/{id}/returned",
 		"POST /api/v1/companions", "GET /api/v1/companions", "GET /api/v1/companions/mine", "GET /api/v1/companions/{id}",
 		"PATCH /api/v1/companions/{id}", "DELETE /api/v1/companions/{id}",
 	},

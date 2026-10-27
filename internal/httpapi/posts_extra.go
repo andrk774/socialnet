@@ -482,6 +482,9 @@ func (s *Server) runScheduler(ctx context.Context) {
 			} else if n > 0 {
 				s.log.Info("scheduled posts published", "count", n)
 			}
+			if err := s.RunControl(ctx); err != nil && ctx.Err() == nil {
+				s.log.Error("hike control deadlines", "err", err)
+			}
 		}
 	}
 }
