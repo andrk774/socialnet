@@ -124,6 +124,7 @@ export function EventPage({ id }) {
                     h("textarea", { value: note, maxLength: 500, rows: 2, onInput: (x) => setNote(x.target.value) })),
                 h("button", { class: "primary" }, e.approval ? "Подать заявку" : e.capacity !== null && e.going_count >= e.capacity ? "Встать в очередь" : "Иду"))),
             e.my_status && !isOrganizer && h("button", { class: "ghost", onClick: () => act(() => del(`/events/${id}/rsvp`)) }, e.my_status === "pending" ? "Отозвать заявку" : e.my_status === "waitlist" ? "Выйти из очереди" : "Не пойду"),
+            h("a", { class: "ghost button-link", href: `/events/${id}/print` }, "\u041B\u0438\u0441\u0442 \u0434\u043B\u044F \u043F\u0435\u0447\u0430\u0442\u0438"),
             isOrganizer && h("button", { class: "ghost", onClick: () => setEditing(true) }, "\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C"),
             isOrganizer && h("button", { class: "ghost danger", onClick: () => confirm("Удалить поход? Участники его больше не увидят.") && act(async () => { await del(`/events/${id}`); navigate("/hikes"); }) }, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C")),
         h(ErrorLine, { error: error }),

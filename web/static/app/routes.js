@@ -46,6 +46,7 @@ export function RouteCard({ route }) {
             h("strong", { class: "route-title" }, route.title),
             h("span", { class: "route-actions" },
                 canMap && h("button", { class: "link", "aria-expanded": map, onClick: () => setMap(!map) }, map ? "Скрыть карту" : "Показать на карте"),
+                h("a", { class: "link", href: `/routes/${route.id}/print` }, "\u041F\u0435\u0447\u0430\u0442\u044C"),
                 h("button", { class: "link", onClick: () => saveFile(route.gpx_url, `${route.title}.gpx`).catch(setError) }, "\u0421\u043A\u0430\u0447\u0430\u0442\u044C GPX"))),
         h("dl", { class: "route-stats" }, stats.map(([k, v]) => h("div", { key: k },
             h("dt", null, k),
@@ -62,7 +63,9 @@ export function RouteCard({ route }) {
 }
 // RouteMap — трек на карте. Подробная геометрия грузится только по запросу:
 // в ленте у записи лишь упрощённая схема.
-export function RouteMap({ route }) {
+// printMode — для листа маршрута: без кнопок, без перетаскивания, точки
+// подписаны номерами из таблицы.
+export function RouteMap({ route, printMode = false }) {
     const box = useRef(null);
     const [full, setFull] = useState(false);
     const [detail, setDetail] = useState(route.detail ? route : null);
@@ -79,7 +82,9 @@ export function RouteMap({ route }) {
         loadMapConfig().then((cfg) => {
             if (!alive || !box.current)
                 return;
-            m = L.map(box.current, { scrollWheelZoom: false, maxZoom: cfg.max_zoom });
+            m = L.map(box.current, printMode
+                ? { zoomControl: false, scrollWheelZoom: false, dragging: false, touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, maxZoom: cfg.max_zoom }
+                : { scrollWheelZoom: false, maxZoom: cfg.max_zoom });
             m.attributionControl.setPrefix(false);
             L.tileLayer(cfg.tiles, { maxZoom: cfg.max_zoom, attribution: escapeHTML(cfg.attribution) }).addTo(m);
             const segs = detail.detail?.length ? detail.detail : [detail.preview];
@@ -87,11 +92,13 @@ export function RouteMap({ route }) {
                 L.polyline(seg, { className: "map-route-halo", weight: 7, interactive: false }).addTo(m);
                 L.polyline(seg, { className: "map-route", weight: 4, interactive: false }).addTo(m);
             }
-            for (const wp of detail.waypoints ?? []) {
+            (detail.waypoints ?? []).forEach((wp, i) => {
                 const p = L.circleMarker([wp.lat, wp.lon], { className: "map-waypoint", radius: 5, weight: 2, fillOpacity: 1 }).addTo(m);
-                if (wp.name)
+                if (printMode)
+                    p.bindTooltip(label(String(i + 1)), { direction: "top", permanent: true });
+                else if (wp.name)
                     p.bindTooltip(label(wp.name), { direction: "top" });
-            }
+            });
             const first = segs[0][0], lastSeg = segs[segs.length - 1], last = lastSeg[lastSeg.length - 1];
             if (first)
                 L.circleMarker(first, { className: "map-start", radius: 7, weight: 3, fillOpacity: 1 }).addTo(m).bindTooltip(label("Старт"));
@@ -114,11 +121,11 @@ export function RouteMap({ route }) {
         document.body.classList.add("no-scroll");
         return () => { document.removeEventListener("keydown", onKey); document.body.classList.remove("no-scroll"); };
     }, [full]);
-    return (h("div", { class: full ? "route-map-wrap route-map-full" : "route-map-wrap", role: full ? "dialog" : undefined, "aria-label": full ? `Карта: ${route.title}` : undefined },
+    return (h("div", { class: full ? "route-map-wrap route-map-full" : printMode ? "route-map-wrap route-map-print" : "route-map-wrap", role: full ? "dialog" : undefined, "aria-label": full ? `Карта: ${route.title}` : undefined },
         !detail && !error && h(Loading, null),
         h(ErrorLine, { error: error }),
         h("div", { ref: box, class: "route-map", "aria-label": "\u041A\u0430\u0440\u0442\u0430 \u043C\u0430\u0440\u0448\u0440\u0443\u0442\u0430" }),
-        detail && h("button", { class: "map-full-toggle", onClick: () => setFull(!full) }, full ? "Закрыть" : "Во весь экран")));
+        detail && !printMode && h("button", { class: "map-full-toggle", onClick: () => setFull(!full) }, full ? "Закрыть" : "Во весь экран")));
 }
 // TrackSketch — линия трека в своём масштабе (равнопромежуточная проекция с
 // поправкой на широту, чтобы север был сверху и пропорции не искажались).

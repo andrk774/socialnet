@@ -122,6 +122,7 @@ export function EventPage({ id }: { id: number }) {
         {e.my_status && !isOrganizer && <button class="ghost" onClick={() => act(() => del(`/events/${id}/rsvp`))}>
           {e.my_status === "pending" ? "Отозвать заявку" : e.my_status === "waitlist" ? "Выйти из очереди" : "Не пойду"}
         </button>}
+        <a class="ghost button-link" href={`/events/${id}/print`}>Лист для печати</a>
         {isOrganizer && <button class="ghost" onClick={() => setEditing(true)}>Изменить</button>}
         {isOrganizer && <button class="ghost danger" onClick={() => confirm("Удалить поход? Участники его больше не увидят.") && act(async () => { await del(`/events/${id}`); navigate("/hikes"); })}>Удалить</button>}
       </div>

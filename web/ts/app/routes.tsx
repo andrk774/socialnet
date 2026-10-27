@@ -54,6 +54,7 @@ export function RouteCard({ route }: { route: Route }) {
         <strong class="route-title">{route.title}</strong>
         <span class="route-actions">
           {canMap && <button class="link" aria-expanded={map} onClick={() => setMap(!map)}>{map ? "Скрыть карту" : "Показать на карте"}</button>}
+          <a class="link" href={`/routes/${route.id}/print`}>Печать</a>
           <button class="link" onClick={() => saveFile(route.gpx_url, `${route.title}.gpx`).catch(setError)}>Скачать GPX</button>
         </span>
       </header>
@@ -73,7 +74,9 @@ export function RouteCard({ route }: { route: Route }) {
 
 // RouteMap — трек на карте. Подробная геометрия грузится только по запросу:
 // в ленте у записи лишь упрощённая схема.
-export function RouteMap({ route }: { route: Route }) {
+// printMode — для листа маршрута: без кнопок, без перетаскивания, точки
+// подписаны номерами из таблицы.
+export function RouteMap({ route, printMode = false }: { route: Route; printMode?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const [full, setFull] = useState(false);
   const [detail, setDetail] = useState<Route | null>(route.detail ? route : null);
@@ -89,7 +92,9 @@ export function RouteMap({ route }: { route: Route }) {
     let alive = true, m: L.LeafletMap | null = null;
     loadMapConfig().then((cfg) => {
       if (!alive || !box.current) return;
-      m = L.map(box.current, { scrollWheelZoom: false, maxZoom: cfg.max_zoom });
+      m = L.map(box.current, printMode
+        ? { zoomControl: false, scrollWheelZoom: false, dragging: false, touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, maxZoom: cfg.max_zoom }
+        : { scrollWheelZoom: false, maxZoom: cfg.max_zoom });
       m.attributionControl.setPrefix(false);
       L.tileLayer(cfg.tiles, { maxZoom: cfg.max_zoom, attribution: escapeHTML(cfg.attribution) }).addTo(m);
       const segs = detail.detail?.length ? detail.detail : [detail.preview];
@@ -97,10 +102,11 @@ export function RouteMap({ route }: { route: Route }) {
         L.polyline(seg, { className: "map-route-halo", weight: 7, interactive: false }).addTo(m);
         L.polyline(seg, { className: "map-route", weight: 4, interactive: false }).addTo(m);
       }
-      for (const wp of detail.waypoints ?? []) {
-        const p = L.circleMarker([wp.lat, wp.lon], { className: "map-waypoint", radius: 5, weight: 2, fillOpacity: 1 }).addTo(m);
-        if (wp.name) p.bindTooltip(label(wp.name), { direction: "top" });
-      }
+      (detail.waypoints ?? []).forEach((wp, i) => {
+        const p = L.circleMarker([wp.lat, wp.lon], { className: "map-waypoint", radius: 5, weight: 2, fillOpacity: 1 }).addTo(m!);
+        if (printMode) p.bindTooltip(label(String(i + 1)), { direction: "top", permanent: true });
+        else if (wp.name) p.bindTooltip(label(wp.name), { direction: "top" });
+      });
       const first = segs[0][0], lastSeg = segs[segs.length - 1], last = lastSeg[lastSeg.length - 1];
       if (first) L.circleMarker(first, { className: "map-start", radius: 7, weight: 3, fillOpacity: 1 }).addTo(m).bindTooltip(label("Старт"));
       if (last) L.circleMarker(last, { className: "map-finish", radius: 7, weight: 3, fillOpacity: 1 }).addTo(m).bindTooltip(label("Финиш"));
@@ -122,11 +128,11 @@ export function RouteMap({ route }: { route: Route }) {
   }, [full]);
 
   return (
-    <div class={full ? "route-map-wrap route-map-full" : "route-map-wrap"} role={full ? "dialog" : undefined} aria-label={full ? `Карта: ${route.title}` : undefined}>
+    <div class={full ? "route-map-wrap route-map-full" : printMode ? "route-map-wrap route-map-print" : "route-map-wrap"} role={full ? "dialog" : undefined} aria-label={full ? `Карта: ${route.title}` : undefined}>
       {!detail && !error && <Loading />}
       <ErrorLine error={error} />
       <div ref={box} class="route-map" aria-label="Карта маршрута" />
-      {detail && <button class="map-full-toggle" onClick={() => setFull(!full)}>{full ? "Закрыть" : "Во весь экран"}</button>}
+      {detail && !printMode && <button class="map-full-toggle" onClick={() => setFull(!full)}>{full ? "Закрыть" : "Во весь экран"}</button>}
     </div>
   );
 }
