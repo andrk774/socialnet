@@ -39,7 +39,7 @@ func (s *Server) communityAdmin(w http.ResponseWriter, r *http.Request) (*store.
 		return nil, false
 	}
 	if !store.RoleAtLeast(c.MyRole, "admin") || viewerFrom(r.Context()).Bot != 0 {
-		writeError(w, http.StatusForbidden, "forbidden", "only community admins can manage bots")
+		writeError(w, http.StatusForbidden, "forbidden", "only community admins can do this")
 		return nil, false
 	}
 	return c, true

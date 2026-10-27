@@ -1,5 +1,5 @@
 import { h, Fragment } from "../vendor/preact/index.js";
-import { useRef, useState } from "../vendor/preact/hooks.js";
+import { useEffect, useRef, useState } from "../vendor/preact/hooks.js";
 import { api, del, fileSize, fullName, get, patch, post, put, saveFile, upload } from "./api.js";
 import { me } from "./session.js";
 import { RouteCard, km } from "./routes.js";
@@ -8,6 +8,20 @@ const reactions = [
     ["like", "👍", "Нравится"], ["love", "❤️", "Люблю"], ["haha", "😄", "Смешно"],
     ["wow", "😮", "Ого"], ["sad", "😢", "Грустно"], ["angry", "😠", "Возмутительно"],
 ];
+const emojiCache = new Map();
+export function communityEmoji(id, fresh = false) {
+    if (fresh || !emojiCache.has(id)) {
+        emojiCache.set(id, get(`/communities/${id}/emoji`).then((r) => r.items).catch(() => { emojiCache.delete(id); return []; }));
+    }
+    return emojiCache.get(id);
+}
+function ReactionIcon({ r, custom }) {
+    const std = reactions.find(([k]) => k === r);
+    if (std)
+        return h(Fragment, null, std[1]);
+    const e = custom.find((x) => x.reaction === r);
+    return e ? h("img", { class: "emoji", src: e.url, alt: `:${e.shortcode}:`, title: `:${e.shortcode}:`, width: 20, height: 20 }) : h(Fragment, null, "\uD83D\uDC4D");
+}
 const audienceLabel = { everyone: "Все", friends: "Друзья", only_me: "Только я", list: "Выбранные друзья" };
 // localInput: значение для <input type="datetime-local"> в часовом поясе браузера.
 const localInput = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -266,6 +280,9 @@ export function PostView({ initial, onDelete }) {
             setError(e);
         }
     };
+    const [custom, setCustom] = useState([]);
+    useEffect(() => { if (p.community)
+        communityEmoji(p.community.id).then(setCustom); }, [p.community?.id]);
     const react = (r) => act(async () => {
         setPicking(false);
         const res = r === null || r === p.my_reaction
@@ -296,6 +313,7 @@ export function PostView({ initial, onDelete }) {
     });
     const top = Object.entries(p.reactions).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
     const mineR = reactions.find(([r]) => r === p.my_reaction);
+    const mineCustom = custom.find((e) => e.reaction === p.my_reaction);
     return (h("article", { class: "post", "aria-labelledby": `post-${p.id}-author` },
         h("header", { class: "post-head" },
             h(Avatar, { user: p.author }),
@@ -325,13 +343,16 @@ export function PostView({ initial, onDelete }) {
         h("footer", { class: "post-actions" },
             h("div", { class: "react-wrap" },
                 h("button", { class: p.my_reaction ? "chip active" : "chip", "aria-pressed": !!p.my_reaction, onClick: () => (p.my_reaction ? react(null) : react("like")), onContextMenu: (e) => { e.preventDefault(); setPicking(!picking); } },
-                    mineR ? mineR[1] : "👍",
+                    p.my_reaction ? h(ReactionIcon, { r: p.my_reaction, custom: custom }) : "👍",
                     " ",
                     p.likes_count > 0 ? p.likes_count : "",
-                    h("span", { class: "sr-only" }, mineR ? `Ваша реакция: ${mineR[2]}. Убрать` : "Нравится")),
+                    h("span", { class: "sr-only" }, mineR ? `Ваша реакция: ${mineR[2]}. Убрать` : mineCustom ? `Ваша реакция: ${mineCustom.shortcode}. Убрать` : "Нравится")),
                 h("button", { class: "chip", "aria-expanded": picking, "aria-label": "\u0412\u044B\u0431\u0440\u0430\u0442\u044C \u0440\u0435\u0430\u043A\u0446\u0438\u044E", onClick: () => setPicking(!picking) }, "\u2026"),
-                picking && (h("div", { class: "react-picker", role: "menu" }, reactions.map(([r, emoji, label]) => h("button", { role: "menuitem", key: r, title: label, "aria-label": label, onClick: () => react(r) }, emoji)))),
-                top.length > 1 && h("span", { class: "muted react-top" }, top.map(([r]) => reactions.find((x) => x[0] === r)[1]).join(""))),
+                picking && (h("div", { class: "react-picker", role: "menu" },
+                    reactions.map(([r, emoji, label]) => h("button", { role: "menuitem", key: r, title: label, "aria-label": label, onClick: () => react(r) }, emoji)),
+                    custom.map((e) => h("button", { role: "menuitem", key: e.id, title: `:${e.shortcode}:`, "aria-label": e.shortcode, onClick: () => react(e.reaction) },
+                        h("img", { class: "emoji", src: e.url, alt: "", width: 22, height: 22 }))))),
+                top.length > 1 && h("span", { class: "muted react-top" }, top.map(([r]) => h(ReactionIcon, { key: r, r: r, custom: custom })))),
             h("button", { class: "chip", "aria-expanded": open, onClick: () => setOpen(!open) },
                 "\u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438",
                 p.comments_count > 0 ? ` ${p.comments_count}` : ""),

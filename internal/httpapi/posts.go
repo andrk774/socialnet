@@ -662,7 +662,14 @@ func (s *Server) handleReact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	errs := map[string]string{}
-	oneOf(errs, "reaction", &req.Reaction, store.Reactions...)
+	custom, err := s.customReaction(r, post, req.Reaction)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	if !custom {
+		oneOf(errs, "reaction", &req.Reaction, store.Reactions...)
+	}
 	if len(errs) > 0 {
 		writeFieldErrors(w, http.StatusUnprocessableEntity, "validation_failed", "invalid input", errs)
 		return

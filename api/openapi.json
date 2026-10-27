@@ -5884,6 +5884,227 @@
     }
    }
   },
+  "/api/v1/communities/{id}/emoji": {
+   "get": {
+    "tags": [
+     "communities"
+    ],
+    "summary": "Эмодзи сообщества (реакция e:<id> — на записях сообщества)",
+    "operationId": "get_api_v1_communities_id_emoji",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "community_id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "shortcode": {
+              "type": "string"
+             },
+             "url": {
+              "type": "string"
+             },
+             "reaction": {
+              "type": "string"
+             },
+             "created_at": {
+              "type": "string",
+              "format": "date-time"
+             }
+            },
+            "required": [
+             "id",
+             "community_id",
+             "shortcode",
+             "url",
+             "reaction",
+             "created_at"
+            ]
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "communities"
+    ],
+    "summary": "Добавить эмодзи (админ; картинка — своё фото; до 50)",
+    "operationId": "post_api_v1_communities_id_emoji",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "shortcode": {
+          "type": "string"
+         },
+         "media_id": {
+          "type": "string",
+          "format": "uuid"
+         }
+        },
+        "required": [
+         "shortcode",
+         "media_id"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "community_id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "shortcode": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          },
+          "reaction": {
+           "type": "string"
+          },
+          "created_at": {
+           "type": "string",
+           "format": "date-time"
+          }
+         },
+         "required": [
+          "id",
+          "community_id",
+          "shortcode",
+          "url",
+          "reaction",
+          "created_at"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/communities/{id}/emoji/{eid}": {
+   "delete": {
+    "tags": [
+     "communities"
+    ],
+    "summary": "Удалить эмодзи (реакции им станут «нравится»)",
+    "operationId": "delete_api_v1_communities_id_emoji_eid",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     },
+     {
+      "name": "eid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/communities/{id}/events": {
    "get": {
     "tags": [

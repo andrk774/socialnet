@@ -369,6 +369,10 @@ r("GET", A + "/voice/{vid}", "messages", "Голосовое (только уч�
 r("GET", A + "/communities/{id}/requests", "communities", "Заявки на вступление (админы)", resp=lst(S("UserCard")))
 r("POST", A + "/communities/{id}/requests/{userID}/approve", "communities", "Принять заявку", code=204)
 r("POST", A + "/communities/{id}/requests/{userID}/reject", "communities", "Отклонить заявку", code=204)
+emoji_s = obj(id=int_, community_id=int_, shortcode=str_, url=str_, reaction=str_, created_at=dt)
+r("GET", A + "/communities/{id}/emoji", "communities", "Эмодзи сообщества (реакция e:<id> — на записях сообщества)", resp=obj(items=arr(emoji_s)))
+r("POST", A + "/communities/{id}/emoji", "communities", "Добавить эмодзи (админ; картинка — своё фото; до 50)", obj(shortcode=str_, media_id=uuid), emoji_s, 201)
+r("DELETE", A + "/communities/{id}/emoji/{eid}", "communities", "Удалить эмодзи (реакции им станут «нравится»)", code=204)
 r("GET", A + "/communities/{id}/events", "events", "Мероприятия сообщества", resp=obj(items=arr(S("Event"))))
 # --- истории ---
 r("POST", A + "/stories", "stories", "Опубликовать историю на 24 часа", obj(**{"photo_id?": uuid, "video_id?": uuid, "caption?": str_}), obj(id=int_, expires_in_hours=int_), 201)
