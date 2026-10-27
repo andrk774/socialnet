@@ -6,9 +6,15 @@ import { useEffect, useLayoutEffect, useRef, useState } from "../vendor/preact/h
 import * as L from "../vendor/leaflet/leaflet-src.esm.js";
 import { del, get, post, saveFile, upload } from "./api.js";
 import { useMe } from "./session.js";
+import { WeatherToggle } from "./weather.js";
 import { isSaved, offlineSupported, removeOffline, saveOffline } from "./offline.js";
 import { ErrorLine, Loading } from "./ui.js";
 let mapConfig = null;
+let clientConfig = null;
+export function loadClientConfig() {
+    clientConfig ??= get("/client-config").catch((e) => { clientConfig = null; throw e; });
+    return clientConfig;
+}
 const CONFIG_KEY = "/offline/client-config.json";
 // loadMapConfig: настройки карты с сервера; без сети — сохранённые вместе с
 // офлайн-маршрутами (иначе карта без связи не построится).
@@ -46,7 +52,9 @@ export function RouteCard({ route }) {
     const [canMap, setCanMap] = useState(false);
     const [maxZoom, setMaxZoom] = useState(15);
     const [offline, setOffline] = useState("no"); // строка — ход загрузки
+    const [canWeather, setCanWeather] = useState(false);
     useEffect(() => {
+        loadClientConfig().then((c) => setCanWeather(c.weather?.enabled ?? false), () => { });
         loadMapConfig().then((c) => { setCanMap(c.enabled); setMaxZoom(c.max_zoom); }, () => setCanMap(false));
         if (offlineSupported())
             isSaved(route.id).then((ok) => setOffline(ok ? "yes" : "no"), () => { });
@@ -91,6 +99,7 @@ export function RouteCard({ route }) {
         h("div", { class: "route-graphics" },
             h(TrackSketch, { points: route.preview }),
             route.profile.length > 1 && h(ElevationProfile, { profile: route.profile })),
+        canWeather && route.preview.length > 0 && h(WeatherToggle, { lat: route.preview[0][0], lon: route.preview[0][1], elevation: route.max_ele }),
         route.hidden_ends_m > 0 && h("p", { class: "muted route-note" },
             "\u041F\u0435\u0440\u0432\u044B\u0435 \u0438 \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 ",
             route.hidden_ends_m,

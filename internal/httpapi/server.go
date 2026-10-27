@@ -56,6 +56,8 @@ type Server struct {
 	callbackClient *http.Client // Callback API: не ходит во внутреннюю сеть
 	tiles          *tileProxy   // nil — карта выключена
 	tileLimiter    limiter
+	weather        *weatherCache // nil — прогноз выключен
+	weatherLimiter limiter
 	yookassa       *yookassa.Client // nil — покупка монет выключена
 	m              *serverMetrics
 	static         map[string]staticFile // встроенный фронтенд
@@ -133,12 +135,13 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 		wsTickets:     tickets,
 		files:         files,
 
-		mailer:      m,
-		box:         box,
-		mfaLimiter:  lim("mfa", 5.0/300, 5),   // 5 попыток за 5 минут
-		mailLimiter: lim("mail", 3.0/3600, 3), // 3 письма в час
-		vulnLimiter: lim("vuln", 5.0/3600, 5), // 5 отчётов в час с IP
-		tileLimiter: lim("tile", 20, 400),     // карта грузит десятки тайлов разом
+		mailer:         m,
+		box:            box,
+		mfaLimiter:     lim("mfa", 5.0/300, 5),   // 5 попыток за 5 минут
+		mailLimiter:    lim("mail", 3.0/3600, 3), // 3 письма в час
+		vulnLimiter:    lim("vuln", 5.0/3600, 5), // 5 отчётов в час с IP
+		tileLimiter:    lim("tile", 20, 400),     // карта грузит десятки тайлов разом
+		weatherLimiter: lim("weather", 1, 30),    // прогноз: 60 в минуту
 
 		vapid:      vapid,
 		pushClient: webpush.SafeClient(),
@@ -152,6 +155,9 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 		appLimiter:     lim("app", 5, 20),  // как у ВКонтакте: несколько запросов в секунду
 		botLimiter:     lim("bot", 20, 40), // ботам — больше
 		callbackClient: safehttp.Client(10 * time.Second),
+	}
+	if cfg.WeatherURL != "" {
+		srv.weather = newWeatherCache()
 	}
 	if cfg.TileURL != "" {
 		srv.tiles = newTileProxy(filepath.Join(cfg.MediaDir, "tile-cache"))
@@ -416,6 +422,7 @@ func (s *Server) Router() http.Handler {
 				r.Get("/events/{id}/applications", s.handleApplications)
 				r.Post("/events/{id}/applications/{uid}", s.handleDecideApplication)
 				r.Get("/hikes", s.handleHikes)
+				r.Get("/weather", s.handleWeather)
 				r.Get("/events/{id}/contacts", s.handleHikeContacts)
 				r.Post("/events/{id}/contacts", s.handleAddHikeContact)
 				r.Delete("/events/{id}/contacts/{cid}", s.handleDeleteHikeContact)

@@ -242,6 +242,10 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await anna.page.getByText("1 из 2 · свободно 1").waitFor();
   await anna.page.locator(".gear li", { hasText: "Коврик и спальник" }).waitFor();
   await anna.page.locator("section.route").waitFor(); // маршрут похода
+  // погода на дни похода: шестой день — гроза, день похода выделен
+  await anna.page.locator(".weather-days li").nth(9).waitFor();
+  await anna.page.locator(".weather-days li.hike-day").first().waitFor();
+  await anna.page.locator(".weather-days li.warn", { hasText: "гроза" }).waitFor();
   const hikeURL = anna.page.url();
 
   await bob.page.goto(base + "/hikes");

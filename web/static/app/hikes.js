@@ -5,11 +5,14 @@ import { useState } from "../vendor/preact/hooks.js";
 import { del, get, patch, post } from "./api.js";
 import { navigate } from "./router.js";
 import { RouteCard } from "./routes.js";
+import { Weather } from "./weather.js";
 import { useMe } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, RichText, Time, UserLink, useLoad } from "./ui.js";
 export const difficulties = ["", "Лёгкий", "Средний", "Сложный", "Очень сложный", "Экстремальный"];
 const dateFmt = new Intl.DateTimeFormat("ru", { weekday: "short", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 const when = (iso) => dateFmt.format(new Date(iso));
+// дата по екатеринбургскому времени (так считает прогноз)
+const ymd = (iso) => new Date(new Date(iso).getTime() + 5 * 36e5).toISOString().slice(0, 10);
 function Difficulty({ level }) {
     if (!level)
         return null;
@@ -136,6 +139,9 @@ export function EventPage({ id }) {
         route.data && h("section", null,
             h("h2", null, "\u041C\u0430\u0440\u0448\u0440\u0443\u0442"),
             h(RouteCard, { route: route.data })),
+        route.data && route.data.preview.length > 0 && new Date(e.starts_at).getTime() - Date.now() < 10 * 864e5 && (e.ends_at ?? e.starts_at) >= new Date().toISOString().slice(0, 10) && (h("section", null,
+            h("h2", null, "\u041F\u043E\u0433\u043E\u0434\u0430"),
+            h(Weather, { lat: route.data.preview[0][0], lon: route.data.preview[0][1], elevation: route.data.max_ele, from: ymd(e.starts_at), to: ymd(e.ends_at ?? e.starts_at) }))),
         e.kind === "hike" && e.control_at && h(Control, { e: e, canMark: e.my_status === "going" || isOrganizer, onChange: ev.reload }),
         isOrganizer && e.pending_count > 0 && h(Applications, { id: id, onChange: ev.reload }),
         h("h2", null, "\u0418\u0434\u0443\u0442"),

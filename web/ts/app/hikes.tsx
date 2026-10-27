@@ -5,6 +5,7 @@ import { useState } from "../vendor/preact/hooks.js";
 import { del, get, Page, patch, post, Route, UserCard } from "./api.js";
 import { navigate } from "./router.js";
 import { RouteCard } from "./routes.js";
+import { Weather } from "./weather.js";
 import { useMe } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, RichText, Time, UserLink, useLoad } from "./ui.js";
 
@@ -23,6 +24,8 @@ export const difficulties = ["", "Лёгкий", "Средний", "Сложны
 
 const dateFmt = new Intl.DateTimeFormat("ru", { weekday: "short", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 const when = (iso: string) => dateFmt.format(new Date(iso));
+// дата по екатеринбургскому времени (так считает прогноз)
+const ymd = (iso: string) => new Date(new Date(iso).getTime() + 5 * 36e5).toISOString().slice(0, 10);
 
 function Difficulty({ level }: { level: number | null }) {
   if (!level) return null;
@@ -136,6 +139,10 @@ export function EventPage({ id }: { id: number }) {
         </section>
       )}
       {route.data && <section><h2>Маршрут</h2><RouteCard route={route.data} /></section>}
+      {route.data && route.data.preview.length > 0 && new Date(e.starts_at).getTime() - Date.now() < 10 * 864e5 && (e.ends_at ?? e.starts_at) >= new Date().toISOString().slice(0, 10) && (
+        <section><h2>Погода</h2><Weather lat={route.data.preview[0][0]} lon={route.data.preview[0][1]} elevation={route.data.max_ele}
+          from={ymd(e.starts_at)} to={ymd(e.ends_at ?? e.starts_at)} /></section>
+      )}
 
       {e.kind === "hike" && e.control_at && <Control e={e} canMark={e.my_status === "going" || isOrganizer} onChange={ev.reload} />}
 
