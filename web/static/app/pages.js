@@ -1,6 +1,6 @@
 import { h, Fragment } from "../vendor/preact/index.js";
 import { useEffect, useState } from "../vendor/preact/hooks.js";
-import { del, fullName, get, post, upload } from "./api.js";
+import { del, get, post, upload } from "./api.js";
 import { Composer, PostList, PostView, communityEmoji } from "./posts.js";
 import { query } from "./router.js";
 import { Avatar, Empty, ErrorLine, Loading, Time, UserLink, duration, useLoad } from "./ui.js";
@@ -368,35 +368,4 @@ export function MusicPage({ userId }) {
                 " \u2014 ",
                 playing.title),
             h("audio", { controls: true, autoPlay: true, src: playing.url }))));
-}
-export function SearchPage() {
-    const q = query("q") ?? "";
-    const [type, setType] = useState("users");
-    const res = useLoad(() => (q ? get(`/search?q=${encodeURIComponent(q)}&type=${type}`) : Promise.resolve({ items: [] })), [q, type]);
-    return (h("section", null,
-        h("h1", null,
-            "\u041F\u043E\u0438\u0441\u043A",
-            q && `: ${q}`),
-        h("div", { class: "tabs", role: "tablist" }, [["users", "Люди"], ["communities", "Сообщества"], ["tracks", "Музыка"]].map(([k, label]) => (h("button", { role: "tab", "aria-selected": type === k, class: type === k ? "tab on" : "tab", onClick: () => setType(k) }, label)))),
-        !q ? h(Empty, null, "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0437\u0430\u043F\u0440\u043E\u0441 \u0432 \u0441\u0442\u0440\u043E\u043A\u0435 \u043F\u043E\u0438\u0441\u043A\u0430.") : res.error ? h(ErrorLine, { error: res.error }) : !res.data ? h(Loading, null) :
-            res.data.items.length === 0 ? h(Empty, null, "\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0448\u043B\u043E\u0441\u044C. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0434\u0440\u0443\u0433\u043E\u0435 \u043D\u0430\u043F\u0438\u0441\u0430\u043D\u0438\u0435.") : (h("ul", { class: "plain-list" }, res.data.items.map((x) => type === "users" ? h("li", { key: x.id },
-                h(Avatar, { user: x, size: 32 }),
-                " ",
-                h("a", { href: `/u/${x.username}` }, fullName(x)),
-                " ",
-                h("span", { class: "muted" },
-                    "@",
-                    x.username)) :
-                type === "communities" ? h("li", { key: x.id },
-                    h("a", { href: `/c/${x.slug}` }, x.name),
-                    " ",
-                    h("span", { class: "muted" },
-                        x.members_count,
-                        " \u0443\u0447.")) :
-                    h("li", { key: x.id },
-                        x.artist,
-                        " \u2014 ",
-                        x.title,
-                        " ",
-                        h("audio", { controls: true, preload: "none", src: x.url })))))));
 }

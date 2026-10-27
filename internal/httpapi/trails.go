@@ -120,7 +120,7 @@ var trailsListTpl = template.Must(template.New("list").Parse(trailsHead + `
 
 var trailTpl = template.Must(template.New("trail").Parse(trailsHead + `
 <h1>{{.R.Title}}</h1>
-<p class="muted">Автор {{.Author}} · открыт {{.Since}}</p>
+<p class="muted">Автор {{.Author}} · открыт {{.Since}}{{with .Rating}} · оценка {{.}}{{end}}</p>
 <dl class="facts route-stats">
 <div><dt>Расстояние</dt><dd>{{.Distance}}</dd></div>
 {{if .HasEle}}<div><dt>Набор / сброс</dt><dd>↑ {{.Gain}} м / ↓ {{.Loss}} м</dd></div>
@@ -283,6 +283,9 @@ func (s *Server) handleTrail(w http.ResponseWriter, r *http.Request) {
 	}
 	if pr.MovingSec > 0 {
 		data["Moving"] = fmt.Sprintf("%d ч %d мин", pr.MovingSec/3600, pr.MovingSec%3600/60)
+	}
+	if rt, err := s.store.RouteRating(r.Context(), pr.ID); err == nil && rt.Count > 0 {
+		data["Rating"] = fmt.Sprintf("%.1f из 5 (%d)", rt.Avg, rt.Count)
 	}
 	data["Description"] = desc + "."
 	s.renderHTML(w, r, trailTpl, data, "public, max-age=300")

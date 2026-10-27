@@ -1,9 +1,9 @@
-import { h, render } from "../vendor/preact/index.js";
+import { h, Fragment, render } from "../vendor/preact/index.js";
 import { useEffect, useState } from "../vendor/preact/hooks.js";
 import { get, logout, onAuthChange, post, refresh, signedIn } from "./api.js";
 import { AuthPage } from "./auth.js";
 import { ChatPage, ConversationsPage, DirectPage } from "./messages.js";
-import { CommunitiesPage, CommunityPage, FeedPage, MusicPage, NotificationsPage, OAuthPage, PostPage, SearchPage, SettingsPage, TagPage, WalletPage } from "./pages.js";
+import { CommunitiesPage, CommunityPage, FeedPage, MusicPage, NotificationsPage, OAuthPage, PostPage, SettingsPage, TagPage, WalletPage } from "./pages.js";
 import { ProfilePage } from "./profile.js";
 import { EventPage, HikeForm, HikesPage } from "./hikes.js";
 import { CompanionsPage } from "./companions.js";
@@ -23,6 +23,8 @@ import { match, navigate, query, usePath } from "./router.js";
 import { loadMe, setMe, useMe } from "./session.js";
 import { Avatar, ErrorLine, Loading } from "./ui.js";
 import { RecordPage } from "./record.js";
+import { SearchPage } from "./search.js";
+import { Showcase } from "./landing.js";
 function routes(path, onRead, myId) {
     let p;
     if (path === "/" || path.startsWith("/?"))
@@ -138,7 +140,7 @@ function Shell() {
                 h("a", { href: "/", class: "wordmark", "aria-label": "socialnet \u2014 \u043B\u0435\u043D\u0442\u0430" }, "socialnet"),
                 h("form", { class: "search", role: "search", onSubmit: (e) => { e.preventDefault(); navigate(`/search?q=${encodeURIComponent(q)}`); } },
                     h("label", { class: "sr-only", for: "q" }, "\u041F\u043E\u0438\u0441\u043A"),
-                    h("input", { id: "q", type: "search", placeholder: "\u041F\u043E\u0438\u0441\u043A \u043B\u044E\u0434\u0435\u0439, \u0441\u043E\u043E\u0431\u0449\u0435\u0441\u0442\u0432, \u043C\u0443\u0437\u044B\u043A\u0438", value: q, onInput: (e) => setQ(e.target.value) })),
+                    h("input", { id: "q", type: "search", placeholder: "\u041F\u043E\u0438\u0441\u043A: \u043F\u043E\u0445\u043E\u0434\u044B, \u043C\u0430\u0440\u0448\u0440\u0443\u0442\u044B, \u043B\u044E\u0434\u0438", value: q, onInput: (e) => setQ(e.target.value) })),
                 h("a", { href: `/u/${user.username}`, class: "me", "aria-label": "\u041C\u043E\u0439 \u043F\u0440\u043E\u0444\u0438\u043B\u044C" },
                     h(Avatar, { user: user, size: 32 })))),
         h("div", { class: "layout" },
@@ -210,7 +212,12 @@ function App() {
             h(OfflinePage, null),
             h("p", null,
                 h("a", { href: "/" }, "\u0412\u043E\u0439\u0442\u0438")));
-    return state === "in" ? h(Shell, null) : h(AuthPage, null);
+    if (state === "in")
+        return h(Shell, null);
+    // гость на главной — форма входа и витрина; по ссылке вглубь — только вход
+    return lp === "/" ? h(Fragment, null,
+        h(AuthPage, null),
+        h(Showcase, null)) : h(AuthPage, null);
 }
 render(h(App, null), document.getElementById("app"));
 if ("serviceWorker" in navigator) {

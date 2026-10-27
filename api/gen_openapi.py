@@ -89,7 +89,7 @@ schemas = {
                  meeting_point=str_, approval=bool_,
                  going_count=int_, maybe_count=int_, pending_count=int_, waitlist_count=int_,
                  my_status=nullable(enum("going", "maybe", "pending", "waitlist")), **{"my_waitlist_position?": int_},
-                 control_at=nullable(dt), returned_at=nullable(dt), alert_sent=bool_, created_at=dt),
+                 control_at=nullable(dt), returned_at=nullable(dt), alert_sent=bool_, created_at=dt, **{"chat_id?": int_, "can_review?": bool_, "my_review?": S("Review")}),
     "CompanionAd": obj(id=int_, author=S("UserCard"), region=str_, title=str_, body=str_,
                        date_from={"type": "string", "format": "date"}, date_to={"type": "string", "format": "date"},
                        difficulty=nullable(enum_int(1, 2, 3, 4, 5)), seats=int_, route_id=nullable(str_), closed=bool_, created_at=dt),
@@ -107,7 +107,7 @@ schemas = {
     "Message": obj(id=int_, conversation_id=int_, sender_id=int_, kind=enum("text", "service"),
                    **{"body?": str_, "ciphertext?": b64, "nonce?": b64},
                    encrypted=bool_, attachments=arr(S("Attachment")), created_at=dt),
-    "Conversation": obj(id=int_, kind=enum("direct", "group"), **{"title?": str_, "members_count?": int_, "peer?": S("UserCard")},
+    "Conversation": obj(id=int_, kind=enum("direct", "group"), **{"title?": str_, "members_count?": int_, "event_id?": int_, "peer?": S("UserCard")},
                         last_message=S("Message"), unread=int_, peer_delivered_id=int_, peer_read_id=int_),
     "Community": obj(id=int_, slug=str_, name=str_, description=str_, owner_id=int_, members_count=int_,
                      my_role=enum("", "member", "editor", "admin", "owner"), visibility=enum("open", "closed"), created_at=dt),
@@ -118,6 +118,9 @@ schemas = {
     "Report": obj(id=int_, reporter=S("UserCard"), target_type=str_, target_id=int_, **{"target_uuid?": uuid},
                   reason=str_, status=enum("open", "resolved", "dismissed"), created_at=dt,
                   **{"target?": obj(title=str_, snippet=str_, author_id=int_, author=str_, hidden=bool_, **{"ref?": str_})}),
+    "Review": obj(id=int_, author=S("UserCard"), kind=enum("organizer", "route"), **{"event_id?": int_, "event_title?": str_, "route_id?": str_},
+                  rating=enum_int(1, 2, 3, 4, 5), text=str_, created_at=dt, updated_at=dt),
+    "Rating": obj(avg=num, count=int_),
     "ModAction": obj(id=int_, moderator_id=int_, action=str_, target_type=str_, target_id=int_, note=str_, created_at=dt),
     "VulnReport": obj(id=int_, contact=str_, title=str_, description=str_, status=str_, created_at=dt),
     "NotificationSettings": obj(muted_types=arr(str_), email_digest=bool_, push_enabled=bool_,
@@ -291,7 +294,7 @@ r("POST", A + "/media", "media", "Загрузить фото (JPEG/PNG/GIF до
 r("DELETE", A + "/media/{id}", "media", "Удалить фото", code=204)
 r("GET", "/media/{id}/{size}", "media", "Файл фото: size = full | thumb", auth=False, resp="binary")
 # --- безопасность / модерация ---
-r("POST", A + "/reports", "moderation", "Пожаловаться", obj(target_type=enum("post", "comment", "user", "community", "track", "video", "document", "route", "companion", "route_point", "article"), **{"target_id?": int_, "target_uuid?": uuid}, reason=str_), obj(id=int_, status=str_), 201)
+r("POST", A + "/reports", "moderation", "Пожаловаться", obj(target_type=enum("post", "comment", "user", "community", "track", "video", "document", "route", "companion", "route_point", "article", "review"), **{"target_id?": int_, "target_uuid?": uuid}, reason=str_), obj(id=int_, status=str_), 201)
 r("GET", A + "/mod/reports", "moderation", "Очередь жалоб (модератор)", resp=lst(S("Report")))
 r("POST", A + "/mod/reports/{id}/resolve", "moderation", "Решение по жалобе", obj(action=enum("dismiss", "hide", "ban"), **{"note?": str_}), code=204)
 r("POST", A + "/mod/users/{id}/ban", "moderation", "Забанить", obj(**{"reason?": str_}), code=204)
@@ -315,7 +318,10 @@ r("GET", A + "/communities/{id}/members", "communities", "Участники", r
 r("PUT", A + "/communities/{id}/members/{userID}/role", "communities", "Роль участника", obj(role=enum("admin", "editor", "member")), obj(user_id=int_, role=str_))
 r("DELETE", A + "/communities/{id}/members/{userID}", "communities", "Исключить участника", code=204)
 r("GET", A + "/communities/{id}/posts", "communities", "Стена сообщества", resp=lst(S("Post")))
-r("GET", A + "/search", "search", "Поиск: ?q=…&type=users|communities|tracks", resp=obj(items=arr({})))
+r("GET", A + "/showcase", "service", "Витрина для гостей: ближайшие походы (без мест сбора и участников) и свежие маршруты каталога; без входа, кеш минута",
+  resp=obj(hikes=arr(obj(id=int_, title=str_, place=str_, starts_at=dt, difficulty=nullable(int_), capacity=nullable(int_), going_count=int_)),
+           routes=arr(obj(id=str_, title=str_, distance_m=int_, gain_m=int_, author=S("UserCard"), url=str_))), auth=False)
+r("GET", A + "/search", "search", "Поиск: ?q=…&type=users|communities|tracks|hikes|articles|routes — {items}; type=all — по 5 из каждого раздела: {hikes, routes, articles, users, communities}", resp={"type": "object"})
 # --- кошелёк ---
 r("GET", A + "/wallet", "wallet", "Баланс и история", resp=obj(balance=int_, debt=int_, transactions=lst(S("Tx"))))
 r("POST", A + "/wallet/transfer", "wallet", "Перевод", obj(to_user_id=int_, **money), S("TxResult"), 201)
@@ -442,6 +448,12 @@ r("GET", A + "/plus", "wallet", "Подписка «Плюс»: состояни
 r("POST", A + "/plus/buy", "wallet", "Купить или продлить на 30 дней за монеты (ключ идемпотентности обязателен)",
   obj(idempotency_key=str_), {"allOf": [plus_s, obj(replayed=bool_, balance=int_)]}, 201)
 r("PATCH", A + "/plus", "wallet", "Автопродление", obj(auto_renew=bool_), plus_s)
+r("POST", A + "/events/{id}/review", "events", "Отзыв участника об организаторе (после похода, 90 дней; повторно — исправить)", obj(rating=enum_int(1, 2, 3, 4, 5), **{"text?": str_}), obj(id=int_))
+r("DELETE", A + "/events/{id}/review", "events", "Удалить свой отзыв о походе", code=204)
+r("GET", A + "/users/{id}/reviews", "users", "Отзывы об организаторе и средняя оценка", resp=obj(rating=S("Rating"), items=arr(S("Review")), next_cursor=nullable(int_)))
+r("GET", A + "/routes/{rid}/reviews", "routes", "Отзывы о маршруте и средняя оценка", resp=obj(rating=S("Rating"), items=arr(S("Review")), next_cursor=nullable(int_)))
+r("POST", A + "/routes/{rid}/reviews", "routes", "Отзыв о маршруте каталога (не своём; повторно — исправить)", obj(rating=enum_int(1, 2, 3, 4, 5), **{"text?": str_}), obj(id=int_))
+r("DELETE", A + "/routes/{rid}/reviews", "routes", "Удалить свой отзыв о маршруте", code=204)
 r("GET", A + "/events/{id}/calendar.ics", "events", "Мероприятие файлом iCalendar: добавить в календарь телефона, с напоминаниями", resp="text")
 r("GET", A + "/events/{id}/participants.csv", "events", "Список группы CSV для регистрации в МЧС (организатору с «Плюсом»)", resp="text")
 r("POST", A + "/articles", "wall", "Статья: разметка ## ### - 1. > --- **жирный** *курсив* [ссылка](https://…) ![подпись](media:UUID); фото и маршрут — свои",

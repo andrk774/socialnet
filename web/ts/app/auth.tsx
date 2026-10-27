@@ -31,7 +31,7 @@ export function AuthPage() {
     <main class="auth">
       <div class="auth-mark" aria-hidden="true" />
       <h1 class="wordmark">socialnet</h1>
-      <p class="auth-lead">Друзья, сообщения и сообщества — без рекламы в ленте.</p>
+      <p class="auth-lead">Походы по Южному Уралу: группы, попутчики, маршруты и чат похода.</p>
       <form class="auth-form" onSubmit={submit}>
         {mfa ? (
           <label>Код из приложения или резервный код

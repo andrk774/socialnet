@@ -72,6 +72,7 @@ type ConvInfo struct {
 	OwnerID *int64
 	MyRole  string
 	Members []int64
+	EventID *int64 // чат похода: состав ведёт сервер
 }
 
 // Peer — собеседник в личном диалоге.
@@ -90,10 +91,10 @@ func (s *Store) ConvAccess(ctx context.Context, convID, user int64) (*ConvInfo, 
 	c := &ConvInfo{ID: convID}
 	err := s.pool.QueryRow(ctx, `
 		SELECT c.kind, c.title, c.owner_id, me.role,
-		       ARRAY(SELECT user_id FROM conversation_state WHERE conversation_id = c.id ORDER BY user_id)
+		       ARRAY(SELECT user_id FROM conversation_state WHERE conversation_id = c.id ORDER BY user_id), c.event_id
 		FROM conversations c
 		JOIN conversation_state me ON me.conversation_id = c.id AND me.user_id = $2
-		WHERE c.id = $1`, convID, user).Scan(&c.Kind, &c.Title, &c.OwnerID, &c.MyRole, &c.Members)
+		WHERE c.id = $1`, convID, user).Scan(&c.Kind, &c.Title, &c.OwnerID, &c.MyRole, &c.Members, &c.EventID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -391,6 +392,7 @@ type ConversationItem struct {
 	Kind         string    `json:"kind"`
 	Title        string    `json:"title,omitempty"`         // для групп
 	MembersCount int       `json:"members_count,omitempty"` // для групп
+	EventID      *int64    `json:"event_id,omitempty"`      // чат похода
 	Peer         *UserCard `json:"peer,omitempty"`          // для личных диалогов
 	LastMessage  Message   `json:"last_message"`
 	Unread       int       `json:"unread"`
@@ -402,7 +404,7 @@ type ConversationItem struct {
 // Conversations: диалоги и группы с сообщениями, свежие сверху. Курсор — last_message_id.
 func (s *Store) Conversations(ctx context.Context, user, before int64, limit int) ([]ConversationItem, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT c.id, c.kind, c.title,
+		SELECT c.id, c.kind, c.title, c.event_id,
 		       (SELECT count(*) FROM conversation_state x WHERE x.conversation_id = c.id),
 		       u.id, u.username, u.first_name, u.last_name, u.avatar_media_id::text,
 		       m.id, m.sender_id, m.kind, m.body, m.ciphertext, m.nonce, m.created_at,
@@ -427,7 +429,7 @@ func (s *Store) Conversations(ctx context.Context, user, before int64, limit int
 			pID                      *int64
 			pUser, pFirst, pLast, av *string
 		)
-		if err := rows.Scan(&c.ID, &c.Kind, &c.Title, &c.MembersCount, &pID, &pUser, &pFirst, &pLast, &av,
+		if err := rows.Scan(&c.ID, &c.Kind, &c.Title, &c.EventID, &c.MembersCount, &pID, &pUser, &pFirst, &pLast, &av,
 			&c.LastMessage.ID, &c.LastMessage.SenderID, &c.LastMessage.Kind, &c.LastMessage.Body, &c.LastMessage.Ciphertext,
 			&c.LastMessage.Nonce, &c.LastMessage.CreatedAt, &c.Unread, &c.PeerDeliveredID, &c.PeerReadID); err != nil {
 			return nil, err

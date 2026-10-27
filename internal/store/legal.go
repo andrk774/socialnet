@@ -115,6 +115,7 @@ func (s *Store) DeleteAccount(ctx context.Context, id int64) (DeletedFiles, erro
 			`DELETE FROM hike_contacts WHERE user_id = $1`,
 			`DELETE FROM route_points WHERE author_id = $1`,
 			`DELETE FROM articles WHERE author_id = $1`,
+			`DELETE FROM reviews WHERE author_id = $1 OR organizer_id = $1`,
 			`DELETE FROM rides WHERE driver_id = $1`,
 			`DELETE FROM antennas WHERE user_id = $1`,
 			`DELETE FROM ride_requests WHERE user_id = $1`,

@@ -201,6 +201,8 @@ func (s *Server) handleCreateEvent(w http.ResponseWriter, r *http.Request) {
 	}
 	if f.Kind == "hike" {
 		s.m.business.Inc("hike_created")
+		s.syncHikeChat(r.Context(), id)
+		e.ChatID, _ = s.store.HikeChatFor(r.Context(), id, me)
 	}
 	writeJSON(w, http.StatusCreated, e)
 }
@@ -254,9 +256,26 @@ func (s *Server) managedEvent(w http.ResponseWriter, r *http.Request) (*store.Ev
 }
 
 func (s *Server) handleGetEvent(w http.ResponseWriter, r *http.Request) {
-	if e, ok := s.eventParam(w, r); ok {
-		writeJSON(w, http.StatusOK, e)
+	e, ok := s.eventParam(w, r)
+	if !ok {
+		return
 	}
+	if e.Kind == "hike" {
+		me := userIDFrom(r.Context())
+		chat, err := s.store.HikeChatFor(r.Context(), e.ID, me)
+		if err != nil {
+			s.internalError(w, r, err)
+			return
+		}
+		// походы, созданные до появления чатов, получают чат при первом заходе участника
+		if chat == nil && (e.CreatorID == me || (e.MyStatus != nil && *e.MyStatus == "going")) {
+			s.syncHikeChat(r.Context(), e.ID)
+			chat, _ = s.store.HikeChatFor(r.Context(), e.ID, me)
+		}
+		e.ChatID = chat
+		s.reviewState(r, e)
+	}
+	writeJSON(w, http.StatusOK, e)
 }
 
 func (s *Server) handleUpdateEvent(w http.ResponseWriter, r *http.Request) {
@@ -301,6 +320,7 @@ func (s *Server) handleUpdateEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.notifyEvent(r.Context(), promoted, "event_seat", 0, e.ID)
+	s.syncHikeChat(r.Context(), e.ID)
 	updated, err := s.store.Event(r.Context(), me, e.ID)
 	if err != nil {
 		s.internalError(w, r, err)
@@ -375,6 +395,7 @@ func (s *Server) handleRSVP(w http.ResponseWriter, r *http.Request) {
 		s.notifyEvent(r.Context(), []int64{e.CreatorID}, "hike_application", me, e.ID)
 	}
 	s.notifyEvent(r.Context(), promoted, "event_seat", 0, e.ID)
+	s.syncHikeChat(r.Context(), e.ID)
 	writeJSON(w, http.StatusOK, map[string]string{"status": status})
 }
 
@@ -394,6 +415,7 @@ func (s *Server) handleCancelRSVP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.notifyEvent(r.Context(), promoted, "event_seat", 0, e.ID)
+	s.syncHikeChat(r.Context(), e.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -423,6 +445,7 @@ func (s *Server) handleRemoveAttendee(w http.ResponseWriter, r *http.Request) {
 	}
 	s.notifyEvent(r.Context(), []int64{uid}, "hike_removed", userIDFrom(r.Context()), e.ID)
 	s.notifyEvent(r.Context(), promoted, "event_seat", 0, e.ID)
+	s.syncHikeChat(r.Context(), e.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -474,6 +497,7 @@ func (s *Server) handleDecideApplication(w http.ResponseWriter, r *http.Request)
 		typ = "hike_rejected"
 	}
 	s.notifyEvent(r.Context(), []int64{uid}, typ, userIDFrom(r.Context()), e.ID)
+	s.syncHikeChat(r.Context(), e.ID)
 	writeJSON(w, http.StatusOK, map[string]string{"status": status})
 }
 

@@ -64,6 +64,8 @@ func (s *Store) TargetAuthor(ctx context.Context, typ string, id int64) (int64, 
 		q = `SELECT author_id FROM route_points WHERE id = $1 AND hidden_at IS NULL`
 	case "article":
 		q = `SELECT author_id FROM articles WHERE id = $1 AND hidden_at IS NULL AND status = 'published'`
+	case "review":
+		q = `SELECT author_id FROM reviews WHERE id = $1 AND hidden_at IS NULL`
 	default:
 		return 0, ErrNotFound
 	}
@@ -214,6 +216,10 @@ const reportTargetSQL = `
 	SELECT rt.title, left(rt.public_note, 300), rt.owner_id, rt.hidden_at IS NOT NULL, rt.id::text
 	  FROM routes rt WHERE r.target_type = 'route' AND rt.id = r.target_uuid AND rt.deleted_at IS NULL
 	UNION ALL
+	SELECT CASE rv.kind WHEN 'route' THEN 'Отзыв о маршруте' ELSE 'Отзыв об организаторе' END || ': ' || rv.rating || ' из 5',
+	       left(rv.text, 300), rv.author_id, rv.hidden_at IS NOT NULL, COALESCE(rv.route_id::text, rv.event_id::text)
+	  FROM reviews rv WHERE r.target_type = 'review' AND rv.id = r.target_id
+	UNION ALL
 	SELECT tr.title, tr.artist, tr.uploader_id, tr.removed_at IS NOT NULL, NULL
 	  FROM tracks tr WHERE r.target_type = 'track' AND tr.id = r.target_uuid
 	UNION ALL
@@ -251,6 +257,8 @@ func (s *Store) SetHidden(ctx context.Context, typ string, id int64, hidden bool
 		table = "route_points"
 	case "article":
 		table = "articles"
+	case "review":
+		table = "reviews"
 	default:
 		return ErrNotFound
 	}

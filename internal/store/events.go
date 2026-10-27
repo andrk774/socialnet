@@ -34,6 +34,9 @@ type Event struct {
 	ReturnedAt   *time.Time    `json:"returned_at"` // группа отметила, что вернулась
 	AlertSent    bool          `json:"alert_sent"`  // срок прошёл — доверенным контактам ушли письма
 	CreatedAt    time.Time     `json:"created_at"`
+	ChatID       *int64        `json:"chat_id,omitempty"` // чат похода, если вы в нём
+	CanReview    bool          `json:"can_review,omitempty"`
+	MyReview     *Review       `json:"my_review,omitempty"`
 }
 
 // eventVisible: мероприятие закрытого сообщества — только участникам.

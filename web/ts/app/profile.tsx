@@ -5,6 +5,7 @@ import { PostList, Composer } from "./posts.js";
 import { navigate } from "./router.js";
 import { Avatar, ErrorLine, Loading, useLoad } from "./ui.js";
 import { ReportButton } from "./report.js";
+import { OrganizerReviews } from "./reviews.js";
 
 interface Profile extends UserCard {
   closed: boolean; plus?: boolean; status_text?: string; city?: string; about?: string;
@@ -53,6 +54,7 @@ export function ProfilePage({ username }: { username: string }) {
       </header>
       <ErrorLine error={error} />
       {u.about && <p class="about">{u.about}</p>}
+      <OrganizerReviews userId={u.id} />
       {u.closed ? <p class="empty">Профиль закрыт. Записи видят только друзья.</p> : (
         <PostList path={`/users/${u.id}/posts`} empty={rel === "self" ? "Здесь появятся ваши записи." : "Записей пока нет."}
           header={(add) => (rel === "self" ? <Composer onPosted={add} /> : null)} />

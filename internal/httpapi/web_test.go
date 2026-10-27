@@ -125,6 +125,7 @@ func TestFrontendE2E(t *testing.T) {
 		t.Cleanup(cancel)
 		go (&worker.Worker{Store: srv.store, AV: srv.avStore, Log: slog.New(&failOnError{t: t})}).Run(ctx)
 	}
+	srv.showcase.ttl = time.Nanosecond // витрина гостей — без минутного кеша
 	// Анна — администратор: роль читается из базы на каждом запросе,
 	// поэтому достаточно выставить её, как только Анна зарегистрируется.
 	adminCtx, stopAdmin := context.WithCancel(context.Background())

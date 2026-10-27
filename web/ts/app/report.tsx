@@ -8,7 +8,7 @@ import { ErrorLine } from "./ui.js";
 const reasons = ["Спам или реклама", "Оскорбления", "Ложные или опасные сведения", "Чужие личные данные", "Незаконный контент"];
 
 export type ReportTarget =
-  | { type: "post" | "comment" | "user" | "community" | "companion" | "route_point" | "article"; id: number }
+  | { type: "post" | "comment" | "user" | "community" | "companion" | "route_point" | "article" | "review"; id: number }
   | { type: "track" | "video" | "document" | "route"; uuid: string };
 
 export function ReportButton({ target, cls = "link" }: { target: ReportTarget; cls?: string }) {

@@ -10,6 +10,7 @@ import { WeatherToggle } from "./weather.js";
 import { isSaved, offlineSupported, removeOffline, saveOffline } from "./offline.js";
 import { ErrorLine, Loading } from "./ui.js";
 import { ReportButton } from "./report.js";
+import { RouteReviews } from "./reviews.js";
 let mapConfig = null;
 let clientConfig = null;
 export function loadClientConfig() {
@@ -274,6 +275,7 @@ function MapPanel({ route }) {
     return (h("div", { class: "map-panel" },
         h(RouteMap, { route: detail, onPick: adding ? (lat, lon) => setPicked([lat, lon]) : undefined, picked: adding ? picked : null }),
         h(Marks, { route: detail, onChange: load }),
+        detail.public && h(RouteReviews, { routeId: detail.id, ownerId: detail.owner_id }),
         !adding ? h("button", { class: "ghost", onClick: () => { setAdding(true); setPicked(null); } }, "\u041E\u0442\u043C\u0435\u0442\u0438\u0442\u044C \u0442\u043E\u0447\u043A\u0443")
             : h(AddMark, { route: detail, picked: picked, onDone: (ok) => { setAdding(false); setPicked(null); if (ok)
                     load(); } })));

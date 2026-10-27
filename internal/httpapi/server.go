@@ -59,6 +59,7 @@ type Server struct {
 	weather        *weatherCache // nil — прогноз выключен
 	weatherLimiter limiter
 	publicLimiter  limiter
+	showcase       showcaseCache    // витрина главной для гостей
 	yookassa       *yookassa.Client // nil — покупка монет выключена
 	m              *serverMetrics
 	static         map[string]staticFile // встроенный фронтенд
@@ -280,6 +281,7 @@ func (s *Server) Router() http.Handler {
 				r.Post("/posts/{id}/reactions", s.handleReact)
 				r.Delete("/posts/{id}/reactions", s.handleUnlike)
 				r.Get("/users/{id}/posts", s.handleWall)
+				r.Get("/users/{id}/reviews", s.handleUserReviews)
 				r.Get("/feed", s.handleFeed)
 				r.Get("/hashtags/{tag}/posts", s.handleHashtag)
 				r.Get("/posts/{id}/audience", s.handlePostAudience)
@@ -310,6 +312,9 @@ func (s *Server) Router() http.Handler {
 				r.Post("/routes/{rid}/marks", s.handleAddMark)
 				r.Post("/routes/{rid}/marks/{pid}/check", s.handleCheckMark)
 				r.Delete("/routes/{rid}/marks/{pid}", s.handleDeleteMark)
+				r.Get("/routes/{rid}/reviews", s.handleRouteReviews)
+				r.Post("/routes/{rid}/reviews", s.handleReviewRoute)
+				r.Delete("/routes/{rid}/reviews", s.handleDeleteRouteReview)
 
 				// уведомления
 				r.Get("/notifications", s.handleNotifications)
@@ -445,6 +450,8 @@ func (s *Server) Router() http.Handler {
 				r.Patch("/plus", s.handlePlusSettings)
 				r.Get("/events/{id}/participants.csv", s.handleParticipantsCSV)
 				r.Get("/events/{id}/calendar.ics", s.handleEventICS)
+				r.Post("/events/{id}/review", s.handleReviewEvent)
+				r.Delete("/events/{id}/review", s.handleDeleteEventReview)
 				r.Get("/antennas", s.handleAntennas)
 				r.Post("/antennas", s.handleCreateAntenna)
 				r.Put("/antennas/{id}", s.handleUpdateAntenna)
@@ -536,6 +543,7 @@ func (s *Server) Router() http.Handler {
 
 			// что включено на сервере (карта и т. п.) — без входа
 			r.Get("/client-config", s.handleClientConfig)
+			r.Get("/showcase", s.handleShowcase)
 			r.Get("/legal", s.handleLegal)
 
 			// приём сообщений об уязвимостях — без входа в аккаунт
