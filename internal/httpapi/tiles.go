@@ -213,5 +213,6 @@ func (s *Server) handleClientConfig(w http.ResponseWriter, _ *http.Request) {
 			"max_zoom":    s.cfg.TileMaxZoom,
 		},
 		"weather": map[string]any{"enabled": s.cfg.WeatherURL != ""},
+		"captcha": map[string]any{"enabled": s.captchaEnabled(), "site_key": s.cfg.CaptchaSiteKey},
 	})
 }

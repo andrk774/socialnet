@@ -136,7 +136,7 @@ export async function verify2FA(mfa_token: string, code: string) {
   setToken(r.access_token);
 }
 
-export async function register(fields: { email: string; username: string; password: string; first_name: string; last_name: string; age_confirmed: boolean; accept_terms: boolean; pd_consent: boolean }) {
+export async function register(fields: { email: string; username: string; password: string; first_name: string; last_name: string; age_confirmed: boolean; accept_terms: boolean; pd_consent: boolean; captcha_token?: string }) {
   const r = await api<{ access_token: string }>("POST", "/auth/register", fields);
   setToken(r.access_token);
 }

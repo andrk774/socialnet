@@ -29,6 +29,7 @@ type registerRequest struct {
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
 	consentRequest
+	CaptchaToken string `json:"captcha_token"`
 }
 
 type loginRequest struct {
@@ -88,6 +89,9 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	if errs := req.validate(); len(errs) > 0 {
 		writeFieldErrors(w, http.StatusUnprocessableEntity, "validation_failed", "invalid input", errs)
+		return
+	}
+	if !s.requireCaptcha(w, r, req.CaptchaToken) {
 		return
 	}
 

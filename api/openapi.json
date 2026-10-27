@@ -4888,6 +4888,9 @@
         "properties": {
          "email": {
           "type": "string"
+         },
+         "captcha_token": {
+          "type": "string"
          }
         },
         "required": [
@@ -5045,6 +5048,9 @@
           "type": "string"
          },
          "last_name": {
+          "type": "string"
+         },
+         "captcha_token": {
           "type": "string"
          }
         },
@@ -5419,11 +5425,27 @@
            "required": [
             "enabled"
            ]
+          },
+          "captcha": {
+           "type": "object",
+           "properties": {
+            "enabled": {
+             "type": "boolean"
+            },
+            "site_key": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "enabled",
+            "site_key"
+           ]
           }
          },
          "required": [
           "map",
-          "weather"
+          "weather",
+          "captcha"
          ]
         }
        }

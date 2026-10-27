@@ -42,6 +42,23 @@ async function newUser(name, viewport = { width: 1280, height: 860 }) {
 
 const anna = await newUser("anna");
 
+// «Забыли пароль?» и ссылки из писем работают без входа
+{
+  const g = await (await anna.ctx.browser().newContext({ locale: "ru-RU" })).newPage();
+  await g.goto(base + "/");
+  await g.getByRole("link", { name: "Забыли пароль?" }).click();
+  await g.getByLabel("Почта").fill("anna@example.com");
+  await g.getByRole("button", { name: "Отправить ссылку" }).click();
+  await g.getByText("Если такой адрес зарегистрирован").waitFor();
+  await g.goto(base + "/reset-password?token=wrong");
+  await g.getByLabel("Новый пароль").fill("new-password-123");
+  await g.getByRole("button", { name: "Сохранить" }).click();
+  await g.locator(".error").first().waitFor();
+  await g.goto(base + "/verify-email?token=wrong");
+  await g.getByText("Ссылка устарела?").waitFor();
+  await g.context().close();
+}
+
 // документы открываются без входа, без скриптов
 {
   const legal = await anna.ctx.newPage();

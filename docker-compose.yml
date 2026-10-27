@@ -71,6 +71,8 @@ services:
       APP_URL: ${APP_URL:-http://localhost:3000}
       SECURITY_CONTACT: ${SECURITY_CONTACT:-security@localhost}
       PLUS_PRICE: ${PLUS_PRICE:-199}
+      CAPTCHA_SITE_KEY: ${CAPTCHA_SITE_KEY:-}
+      CAPTCHA_SECRET: ${CAPTCHA_SECRET:-}
       LEGAL_OPERATOR: ${LEGAL_OPERATOR:-}
       LEGAL_INN: ${LEGAL_INN:-}
       LEGAL_ADDRESS: ${LEGAL_ADDRESS:-}
