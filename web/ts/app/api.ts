@@ -1,3 +1,4 @@
+import type { AreaNotice } from "./notices.js";
 // Клиент API. Access-токен живёт только в памяти вкладки (не в localStorage —
 // его не украдёт XSS из хранилища), refresh-токен — в HttpOnly-cookie.
 
@@ -24,6 +25,7 @@ export interface Route {
   hidden_ends_m: number; bbox: [number, number, number, number]; preview: [number, number][];
   profile: { d: number; e: number }[]; gpx_url: string; public: boolean; public_note: string; created_at: string;
   detail?: [number, number][][]; waypoints?: { lat: number; lon: number; ele?: number; name: string }[]; marks?: Mark[];
+  notices?: AreaNotice[];
 }
 export type MarkKind = "spring" | "camp" | "ford" | "danger" | "view" | "other";
 export interface Mark {

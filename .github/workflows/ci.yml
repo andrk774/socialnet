@@ -112,6 +112,8 @@ jobs:
           BACKUP_ENC_KEY=$(openssl rand -hex 32)
           COOKIE_SECURE=false
           EOF
+      - name: Конфигурация всех профилей (s3, monitoring, tiles)
+        run: docker compose --profile s3 --profile monitoring --profile tiles config -q
       - run: docker compose up -d --build --wait --wait-timeout 300
       - run: python3 deploy/smoke.py
       # Учения: копию, снятую smoke-проверкой, восстанавливаем «на пустом

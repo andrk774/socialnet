@@ -515,6 +515,22 @@ await anna.page.getByRole("tab", { name: "Жалобы" }).click();
   await rep.getByRole("button", { name: "Скрыть" }).waitFor();
   assert.equal(await rep.getByText("скрыто").count(), 0, "article is back");
 }
+// предупреждение на территории: модератор добавляет — баннер на походе
+{
+  await anna.page.getByRole("tab", { name: "Предупреждения" }).click();
+  const form = anna.page.locator(".notice-form");
+  await form.getByLabel("Что").selectOption({ label: "Противопожарный режим" });
+  await form.getByLabel("Заголовок").fill("Запрет посещения лесов");
+  await form.getByLabel("Ссылка на источник").fill("https://example.gov.ru/fire");
+  for (const [label, v] of [["Широта от", "54.9"], ["Долгота от", "59.9"], ["Широта до", "55.2"], ["Долгота до", "60.3"]]) await form.getByLabel(label).fill(v);
+  await form.getByRole("button", { name: "Добавить предупреждение" }).click();
+  await anna.page.locator(".notices-admin li", { hasText: "Запрет посещения лесов" }).waitFor();
+  await anna.page.goto(base + "/hikes");
+  await anna.page.getByRole("link", { name: "Двуглавая сопка с ночёвкой" }).click();
+  await anna.page.locator(".notice-fire", { hasText: "Запрет посещения лесов" }).waitFor();
+  await anna.page.screenshot({ path: `${shots}/14b-hike-notice.png` });
+  await anna.page.goto(base + "/admin");
+}
 await anna.page.getByRole("tab", { name: "Пользователи" }).click();
 await anna.page.getByPlaceholder(/id, почта/).fill("bob");
 await anna.page.getByRole("button", { name: "Найти" }).click();

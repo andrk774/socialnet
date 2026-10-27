@@ -8,6 +8,7 @@ import { Page, UserCard, fullName, get, post, put } from "./api.js";
 import { navigate, query } from "./router.js";
 import { me } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, Time, useLoad } from "./ui.js";
+import { NoticesTab } from "./notices.js";
 
 interface Stats {
   users: number; users_new_24h: number; users_new_7d: number; active_24h: number; banned: number;
@@ -29,10 +30,10 @@ interface Report { id: number; reporter: UserCard; target_type: string; target_i
 interface Alert { id: number; rule: string; subject: string; severity: "low" | "medium" | "high"; details: Record<string, unknown>; created_at: string; acknowledged_by: number | null }
 interface Audit { id: number; actor_id: number; actor_role: string; action: string; target: string; status: number; ip: string; created_at: string }
 
-type Tab = "stats" | "users" | "reports" | "alerts" | "audit";
+type Tab = "stats" | "users" | "reports" | "notices" | "alerts" | "audit";
 const tabs: [Tab, string, boolean][] = [
   ["stats", "Сводка", true], ["users", "Пользователи", true], ["reports", "Жалобы", false],
-  ["alerts", "Тревоги", true], ["audit", "Журнал", true],
+  ["notices", "Предупреждения", false], ["alerts", "Тревоги", true], ["audit", "Журнал", true],
 ];
 
 export function AdminPage() {
@@ -51,6 +52,7 @@ export function AdminPage() {
       {tab === "stats" && isAdmin && <StatsTab />}
       {tab === "users" && isAdmin && (user ? <UserCardView id={+user} /> : <UsersTab />)}
       {tab === "reports" && <ReportsTab />}
+      {tab === "notices" && <NoticesTab />}
       {tab === "alerts" && isAdmin && <AlertsTab />}
       {tab === "audit" && isAdmin && <AuditTab />}
     </section>

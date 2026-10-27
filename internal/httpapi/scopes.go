@@ -76,7 +76,7 @@ var scopeRoutes = map[string][]string{
 		"POST /api/v1/routes", "GET /api/v1/routes", "GET /api/v1/routes/{rid}", "PATCH /api/v1/routes/{rid}",
 		"DELETE /api/v1/routes/{rid}", "GET /api/v1/routes/{rid}/gpx",
 		"POST /api/v1/routes/{rid}/marks", "POST /api/v1/routes/{rid}/marks/{pid}/check", "DELETE /api/v1/routes/{rid}/marks/{pid}",
-		"GET /api/v1/routes/{rid}/reviews", "POST /api/v1/routes/{rid}/reviews", "DELETE /api/v1/routes/{rid}/reviews",
+		"GET /api/v1/notices", "GET /api/v1/routes/{rid}/reviews", "POST /api/v1/routes/{rid}/reviews", "DELETE /api/v1/routes/{rid}/reviews",
 	},
 	"bookmarks": {
 		"GET /api/v1/bookmarks", "PUT /api/v1/bookmarks/{kind}/{target}", "DELETE /api/v1/bookmarks/{kind}/{target}",

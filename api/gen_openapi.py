@@ -59,7 +59,7 @@ schemas = {
                  hidden_ends_m=enum_int(0, 200, 500, 1000), bbox=arr(num), preview=arr(arr(num)),
                  profile=arr(obj(d=num, e=num)), gpx_url=str_, public=bool_, public_note=str_, created_at=dt,
                  **{"detail?": arr(arr(arr(num))), "waypoints?": arr(obj(lat=num, lon=num, name=str_, **{"ele?": num})),
-                    "marks?": arr(S("RouteMark"))}),
+                    "marks?": arr(S("RouteMark")), "notices?": arr(S("AreaNotice"))}),
     "RouteMark": obj(id=int_, route_id=uuid, author=S("UserCard"), kind=enum("spring", "camp", "ford", "danger", "view", "other"),
                      lat=num, lon=num, title=str_, note=str_, photo_url=nullable(str_), thumb_url=nullable(str_),
                      verified_on={"type": "string", "format": "date"}, checks=int_, my_check=bool_, created_at=dt),
@@ -89,7 +89,7 @@ schemas = {
                  meeting_point=str_, approval=bool_,
                  going_count=int_, maybe_count=int_, pending_count=int_, waitlist_count=int_,
                  my_status=nullable(enum("going", "maybe", "pending", "waitlist")), **{"my_waitlist_position?": int_},
-                 control_at=nullable(dt), returned_at=nullable(dt), alert_sent=bool_, created_at=dt, **{"chat_id?": int_, "can_review?": bool_, "my_review?": S("Review")}),
+                 control_at=nullable(dt), returned_at=nullable(dt), alert_sent=bool_, created_at=dt, **{"chat_id?": int_, "can_review?": bool_, "my_review?": S("Review"), "notices?": arr(S("AreaNotice"))}),
     "CompanionAd": obj(id=int_, author=S("UserCard"), region=str_, title=str_, body=str_,
                        date_from={"type": "string", "format": "date"}, date_to={"type": "string", "format": "date"},
                        difficulty=nullable(enum_int(1, 2, 3, 4, 5)), seats=int_, route_id=nullable(str_), closed=bool_, created_at=dt),
@@ -121,6 +121,8 @@ schemas = {
     "Review": obj(id=int_, author=S("UserCard"), kind=enum("organizer", "route"), **{"event_id?": int_, "event_title?": str_, "route_id?": str_},
                   rating=enum_int(1, 2, 3, 4, 5), text=str_, created_at=dt, updated_at=dt),
     "Rating": obj(avg=num, count=int_),
+    "AreaNotice": obj(id=int_, kind=enum("fire", "closure", "flood", "other"), title=str_, body=str_, source_url=str_,
+                      bbox=arr(num), starts_on=str_, ends_on=nullable(str_), updated_at=dt),
     "ModAction": obj(id=int_, moderator_id=int_, action=str_, target_type=str_, target_id=int_, note=str_, created_at=dt),
     "VulnReport": obj(id=int_, contact=str_, title=str_, description=str_, status=str_, created_at=dt),
     "NotificationSettings": obj(muted_types=arr(str_), email_digest=bool_, push_enabled=bool_,
@@ -321,6 +323,10 @@ r("GET", A + "/communities/{id}/posts", "communities", "Стена сообще�
 r("GET", A + "/showcase", "service", "Витрина для гостей: ближайшие походы (без мест сбора и участников) и свежие маршруты каталога; без входа, кеш минута",
   resp=obj(hikes=arr(obj(id=int_, title=str_, place=str_, starts_at=dt, difficulty=nullable(int_), capacity=nullable(int_), going_count=int_)),
            routes=arr(obj(id=str_, title=str_, distance_m=int_, gain_m=int_, author=S("UserCard"), url=str_))), auth=False)
+r("GET", A + "/notices", "routes", "Действующие предупреждения на территории (?all=1 — и прошедшие)", resp=obj(items=arr(S("AreaNotice"))))
+r("POST", A + "/mod/notices", "moderation", "Добавить предупреждение: противопожарный режим, закрытая тропа…", obj(kind=enum("fire", "closure", "flood", "other"), title=str_, **{"body?": str_, "source_url?": str_, "ends_on?": nullable(str_)}, bbox=arr(num), starts_on=str_), S("AreaNotice"), 201)
+r("PATCH", A + "/mod/notices/{id}", "moderation", "Изменить предупреждение", obj(kind=enum("fire", "closure", "flood", "other"), title=str_, **{"body?": str_, "source_url?": str_, "ends_on?": nullable(str_)}, bbox=arr(num), starts_on=str_), S("AreaNotice"))
+r("DELETE", A + "/mod/notices/{id}", "moderation", "Удалить предупреждение", code=204)
 r("GET", A + "/search", "search", "Поиск: ?q=…&type=users|communities|tracks|hikes|articles|routes — {items}; type=all — по 5 из каждого раздела: {hikes, routes, articles, users, communities}", resp={"type": "object"})
 # --- кошелёк ---
 r("GET", A + "/wallet", "wallet", "Баланс и история", resp=obj(balance=int_, debt=int_, transactions=lst(S("Tx"))))

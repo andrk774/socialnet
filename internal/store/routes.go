@@ -43,7 +43,8 @@ type Route struct {
 	Profile     []ProfilePoint  `json:"profile"`
 	Detail      [][]LatLon      `json:"detail,omitempty"`
 	Waypoints   []RouteWaypoint `json:"waypoints,omitempty"`
-	Marks       []RoutePoint    `json:"marks,omitempty"` // точки от ходивших: родники, стоянки…
+	Marks       []RoutePoint    `json:"marks,omitempty"`   // точки от ходивших: родники, стоянки…
+	Notices     []AreaNotice    `json:"notices,omitempty"` // действующие предупреждения на территории
 	GPXURL      string          `json:"gpx_url"`
 	Public      bool            `json:"public"`      // в открытом каталоге /trails
 	PublicNote  string          `json:"public_note"` // описание для каталога

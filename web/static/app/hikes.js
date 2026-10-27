@@ -10,6 +10,7 @@ import { Rides } from "./rides.js";
 import { useMe } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, RichText, Time, UserLink, useLoad } from "./ui.js";
 import { ReviewForm } from "./reviews.js";
+import { NoticeBanner } from "./notices.js";
 export const difficulties = ["", "Лёгкий", "Средний", "Сложный", "Очень сложный", "Экстремальный"];
 const dateFmt = new Intl.DateTimeFormat("ru", { weekday: "short", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 const when = (iso) => dateFmt.format(new Date(iso));
@@ -136,6 +137,7 @@ export function EventPage({ id }) {
             isOrganizer && h("button", { class: "ghost", onClick: () => setEditing(true) }, "\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C"),
             isOrganizer && h("button", { class: "ghost danger", onClick: () => confirm("Удалить поход? Участники его больше не увидят.") && act(async () => { await del(`/events/${id}`); navigate("/hikes"); }) }, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C")),
         h(ErrorLine, { error: error }),
+        h(NoticeBanner, { notices: e.notices }),
         e.can_review && h("section", { class: "hike-review" },
             h("h2", null, "\u041A\u0430\u043A \u043F\u0440\u043E\u0448\u0451\u043B \u043F\u043E\u0445\u043E\u0434?"),
             h(ReviewForm, { path: `/events/${id}/review`, initial: e.my_review ?? null, label: "\u041E\u0446\u0435\u043D\u0438\u0442\u0435 \u043F\u043E\u0445\u043E\u0434 \u0438 \u043E\u0440\u0433\u0430\u043D\u0438\u0437\u0430\u0442\u043E\u0440\u0430", onSaved: ev.reload })),

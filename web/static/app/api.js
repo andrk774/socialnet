@@ -1,5 +1,3 @@
-// Клиент API. Access-токен живёт только в памяти вкладки (не в localStorage —
-// его не украдёт XSS из хранилища), refresh-токен — в HttpOnly-cookie.
 export class ApiError extends Error {
     status;
     code;

@@ -11,6 +11,7 @@ import { isSaved, offlineSupported, removeOffline, saveOffline } from "./offline
 import { ErrorLine, Loading } from "./ui.js";
 import { ReportButton } from "./report.js";
 import { RouteReviews } from "./reviews.js";
+import { NoticeBanner } from "./notices.js";
 
 interface MapConfig { enabled: boolean; tiles: string; attribution: string; max_zoom: number }
 let mapConfig: Promise<MapConfig> | null = null;
@@ -283,6 +284,7 @@ function MapPanel({ route }: { route: Route }) {
   if (!detail) return <Loading />;
   return (
     <div class="map-panel">
+      <NoticeBanner notices={detail.notices} />
       <RouteMap route={detail} onPick={adding ? (lat, lon) => setPicked([lat, lon]) : undefined} picked={adding ? picked : null} />
       <Marks route={detail} onChange={load} />
       {detail.public && <RouteReviews routeId={detail.id} ownerId={detail.owner_id} />}
