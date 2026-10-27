@@ -11,6 +11,7 @@ import { ConsentGate } from "./legal.js";
 import { PrintPage } from "./print.js";
 import { OfflinePage } from "./offlinepage.js";
 import { ArticleEditor, ArticlePage, ArticlesPage } from "./articles.js";
+import { RidesPage } from "./rides.js";
 import { AdminPage } from "./admin.js";
 import { BookmarksPage, DocumentsPage, ScheduledPage } from "./library.js";
 import { on, startRealtime, stopRealtime } from "./realtime.js";
@@ -53,6 +54,8 @@ function routes(path, onRead, myId) {
         return h(OfflinePage, null);
     if (match("/articles", path))
         return h(ArticlesPage, null);
+    if (match("/rides", path))
+        return h(RidesPage, null);
     if (match("/articles/new", path))
         return h(ArticleEditor, null);
     if ((p = match("/articles/:id/edit", path)))
@@ -87,7 +90,7 @@ function routes(path, onRead, myId) {
             h("a", { href: "/" }, "\u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u0432 \u043B\u0435\u043D\u0442\u0443")));
 }
 const nav = [
-    ["/", "Лента"], ["/hikes", "Походы"], ["/companions", "Попутчики"], ["/articles", "Статьи"], ["/im", "Сообщения"], ["/notifications", "Уведомления"],
+    ["/", "Лента"], ["/hikes", "Походы"], ["/companions", "Попутчики"], ["/rides", "Подвоз"], ["/articles", "Статьи"], ["/im", "Сообщения"], ["/notifications", "Уведомления"],
     ["/communities", "Сообщества"], ["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"],
     ["/scheduled", "Отложенные"], ["/offline", "Офлайн"], ["/wallet", "Кошелёк"], ["/settings", "Безопасность"],
 ];

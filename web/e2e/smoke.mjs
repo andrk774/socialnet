@@ -278,6 +278,23 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await bob.page.reload();
   await bob.page.getByText("Вы идёте").waitFor();
   await bob.page.getByRole("heading", { name: "Мои доверенные контакты" }).waitFor();
+  // подвоз: Борис предлагает места, Анна просится, Борис берёт
+  await bob.page.getByText("Предложить места в машине").click();
+  const dep = new Date(Date.now() + 5 * 864e5 - 2 * 36e5);
+  await bob.page.locator(".rides").getByLabel("Отправление").fill(new Date(dep.getTime() - dep.getTimezoneOffset() * 6e4).toISOString().slice(0, 16));
+  await bob.page.locator(".rides").getByLabel("Свободных мест").fill("2");
+  await bob.page.locator(".rides").getByRole("button", { name: "Предложить" }).click();
+  await bob.page.locator("li.ride", { hasText: "свободно 2 из 2" }).waitFor();
+  await anna.page.reload();
+  await anna.page.locator("li.ride").getByRole("button", { name: "Попроситься" }).click();
+  await anna.page.locator("li.ride").getByLabel("Пара слов водителю").fill("Заберёшь у вокзала?");
+  await anna.page.locator("li.ride").getByRole("button", { name: "Отправить" }).click();
+  await anna.page.locator("li.ride").getByText("Заявка у водителя").waitFor();
+  await bob.page.reload();
+  await bob.page.locator("li.ride").getByRole("button", { name: "Взять" }).click();
+  await bob.page.locator("li.ride", { hasText: "свободно 1 из 2" }).waitFor();
+  await anna.page.reload();
+  await anna.page.locator("li.ride").getByText("Вы едете").waitFor();
   // лист для печати: карта, профиль, точки с координатами, снаряжение, 112
   await anna.page.getByRole("link", { name: "Лист для печати" }).click();
   await anna.page.locator(".print-sheet .route-map path.map-route").waitFor({ state: "attached" });

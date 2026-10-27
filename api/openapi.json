@@ -1629,6 +1629,74 @@
      "published_at"
     ]
    },
+   "Ride": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "driver": {
+      "$ref": "#/components/schemas/UserCard"
+     },
+     "event_id": {
+      "type": "integer",
+      "format": "int64",
+      "nullable": true
+     },
+     "from": {
+      "type": "string"
+     },
+     "to": {
+      "type": "string"
+     },
+     "departs_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "seats": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "taken": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "pending": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "note": {
+      "type": "string"
+     },
+     "my_status": {
+      "type": "string",
+      "enum": [
+       "pending",
+       "accepted"
+      ],
+      "nullable": true
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    },
+    "required": [
+     "id",
+     "driver",
+     "event_id",
+     "from",
+     "to",
+     "departs_at",
+     "seats",
+     "taken",
+     "pending",
+     "note",
+     "my_status",
+     "created_at"
+    ]
+   },
    "Application": {
     "type": "object",
     "properties": {
@@ -1671,6 +1739,10 @@
       "format": "int64"
      },
      "event_id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "ride_id": {
       "type": "integer",
       "format": "int64"
      },
@@ -11273,6 +11345,428 @@
           "id",
           "status"
          ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/rides": {
+   "get": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Предстоящие поездки: ?event_id=&to=",
+    "operationId": "get_api_v1_rides",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Ride"
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Подвоз к началу маршрута: места в машине (деньги приложение не принимает)",
+    "operationId": "post_api_v1_rides",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "from": {
+          "type": "string"
+         },
+         "to": {
+          "type": "string"
+         },
+         "departs_at": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "seats": {
+          "type": "integer",
+          "format": "int64"
+         },
+         "event_id": {
+          "type": "integer",
+          "format": "int64"
+         },
+         "note": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "from",
+         "to",
+         "departs_at",
+         "seats"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ride"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/rides/{id}": {
+   "delete": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Отменить (водитель); попутчикам — уведомление",
+    "operationId": "delete_api_v1_rides_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Поездка",
+    "operationId": "get_api_v1_rides_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ride"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/rides/{id}/request": {
+   "delete": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Отозвать заявку или выйти",
+    "operationId": "delete_api_v1_rides_id_request",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Попроситься",
+    "operationId": "post_api_v1_rides_id_request",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "note": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ride"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/rides/{id}/requests": {
+   "get": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Заявки и попутчики (водителю)",
+    "operationId": "get_api_v1_rides_id_requests",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "user": {
+              "$ref": "#/components/schemas/UserCard"
+             },
+             "status": {
+              "type": "string",
+              "enum": [
+               "pending",
+               "accepted"
+              ]
+             },
+             "note": {
+              "type": "string"
+             },
+             "created_at": {
+              "type": "string",
+              "format": "date-time"
+             }
+            },
+            "required": [
+             "user",
+             "status",
+             "note",
+             "created_at"
+            ]
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/rides/{id}/requests/{uid}": {
+   "post": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Принять (если есть место) или отказать/высадить",
+    "operationId": "post_api_v1_rides_id_requests_uid",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     },
+     {
+      "name": "uid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "accept": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "accept"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ride"
         }
        }
       }

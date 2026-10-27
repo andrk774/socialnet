@@ -32,6 +32,8 @@ const notifText = {
     hike_removed: "убрал(а) вас из похода", event_seat: "Освободилось место — вы в походе",
     hike_control_soon: "Через час контрольный срок похода — отметьте возвращение", hike_alert_sent: "Контрольный срок прошёл: доверенным контактам отправлены письма",
     hike_returned: "отметил(а), что группа вернулась",
+    ride_request: "просится в вашу машину", ride_accepted: "берёт вас в поездку", ride_declined: "не сможет взять вас в поездку",
+    ride_left: "передумал(а) ехать с вами", ride_canceled: "отменил(а) поездку",
 };
 export function NotificationsPage({ onRead }) {
     const list = useLoad(() => get("/notifications?limit=50"), []);
@@ -48,7 +50,8 @@ export function NotificationsPage({ onRead }) {
             h("span", null,
                 n.actor && h(UserLink, { user: n.actor }),
                 " ",
-                n.post_id ? h("a", { href: `/p/${n.post_id}` }, notifText[n.type] ?? n.type) : n.event_id ? h("a", { href: `/events/${n.event_id}` }, notifText[n.type] ?? n.type) : notifText[n.type] ?? n.type,
+                n.post_id ? h("a", { href: `/p/${n.post_id}` }, notifText[n.type] ?? n.type) : n.event_id ? h("a", { href: `/events/${n.event_id}` }, notifText[n.type] ?? n.type)
+                    : n.ride_id ? h("a", { href: `/rides#ride-${n.ride_id}` }, notifText[n.type] ?? n.type) : notifText[n.type] ?? n.type,
                 h("br", null),
                 h(Time, { iso: n.created_at })))))))));
 }

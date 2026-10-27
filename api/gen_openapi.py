@@ -99,8 +99,10 @@ schemas = {
     "Article": obj(id=int_, author=S("UserCard"), title=str_, cover_url=nullable(str_), cover_thumb_url=nullable(str_),
                    cover_media_id=nullable(uuid), route_id=nullable(uuid), status=enum("draft", "published"), excerpt=str_,
                    created_at=dt, updated_at=dt, published_at=nullable(dt), **{"body?": str_, "blocks?": arr(S("Block"))}),
+    "Ride": obj(id=int_, driver=S("UserCard"), event_id=nullable(int_), **{"from": str_}, to=str_, departs_at=dt, seats=int_,
+                taken=int_, pending=int_, note=str_, my_status=nullable(enum("pending", "accepted")), created_at=dt),
     "Application": obj(user=S("UserCard"), note=str_, created_at=dt),
-    "Notification": obj(id=int_, type=str_, **{"actor?": S("UserCard"), "post_id?": int_, "comment_id?": int_, "event_id?": int_},
+    "Notification": obj(id=int_, type=str_, **{"actor?": S("UserCard"), "post_id?": int_, "comment_id?": int_, "event_id?": int_, "ride_id?": int_},
                         created_at=dt, read=bool_),
     "Message": obj(id=int_, conversation_id=int_, sender_id=int_, kind=enum("text", "service"),
                    **{"body?": str_, "ciphertext?": b64, "nonce?": b64},
@@ -420,6 +422,16 @@ r("POST", A + "/articles/preview", "wall", "Предпросмотр разме�
 r("GET", A + "/articles/{id}", "wall", "Статья с деревом блоков (черновик — только автору)", resp=S("Article"))
 r("PATCH", A + "/articles/{id}", "wall", "Изменить, опубликовать (status=published) или снять в черновики", art, S("Article"))
 r("DELETE", A + "/articles/{id}", "wall", "Удалить", code=204)
+r("POST", A + "/rides", "events", "Подвоз к началу маршрута: места в машине (деньги приложение не принимает)",
+  obj(**{"from": str_}, to=str_, departs_at=dt, seats=int_, **{"event_id?": int_, "note?": str_}), S("Ride"), 201)
+r("GET", A + "/rides", "events", "Предстоящие поездки: ?event_id=&to=", resp=obj(items=arr(S("Ride"))))
+r("GET", A + "/rides/{id}", "events", "Поездка", resp=S("Ride"))
+r("DELETE", A + "/rides/{id}", "events", "Отменить (водитель); попутчикам — уведомление", code=204)
+r("POST", A + "/rides/{id}/request", "events", "Попроситься", obj(**{"note?": str_}), S("Ride"))
+r("DELETE", A + "/rides/{id}/request", "events", "Отозвать заявку или выйти", code=204)
+r("GET", A + "/rides/{id}/requests", "events", "Заявки и попутчики (водителю)",
+  resp=obj(items=arr(obj(user=S("UserCard"), status=enum("pending", "accepted"), note=str_, created_at=dt))))
+r("POST", A + "/rides/{id}/requests/{uid}", "events", "Принять (если есть место) или отказать/высадить", obj(accept=bool_), S("Ride"))
 r("GET", A + "/weather", "routes", "Прогноз на 10 дней (Open-Meteo через сервер, кеш час, район ~5 км): ?lat=&lon=&elevation=",
   resp=obj(lat=num, lon=num, elevation=nullable(num), source=str_, fetched_at=dt,
            days=arr(obj(date={"type": "string", "format": "date"}, code=int_, t_max=nullable(num), t_min=nullable(num),

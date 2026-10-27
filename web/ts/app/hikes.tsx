@@ -6,6 +6,7 @@ import { del, get, Page, patch, post, Route, UserCard } from "./api.js";
 import { navigate } from "./router.js";
 import { RouteCard } from "./routes.js";
 import { Weather } from "./weather.js";
+import { Rides } from "./rides.js";
 import { useMe } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, RichText, Time, UserLink, useLoad } from "./ui.js";
 
@@ -145,6 +146,9 @@ export function EventPage({ id }: { id: number }) {
       )}
 
       {e.kind === "hike" && e.control_at && <Control e={e} canMark={e.my_status === "going" || isOrganizer} onChange={ev.reload} />}
+
+      <h2>Подвоз</h2>
+      <Rides eventId={e.id} meeting={e.meeting_point} />
 
       {isOrganizer && e.pending_count > 0 && <Applications id={id} onChange={ev.reload} />}
 
