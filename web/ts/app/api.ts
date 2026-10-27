@@ -34,7 +34,7 @@ export interface Post {
   id: number; author: UserCard; community?: { id: number; slug: string; name: string }; text: string;
   photos: Photo[]; tracks: PostTrack[]; videos: PostVideo[]; documents: PostDocument[]; routes: Route[]; poll: Poll | null;
   audience: Audience; bookmarked: boolean; likes_count: number; comments_count: number;
-  my_reaction: Reaction | null; reactions: Partial<Record<Reaction, number>>; created_at: string;
+  my_reaction: Reaction | string | null; reactions: Record<string, number>; created_at: string;
 }
 export interface Scheduled {
   id: number; author_id: number; community_id?: number; publish_at: string; status: "pending" | "published" | "failed" | "canceled";

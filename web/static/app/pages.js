@@ -1,7 +1,7 @@
 import { h, Fragment } from "../vendor/preact/index.js";
 import { useEffect, useState } from "../vendor/preact/hooks.js";
-import { del, fullName, get, post } from "./api.js";
-import { Composer, PostList, PostView } from "./posts.js";
+import { del, fullName, get, post, upload } from "./api.js";
+import { Composer, PostList, PostView, communityEmoji } from "./posts.js";
 import { query } from "./router.js";
 import { Avatar, Empty, ErrorLine, Loading, Time, UserLink, duration, useLoad } from "./ui.js";
 import { DeleteAccount } from "./legal.js";
@@ -133,8 +133,54 @@ export function CommunityPage({ slug }) {
             com.my_role !== "owner" && h("button", { class: com.my_role ? "ghost" : "primary", onClick: toggle }, com.my_role ? "Выйти" : com.visibility === "closed" ? "Подать заявку" : "Вступить"),
             canPost && h("a", { class: "ghost-link", href: `/scheduled?community=${com.id}` }, "\u041E\u0442\u043B\u043E\u0436\u0435\u043D\u043D\u044B\u0435 \u0437\u0430\u043F\u0438\u0441\u0438 \u0441\u043E\u043E\u0431\u0449\u0435\u0441\u0442\u0432\u0430"),
             msg && h("p", { class: "note" }, msg),
-            h(ErrorLine, { error: error })),
+            h(ErrorLine, { error: error }),
+            ["admin", "owner"].includes(com.my_role) && h(EmojiManager, { communityId: com.id })),
         h(PostList, { path: `/communities/${com.id}/posts`, empty: com.visibility === "closed" && !com.my_role ? "Записи видят только участники." : "Записей пока нет.", header: (add) => (canPost ? h(Composer, { communityId: com.id, onPosted: add }) : null) })));
+}
+// EmojiManager — свои эмодзи сообщества (администраторам).
+function EmojiManager({ communityId }) {
+    const [list, setList] = useState(null);
+    const [code, setCode] = useState("");
+    const [file, setFile] = useState(null);
+    const [error, setError] = useState(null);
+    const load = (fresh = false) => communityEmoji(communityId, fresh).then(setList);
+    useEffect(() => { load(); }, [communityId]);
+    const add = async (e) => {
+        e.preventDefault();
+        if (!file)
+            return;
+        setError(null);
+        try {
+            const m = await upload("/media", file);
+            await post(`/communities/${communityId}/emoji`, { shortcode: code, media_id: m.id });
+            setCode("");
+            setFile(null);
+            load(true);
+        }
+        catch (err) {
+            setError(err);
+        }
+    };
+    return (h("details", { class: "create emoji-manager" },
+        h("summary", null,
+            "\u042D\u043C\u043E\u0434\u0437\u0438 \u0441\u043E\u043E\u0431\u0449\u0435\u0441\u0442\u0432\u0430",
+            list ? ` (${list.length})` : ""),
+        list && list.length > 0 && h("ul", { class: "emoji-list" }, list.map((e) => h("li", { key: e.id },
+            h("img", { class: "emoji", src: e.url, alt: "", width: 28, height: 28 }),
+            " :",
+            e.shortcode,
+            ":",
+            h("button", { class: "link", onClick: () => del(`/communities/${communityId}/emoji/${e.id}`).then(() => load(true), setError) }, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C")))),
+        h("form", { class: "row", onSubmit: add },
+            h("label", null,
+                "\u041A\u043E\u0434",
+                h("input", { value: code, required: true, pattern: "[a-z0-9_]{2,32}", title: "2\u201332 \u0441\u0438\u043C\u0432\u043E\u043B\u0430: a\u2013z, 0\u20139, _", onInput: (e) => setCode(e.target.value), placeholder: "gora" })),
+            h("label", null,
+                "\u041A\u0430\u0440\u0442\u0438\u043D\u043A\u0430",
+                h("input", { type: "file", accept: "image/png,image/jpeg", required: true, onChange: (e) => setFile(e.target.files?.[0] ?? null) })),
+            h("button", { class: "primary" }, "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C")),
+        h("p", { class: "hint" }, "\u0423\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u0438 \u0441\u043C\u043E\u0433\u0443\u0442 \u0440\u0435\u0430\u0433\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u044D\u0442\u0438\u043C\u0438 \u044D\u043C\u043E\u0434\u0437\u0438 \u043D\u0430 \u0437\u0430\u043F\u0438\u0441\u0438 \u0441\u043E\u043E\u0431\u0449\u0435\u0441\u0442\u0432\u0430."),
+        h(ErrorLine, { error: error })));
 }
 const txKind = { transfer: "Перевод", gift: "Подарок", donation: "Пожертвование", reward: "Бонус", mint: "Начисление", purchase: "Покупка", payout: "Вывод", refund: "Возврат платежа", debt: "Погашение долга" };
 export function WalletPage() {

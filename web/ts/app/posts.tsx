@@ -1,5 +1,5 @@
 import { h, Fragment } from "../vendor/preact/index.js";
-import { useRef, useState } from "../vendor/preact/hooks.js";
+import { useEffect, useRef, useState } from "../vendor/preact/hooks.js";
 import { Audience, Comment, Doc, Page, Photo, Poll, Post, PostDocument, Reaction, Route, Scheduled, UserCard, api, del, fileSize, fullName, get, patch, post, put, saveFile, upload } from "./api.js";
 import { me } from "./session.js";
 import { RouteCard, km } from "./routes.js";
@@ -9,6 +9,23 @@ const reactions: [Reaction, string, string][] = [
   ["like", "👍", "Нравится"], ["love", "❤️", "Люблю"], ["haha", "😄", "Смешно"],
   ["wow", "😮", "Ого"], ["sad", "😢", "Грустно"], ["angry", "😠", "Возмутительно"],
 ];
+
+// Свои эмодзи сообществ: загружаются один раз на сообщество.
+export interface Emoji { id: number; community_id: number; shortcode: string; url: string; reaction: string }
+const emojiCache = new Map<number, Promise<Emoji[]>>();
+export function communityEmoji(id: number, fresh = false): Promise<Emoji[]> {
+  if (fresh || !emojiCache.has(id)) {
+    emojiCache.set(id, get<{ items: Emoji[] }>(`/communities/${id}/emoji`).then((r) => r.items).catch(() => { emojiCache.delete(id); return []; }));
+  }
+  return emojiCache.get(id)!;
+}
+
+function ReactionIcon({ r, custom }: { r: string; custom: Emoji[] }) {
+  const std = reactions.find(([k]) => k === r);
+  if (std) return <>{std[1]}</>;
+  const e = custom.find((x) => x.reaction === r);
+  return e ? <img class="emoji" src={e.url} alt={`:${e.shortcode}:`} title={`:${e.shortcode}:`} width={20} height={20} /> : <>👍</>;
+}
 
 const audienceLabel: Record<Audience, string> = { everyone: "Все", friends: "Друзья", only_me: "Только я", list: "Выбранные друзья" };
 
@@ -278,7 +295,10 @@ export function PostView({ initial, onDelete }: { initial: Post; onDelete?: () =
     try { await fn(); } catch (e) { setError(e); }
   };
 
-  const react = (r: Reaction | null) => act(async () => {
+  const [custom, setCustom] = useState<Emoji[]>([]);
+  useEffect(() => { if (p.community) communityEmoji(p.community.id).then(setCustom); }, [p.community?.id]);
+
+  const react = (r: Reaction | string | null) => act(async () => {
     setPicking(false);
     const res = r === null || r === p.my_reaction
       ? await api<{ likes_count: number }>("DELETE", `/posts/${p.id}/reactions`)
@@ -304,8 +324,9 @@ export function PostView({ initial, onDelete }: { initial: Post; onDelete?: () =
     setP(await patch<Post>(`/posts/${p.id}`, { audience: a }));
   });
 
-  const top = (Object.entries(p.reactions) as [Reaction, number][]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const top = (Object.entries(p.reactions) as [string, number][]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
   const mineR = reactions.find(([r]) => r === p.my_reaction);
+  const mineCustom = custom.find((e) => e.reaction === p.my_reaction);
   return (
     <article class="post" aria-labelledby={`post-${p.id}-author`}>
       <header class="post-head">
@@ -337,16 +358,17 @@ export function PostView({ initial, onDelete }: { initial: Post; onDelete?: () =
           <button class={p.my_reaction ? "chip active" : "chip"} aria-pressed={!!p.my_reaction}
             onClick={() => (p.my_reaction ? react(null) : react("like"))}
             onContextMenu={(e) => { e.preventDefault(); setPicking(!picking); }}>
-            {mineR ? mineR[1] : "👍"} {p.likes_count > 0 ? p.likes_count : ""}
-            <span class="sr-only">{mineR ? `Ваша реакция: ${mineR[2]}. Убрать` : "Нравится"}</span>
+            {p.my_reaction ? <ReactionIcon r={p.my_reaction} custom={custom} /> : "👍"} {p.likes_count > 0 ? p.likes_count : ""}
+            <span class="sr-only">{mineR ? `Ваша реакция: ${mineR[2]}. Убрать` : mineCustom ? `Ваша реакция: ${mineCustom.shortcode}. Убрать` : "Нравится"}</span>
           </button>
           <button class="chip" aria-expanded={picking} aria-label="Выбрать реакцию" onClick={() => setPicking(!picking)}>…</button>
           {picking && (
             <div class="react-picker" role="menu">
               {reactions.map(([r, emoji, label]) => <button role="menuitem" key={r} title={label} aria-label={label} onClick={() => react(r)}>{emoji}</button>)}
+              {custom.map((e) => <button role="menuitem" key={e.id} title={`:${e.shortcode}:`} aria-label={e.shortcode} onClick={() => react(e.reaction)}><img class="emoji" src={e.url} alt="" width={22} height={22} /></button>)}
             </div>
           )}
-          {top.length > 1 && <span class="muted react-top">{top.map(([r]) => reactions.find((x) => x[0] === r)![1]).join("")}</span>}
+          {top.length > 1 && <span class="muted react-top">{top.map(([r]) => <ReactionIcon key={r} r={r} custom={custom} />)}</span>}
         </div>
         <button class="chip" aria-expanded={open} onClick={() => setOpen(!open)}>
           Комментарии{p.comments_count > 0 ? ` ${p.comments_count}` : ""}

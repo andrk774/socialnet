@@ -406,6 +406,9 @@ func (s *Server) Router() http.Handler {
 				r.Post("/communities/{id}/requests/{userID}/approve", s.handleResolveJoin(true))
 				r.Post("/communities/{id}/requests/{userID}/reject", s.handleResolveJoin(false))
 				r.Get("/communities/{id}/events", s.handleCommunityEvents)
+				r.Get("/communities/{id}/emoji", s.handleCommunityEmoji)
+				r.Post("/communities/{id}/emoji", s.handleAddEmoji)
+				r.Delete("/communities/{id}/emoji/{eid}", s.handleDeleteEmoji)
 
 				// истории
 				r.Post("/stories", s.handleCreateStory)

@@ -1,7 +1,7 @@
 import { h, Fragment } from "../vendor/preact/index.js";
 import { useEffect, useState } from "../vendor/preact/hooks.js";
-import { Page, Post, UserCard, del, fullName, get, post } from "./api.js";
-import { Composer, PostList, PostView } from "./posts.js";
+import { Page, Post, UserCard, del, fullName, get, post, upload } from "./api.js";
+import { Composer, Emoji, PostList, PostView, communityEmoji } from "./posts.js";
 import { query } from "./router.js";
 import { Avatar, Empty, ErrorLine, Loading, Time, UserLink, duration, useLoad } from "./ui.js";
 import { DeleteAccount } from "./legal.js";
@@ -141,10 +141,47 @@ export function CommunityPage({ slug }: { slug: string }) {
         {canPost && <a class="ghost-link" href={`/scheduled?community=${com.id}`}>Отложенные записи сообщества</a>}
         {msg && <p class="note">{msg}</p>}
         <ErrorLine error={error} />
+        {["admin", "owner"].includes(com.my_role) && <EmojiManager communityId={com.id} />}
       </header>
       <PostList path={`/communities/${com.id}/posts`} empty={com.visibility === "closed" && !com.my_role ? "Записи видят только участники." : "Записей пока нет."}
         header={(add) => (canPost ? <Composer communityId={com.id} onPosted={add} /> : null)} />
     </section>
+  );
+}
+
+// EmojiManager — свои эмодзи сообщества (администраторам).
+function EmojiManager({ communityId }: { communityId: number }) {
+  const [list, setList] = useState<Emoji[] | null>(null);
+  const [code, setCode] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const load = (fresh = false) => communityEmoji(communityId, fresh).then(setList);
+  useEffect(() => { load(); }, [communityId]);
+  const add = async (e: Event) => {
+    e.preventDefault();
+    if (!file) return;
+    setError(null);
+    try {
+      const m = await upload<{ id: string }>("/media", file);
+      await post(`/communities/${communityId}/emoji`, { shortcode: code, media_id: m.id });
+      setCode(""); setFile(null); load(true);
+    } catch (err) { setError(err); }
+  };
+  return (
+    <details class="create emoji-manager">
+      <summary>Эмодзи сообщества{list ? ` (${list.length})` : ""}</summary>
+      {list && list.length > 0 && <ul class="emoji-list">
+        {list.map((e) => <li key={e.id}><img class="emoji" src={e.url} alt="" width={28} height={28} /> :{e.shortcode}:
+          <button class="link" onClick={() => del(`/communities/${communityId}/emoji/${e.id}`).then(() => load(true), setError)}>Удалить</button></li>)}
+      </ul>}
+      <form class="row" onSubmit={add}>
+        <label>Код<input value={code} required pattern="[a-z0-9_]{2,32}" title="2–32 символа: a–z, 0–9, _" onInput={(e) => setCode((e.target as HTMLInputElement).value)} placeholder="gora" /></label>
+        <label>Картинка<input type="file" accept="image/png,image/jpeg" required onChange={(e) => setFile((e.target as HTMLInputElement).files?.[0] ?? null)} /></label>
+        <button class="primary">Добавить</button>
+      </form>
+      <p class="hint">Участники смогут реагировать этими эмодзи на записи сообщества.</p>
+      <ErrorLine error={error} />
+    </details>
   );
 }
 

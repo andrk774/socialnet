@@ -365,6 +365,29 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await bob.page.locator(".article-card", { hasText: "Три дня на Таганае" }).waitFor();
 }
 
+// сообщество со своими эмодзи: администратор добавляет, участник реагирует
+{
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+  await anna.page.getByRole("link", { name: "Сообщества" }).click();
+  await anna.page.getByText("Создать сообщество").click();
+  await anna.page.getByLabel("Название").fill("Клуб Таганая");
+  await anna.page.getByLabel("Адрес").fill("taganay_club");
+  await anna.page.getByRole("button", { name: "Создать" }).click();
+  await anna.page.getByRole("link", { name: "Клуб Таганая" }).click();
+  await anna.page.getByText(/^Эмодзи сообщества/).click();
+  await anna.page.locator(".emoji-manager").getByLabel("Код").fill("gora");
+  await anna.page.locator(".emoji-manager").getByLabel("Картинка").setInputFiles({ name: "gora.png", mimeType: "image/png", buffer: png });
+  await anna.page.locator(".emoji-manager").getByRole("button", { name: "Добавить" }).click();
+  await anna.page.locator(".emoji-list li", { hasText: ":gora:" }).waitFor();
+  await anna.page.getByPlaceholder("Что у вас нового?").fill("Сбор клуба в субботу");
+  await anna.page.getByRole("button", { name: "Опубликовать" }).click();
+  await bob.page.goto(base + "/c/taganay_club");
+  const cpost = bob.page.locator("article.post", { hasText: "Сбор клуба в субботу" });
+  await cpost.getByRole("button", { name: "Выбрать реакцию" }).click();
+  await cpost.getByRole("menuitem", { name: "gora" }).click();
+  await cpost.locator(".react-wrap button.chip.active img.emoji").waitFor();
+}
+
 // отложенная запись
 await anna.page.goto(base + "/");
 await anna.page.getByPlaceholder("Что у вас нового?").fill("Это выйдет через час");
