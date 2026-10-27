@@ -54,7 +54,8 @@ func (s *Server) handleAddEmoji(w http.ResponseWriter, r *http.Request) {
 		writeFieldErrors(w, http.StatusUnprocessableEntity, "validation_failed", "invalid input", errs)
 		return
 	}
-	id, err := s.store.AddEmoji(r.Context(), c.ID, userIDFrom(r.Context()), code, media)
+	max := s.plusLimit(r, c.OwnerID, store.MaxEmojiPerCommunity, store.MaxEmojiPerCommunityPlus) // клуб: «Плюс» у владельца
+	id, err := s.store.AddEmoji(r.Context(), c.ID, userIDFrom(r.Context()), code, media, max)
 	switch {
 	case errors.Is(err, store.ErrBadPhoto):
 		writeFieldErrors(w, http.StatusUnprocessableEntity, "validation_failed", "invalid input", map[string]string{"media_id": "photo not found"})
@@ -63,7 +64,7 @@ func (s *Server) handleAddEmoji(w http.ResponseWriter, r *http.Request) {
 		writeFieldErrors(w, http.StatusConflict, "conflict", "already exists", map[string]string{"shortcode": "already used in this community"})
 		return
 	case errors.Is(err, store.ErrTooMany):
-		writeError(w, http.StatusUnprocessableEntity, "too_many_emoji", fmt.Sprintf("at most %d emoji", store.MaxEmojiPerCommunity))
+		writeError(w, http.StatusUnprocessableEntity, "too_many_emoji", fmt.Sprintf("at most %d emoji", max))
 		return
 	case err != nil:
 		s.internalError(w, r, err)

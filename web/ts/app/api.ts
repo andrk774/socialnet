@@ -4,7 +4,7 @@
 export interface UserCard { id: number; username: string; first_name: string; last_name: string; avatar_url: string | null }
 export interface Self extends UserCard {
   email: string; email_verified: boolean; status_text: string; city: string; about: string;
-  role: "user" | "moderator" | "admin"; two_factor_enabled: boolean; consent_required: boolean;
+  role: "user" | "moderator" | "admin"; two_factor_enabled: boolean; consent_required: boolean; plus: boolean;
 }
 export interface Photo { id: string; url: string; thumb_url: string }
 export interface PostTrack { id: string; title: string; artist: string; duration_sec: number; url: string }

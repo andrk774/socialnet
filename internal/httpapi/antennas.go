@@ -66,10 +66,11 @@ func (s *Server) saveAntenna(w http.ResponseWriter, r *http.Request, id int64) {
 		return
 	}
 	me := userIDFrom(r.Context())
-	id, err := s.store.SaveAntenna(r.Context(), me, id, name, kw, ex)
+	max := s.plusLimit(r, me, store.MaxAntennas, store.MaxAntennasPlus)
+	id, err := s.store.SaveAntenna(r.Context(), me, id, name, kw, ex, max)
 	switch {
 	case errors.Is(err, store.ErrTooMany):
-		writeError(w, http.StatusUnprocessableEntity, "too_many_antennas", fmt.Sprintf("at most %d feeds", store.MaxAntennas))
+		writeError(w, http.StatusUnprocessableEntity, "too_many_antennas", fmt.Sprintf("at most %d feeds", max))
 		return
 	case errors.Is(err, store.ErrNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "feed not found")

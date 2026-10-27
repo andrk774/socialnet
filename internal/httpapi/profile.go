@@ -19,6 +19,10 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 	v := toSelf(user)
 	v.ConsentRequired = viewerFrom(r.Context()).NeedsConsent
+	if v.Plus, err = s.store.HasPlus(r.Context(), user.ID); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, v)
 }
 
@@ -149,6 +153,10 @@ func (s *Server) respondProfile(w http.ResponseWriter, r *http.Request, user *st
 	}
 	v := toProfile(user, me == user.ID, rel)
 	v.Presence = s.presence(user.ID, user.LastSeenAt, user.OnlineVisibility, me == user.ID, rel)
+	if v.Plus, err = s.store.HasPlus(r.Context(), user.ID); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, v)
 }
 

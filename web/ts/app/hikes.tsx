@@ -2,7 +2,7 @@
 // заявками, форма организатора. Маршрут похода — карточка из routes.tsx.
 import { Fragment, h } from "../vendor/preact/index.js";
 import { useState } from "../vendor/preact/hooks.js";
-import { del, get, Page, patch, post, Route, UserCard } from "./api.js";
+import { del, get, Page, patch, post, Route, saveFile, UserCard } from "./api.js";
 import { navigate } from "./router.js";
 import { RouteCard } from "./routes.js";
 import { Weather } from "./weather.js";
@@ -127,6 +127,7 @@ export function EventPage({ id }: { id: number }) {
           {e.my_status === "pending" ? "Отозвать заявку" : e.my_status === "waitlist" ? "Выйти из очереди" : "Не пойду"}
         </button>}
         <a class="ghost button-link" href={`/events/${id}/print`}>Лист для печати</a>
+        {isOrganizer && me.plus && <button class="ghost" onClick={() => saveFile(`/events/${id}/participants.csv`, `участники-${id}.csv`).catch(setError)}>Список группы (CSV)</button>}
         {isOrganizer && <button class="ghost" onClick={() => setEditing(true)}>Изменить</button>}
         {isOrganizer && <button class="ghost danger" onClick={() => confirm("Удалить поход? Участники его больше не увидят.") && act(async () => { await del(`/events/${id}`); navigate("/hikes"); })}>Удалить</button>}
       </div>

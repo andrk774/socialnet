@@ -99,10 +99,11 @@ func (s *Server) handleCreateCompanionAd(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	a.DateFrom, a.DateTo = *from, *to
-	id, err := s.store.CreateCompanionAd(r.Context(), a)
+	maxOpen := s.plusLimit(r, me, store.MaxOpenCompanionAds, store.MaxOpenCompanionAdsPlus)
+	id, err := s.store.CreateCompanionAd(r.Context(), a, maxOpen)
 	if errors.Is(err, store.ErrTooMany) {
 		writeError(w, http.StatusUnprocessableEntity, "too_many_ads",
-			fmt.Sprintf("at most %d open ads; close one first", store.MaxOpenCompanionAds))
+			fmt.Sprintf("at most %d open ads; close one first", maxOpen))
 		return
 	}
 	if err != nil {

@@ -72,7 +72,8 @@ export function RouteCard({ route }: { route: Route }) {
     setError(null);
     try {
       if (offline === "yes") { await removeOffline(route.id); setOffline("no"); return; }
-      await saveOffline(route.id, maxZoom, (d, t) => setOffline(t ? `${Math.round((d / t) * 100)}%` : "…"));
+      // с «Плюсом» — больше тайлов: подробнее карта без сети
+      await saveOffline(route.id, maxZoom, (d, t) => setOffline(t ? `${Math.round((d / t) * 100)}%` : "…"), me?.plus ? 2000 : 600);
       setOffline("yes");
     } catch (e) { setError(e); setOffline("no"); }
   };

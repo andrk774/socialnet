@@ -18,7 +18,7 @@ const lat2y = (lat: number, z: number) => {
 
 // tilesFor — тайлы рамки маршрута (с запасом) на масштабах 10…maxZoom;
 // если их больше лимита, крупные масштабы отбрасываются.
-export function tilesFor(bbox: [number, number, number, number], maxZoom: number): string[] {
+export function tilesFor(bbox: [number, number, number, number], maxZoom: number, maxTiles = MAX_TILES): string[] {
   const [s, w, n, e] = bbox;
   const padLat = Math.max((n - s) * 0.15, 0.005), padLon = Math.max((e - w) * 0.15, 0.005);
   for (let top = Math.min(maxZoom, 16); top >= 10; top--) {
@@ -27,7 +27,7 @@ export function tilesFor(bbox: [number, number, number, number], maxZoom: number
       const x0 = lon2x(w - padLon, z), x1 = lon2x(e + padLon, z), y0 = lat2y(n + padLat, z), y1 = lat2y(s - padLat, z);
       for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) out.push(`/tiles/${z}/${x}/${y}.png`);
     }
-    if (out.length <= MAX_TILES) return out;
+    if (out.length <= maxTiles) return out;
   }
   return [];
 }
@@ -42,9 +42,9 @@ async function fetchTile(url: string, cache: Cache): Promise<void> {
   }
 }
 
-export async function saveOffline(id: string, maxZoom: number, onProgress: (done: number, total: number) => void): Promise<void> {
+export async function saveOffline(id: string, maxZoom: number, onProgress: (done: number, total: number) => void, maxTiles = MAX_TILES): Promise<void> {
   const route = await get<Route>(`/routes/${id}`);
-  const tiles = tilesFor(route.bbox, maxZoom);
+  const tiles = tilesFor(route.bbox, maxZoom, maxTiles);
   const tc = await caches.open(TILES);
   let done = 0, next = 0;
   onProgress(0, tiles.length);

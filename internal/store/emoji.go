@@ -18,7 +18,8 @@ type Emoji struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
-const MaxEmojiPerCommunity = 50
+// Эмодзи в сообществе: обычно и если у владельца «Плюс» (клубы).
+const MaxEmojiPerCommunity, MaxEmojiPerCommunityPlus = 50, 200
 
 var ErrDuplicateEmoji = errors.New("shortcode taken")
 
@@ -44,7 +45,7 @@ func (s *Store) CommunityEmoji(ctx context.Context, community int64) ([]Emoji, e
 }
 
 // AddEmoji: фото — только своё; не больше MaxEmojiPerCommunity.
-func (s *Store) AddEmoji(ctx context.Context, community, by int64, shortcode, media string) (int64, error) {
+func (s *Store) AddEmoji(ctx context.Context, community, by int64, shortcode, media string, max int) (int64, error) {
 	var id int64
 	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `SELECT 1 FROM communities WHERE id = $1 FOR UPDATE`, community); err != nil {
@@ -54,7 +55,7 @@ func (s *Store) AddEmoji(ctx context.Context, community, by int64, shortcode, me
 		if err := tx.QueryRow(ctx, `SELECT count(*) FROM community_emoji WHERE community_id = $1`, community).Scan(&n); err != nil {
 			return err
 		}
-		if n >= MaxEmojiPerCommunity {
+		if n >= max {
 			return ErrTooMany
 		}
 		var mine bool

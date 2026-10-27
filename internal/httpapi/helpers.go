@@ -73,6 +73,7 @@ func validUUID(s string) bool { return uuidRe.MatchString(s) }
 type selfView struct {
 	ID               int64       `json:"id"`
 	ConsentRequired  bool        `json:"consent_required"` // принять новую редакцию документов
+	Plus             bool        `json:"plus"`
 	Email            string      `json:"email"`
 	EmailVerified    bool        `json:"email_verified"`
 	Username         string      `json:"username"`
@@ -125,6 +126,7 @@ type profileView struct {
 	City         string       `json:"city,omitempty"`
 	About        string       `json:"about,omitempty"`
 	CreatedAt    *time.Time   `json:"created_at,omitempty"`
+	Plus         bool         `json:"plus"` // значок подписки «Плюс»
 	Relationship relView      `json:"relationship"`
 	Presence     presenceView `json:"presence"`
 }

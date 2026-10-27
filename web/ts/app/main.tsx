@@ -13,6 +13,7 @@ import { OfflinePage } from "./offlinepage.js";
 import { ArticleEditor, ArticlePage, ArticlesPage } from "./articles.js";
 import { RidesPage } from "./rides.js";
 import { AntennasPage } from "./antennas.js";
+import { PlusPage } from "./plus.js";
 import { AdminPage } from "./admin.js";
 import { BookmarksPage, DocumentsPage, ScheduledPage } from "./library.js";
 import { on, startRealtime, stopRealtime } from "./realtime.js";
@@ -41,6 +42,7 @@ function routes(path: string, onRead: () => void, myId: number): ComponentChildr
   if (match("/articles", path)) return <ArticlesPage />;
   if (match("/rides", path)) return <RidesPage />;
   if (match("/feeds", path)) return <AntennasPage />;
+  if (match("/plus", path)) return <PlusPage />;
   if (match("/articles/new", path)) return <ArticleEditor />;
   if ((p = match("/articles/:id/edit", path))) return <ArticleEditor id={+p.id} />;
   if ((p = match("/articles/:id", path))) return <ArticlePage id={+p.id} />;
@@ -60,7 +62,7 @@ function routes(path: string, onRead: () => void, myId: number): ComponentChildr
 const nav: [string, string][] = [
   ["/", "Лента"], ["/feeds", "Мои ленты"], ["/hikes", "Походы"], ["/companions", "Попутчики"], ["/rides", "Подвоз"], ["/articles", "Статьи"], ["/im", "Сообщения"], ["/notifications", "Уведомления"],
   ["/communities", "Сообщества"], ["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"],
-  ["/scheduled", "Отложенные"], ["/offline", "Офлайн"], ["/wallet", "Кошелёк"], ["/settings", "Безопасность"],
+  ["/scheduled", "Отложенные"], ["/offline", "Офлайн"], ["/wallet", "Кошелёк"], ["/plus", "Плюс"], ["/settings", "Безопасность"],
 ];
 
 function Shell() {

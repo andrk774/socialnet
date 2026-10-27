@@ -37,12 +37,12 @@ schemas = {
                    profile_visibility=enum("everyone", "friends", "only_me"),
                    friends_visibility=enum("everyone", "friends", "only_me"),
                    message_privacy=enum("everyone", "friends", "nobody"), searchable=bool_),
-    "Self": obj(id=int_, consent_required=bool_, email=str_, email_verified=bool_, username=str_, first_name=str_, last_name=str_,
+    "Self": obj(id=int_, consent_required=bool_, plus=bool_, email=str_, email_verified=bool_, username=str_, first_name=str_, last_name=str_,
                 status_text=str_, city=str_, about=str_, avatar_url=nullable(str_), role=enum("user", "moderator", "admin"),
                 two_factor_enabled=bool_, privacy=S("Privacy"), created_at=dt),
     "Presence": obj(user_id=int_, **{"online?": bool_, "last_seen?": dt,
                                      "last_seen_approx?": enum("recently", "within_week", "within_month", "long_ago")}),
-    "Profile": obj(id=int_, username=str_, first_name=str_, last_name=str_, avatar_url=nullable(str_), closed=bool_,
+    "Profile": obj(id=int_, plus=bool_, username=str_, first_name=str_, last_name=str_, avatar_url=nullable(str_), closed=bool_,
                    **{"status_text?": str_, "city?": str_, "about?": str_, "created_at?": dt},
                    relationship=obj(status=enum("self", "friends", "request_sent", "request_received", "none"),
                                     i_blocked=bool_, can_write=bool_),
@@ -425,6 +425,12 @@ r("POST", A + "/antennas", "wall", "Новая лента: 1–10 слов (ру
 r("PUT", A + "/antennas/{id}", "wall", "Изменить ленту", antenna_body, antenna)
 r("DELETE", A + "/antennas/{id}", "wall", "Удалить ленту", code=204)
 r("GET", A + "/antennas/{id}/posts", "wall", "Записи ленты (только видимые); первая страница отмечает их просмотренными", resp=lst(S("Post")))
+plus_s = obj(active=bool_, expires_at=nullable(dt), auto_renew=bool_, price=int_, days=int_, limits=obj())
+r("GET", A + "/plus", "wallet", "Подписка «Плюс»: состояние, цена в монетах, лимиты (обычный и с «Плюсом»)", resp=plus_s)
+r("POST", A + "/plus/buy", "wallet", "Купить или продлить на 30 дней за монеты (ключ идемпотентности обязателен)",
+  obj(idempotency_key=str_), {"allOf": [plus_s, obj(replayed=bool_, balance=int_)]}, 201)
+r("PATCH", A + "/plus", "wallet", "Автопродление", obj(auto_renew=bool_), plus_s)
+r("GET", A + "/events/{id}/participants.csv", "events", "Список группы CSV для регистрации в МЧС (организатору с «Плюсом»)", resp="text")
 r("POST", A + "/articles", "wall", "Статья: разметка ## ### - 1. > --- **жирный** *курсив* [ссылка](https://…) ![подпись](media:UUID); фото и маршрут — свои",
   art, S("Article"), 201)
 r("GET", A + "/articles", "wall", "Опубликованные статьи (без текста, с анонсом)", resp=lst(S("Article")))
