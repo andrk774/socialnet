@@ -228,6 +228,19 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await bob.page.reload();
   await bob.page.getByText("Вы идёте").waitFor();
   await bob.page.getByRole("heading", { name: "Мои доверенные контакты" }).waitFor();
+  // лист для печати: карта, профиль, точки с координатами, снаряжение, 112
+  await anna.page.getByRole("link", { name: "Лист для печати" }).click();
+  await anna.page.locator(".print-sheet .route-map path.map-route").waitFor({ state: "attached" });
+  await anna.page.locator(".print-table td", { hasText: "Финиш" }).waitFor();
+  await anna.page.locator(".print-table", { hasText: "с. ш." }).waitFor();
+  await anna.page.locator(".checklist li", { hasText: "Коврик и спальник" }).waitFor();
+  await anna.page.getByText("единый номер экстренных служб").waitFor();
+  await anna.page.locator("img.leaflet-tile-loaded").first().waitFor();
+  await anna.page.emulateMedia({ media: "print" });
+  assert.equal(await anna.page.locator(".sidenav").isVisible(), false, "navigation hidden when printing");
+  await anna.page.pdf({ path: `${shots}/16-route-sheet.pdf`, format: "A4", printBackground: true });
+  await anna.page.emulateMedia({ media: "screen" });
+  await anna.page.goBack();
   await anna.page.getByRole("button", { name: "Мы вернулись" }).click();
   await anna.page.getByText(/группа вернулась/).waitFor();
   await bob.page.goto(base + "/notifications");

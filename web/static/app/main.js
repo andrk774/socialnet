@@ -8,6 +8,7 @@ import { ProfilePage } from "./profile.js";
 import { EventPage, HikeForm, HikesPage } from "./hikes.js";
 import { CompanionsPage } from "./companions.js";
 import { ConsentGate } from "./legal.js";
+import { PrintPage } from "./print.js";
 import { AdminPage } from "./admin.js";
 import { BookmarksPage, DocumentsPage, ScheduledPage } from "./library.js";
 import { on, startRealtime, stopRealtime } from "./realtime.js";
@@ -42,6 +43,10 @@ function routes(path, onRead, myId) {
         return h(CompanionsPage, null);
     if ((p = match("/events/:id", path)))
         return h(EventPage, { id: +p.id });
+    if ((p = match("/events/:id/print", path)))
+        return h(PrintPage, { eventId: +p.id });
+    if ((p = match("/routes/:id/print", path)))
+        return h(PrintPage, { routeId: p.id });
     if ((p = match("/c/:slug", path)))
         return h(CommunityPage, { slug: p.slug });
     if (match("/music", path))

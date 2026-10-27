@@ -24,6 +24,7 @@ export interface LeafletMap {
 }
 export interface MapOptions {
   zoomControl?: boolean; attributionControl?: boolean; scrollWheelZoom?: boolean | "center";
+  dragging?: boolean; touchZoom?: boolean; doubleClickZoom?: boolean; boxZoom?: boolean; keyboard?: boolean;
   maxZoom?: number; minZoom?: number; preferCanvas?: boolean;
 }
 export interface TileLayerOptions { maxZoom?: number; minZoom?: number; attribution?: string; crossOrigin?: boolean | string }

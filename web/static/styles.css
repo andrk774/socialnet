@@ -396,3 +396,30 @@ body.legal-page { background: var(--surface, #fff); }
 .control .people li { overflow-wrap: anywhere; }
 .hint { display: block; margin-top: .25rem; font-size: var(--step--1); color: var(--ink-2); }
 .control .stack button { justify-self: start; }
+
+/* ---------- лист для печати ---------- */
+.print-sheet { max-width: 48rem; }
+.print-actions { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+.print-when { font-weight: 600; margin-top: -.25rem; }
+.route-map-print .route-map { height: 110mm; border: 1px solid var(--line); }
+.print-profile { max-width: 36rem; margin: .5rem 0 1rem; }
+.print-table { width: 100%; border-collapse: collapse; font-size: var(--step--1); }
+.print-table th, .print-table td { border-bottom: 1px solid var(--line); padding: .35rem .5rem .35rem 0; text-align: left; vertical-align: top; }
+.print-table td:first-child { font-weight: 700; width: 2rem; }
+.checklist { list-style: none; padding: 0; columns: 2 14rem; }
+.checklist li { display: flex; gap: .5rem; align-items: center; break-inside: avoid; margin-bottom: .35rem; }
+.checklist .box { width: .9rem; height: .9rem; border: 1.5px solid var(--ink); border-radius: 2px; flex: none; }
+.print-emergency { border: 2px solid var(--garnet); border-radius: var(--radius-m); padding: .5rem 1rem; margin-top: 1.5rem; break-inside: avoid; }
+.print-emergency h2 { margin-top: .25rem; }
+.leaflet-container .leaflet-tooltip { font-weight: 700; }
+@media print {
+  @page { size: A4; margin: 12mm; }
+  .topbar, .sidenav, .no-print, .banner { display: none !important; }
+  body { background: #fff; color: #000; }
+  .layout, .content { display: block; margin: 0; padding: 0; max-width: none; }
+  .print-sheet { max-width: none; }
+  .print-sheet h2 { break-after: avoid; }
+  .print-table tr, .facts div { break-inside: avoid; }
+  .leaflet-control-container .leaflet-control-zoom { display: none; }
+  a { color: inherit; text-decoration: none; }
+}
