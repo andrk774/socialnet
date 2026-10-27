@@ -87,6 +87,9 @@ type Config struct {
 	TileAttribution string
 	TileMaxZoom     int
 
+	// PLUS_PRICE — цена подписки «Плюс» в монетах за 30 дней.
+	PlusPrice int64
+
 	// WEATHER_URL — прогноз (API в формате Open-Meteo). Пусто — выключен.
 	WeatherURL string
 
@@ -235,6 +238,14 @@ func Load() (Config, error) {
 		return c, errors.New("TILE_URL must be an http(s) URL template with {z}, {x} and {y}")
 	}
 	c.TileAttribution = getenv("TILE_ATTRIBUTION", "© участники OpenStreetMap")
+	c.PlusPrice = 199
+	if v := os.Getenv("PLUS_PRICE"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n < 1 || n > 1_000_000 {
+			return c, errors.New("PLUS_PRICE must be 1..1000000 coins")
+		}
+		c.PlusPrice = n
+	}
 	c.WeatherURL = "https://api.open-meteo.com/v1/forecast"
 	if v, set := os.LookupEnv("WEATHER_URL"); set {
 		c.WeatherURL = strings.TrimRight(strings.TrimSpace(v), "/")

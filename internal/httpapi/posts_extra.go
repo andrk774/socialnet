@@ -485,6 +485,9 @@ func (s *Server) runScheduler(ctx context.Context) {
 			if err := s.RunControl(ctx); err != nil && ctx.Err() == nil {
 				s.log.Error("hike control deadlines", "err", err)
 			}
+			if err := s.RunPlusRenewals(ctx); err != nil && ctx.Err() == nil {
+				s.log.Error("plus renewals", "err", err)
+			}
 		}
 	}
 }

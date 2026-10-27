@@ -81,9 +81,9 @@ func (s *Store) queryCompanions(ctx context.Context, sql string, args ...any) ([
 var ErrTooMany = errors.New("too many")
 
 // MaxOpenCompanionAds — открытых объявлений у одного автора одновременно.
-const MaxOpenCompanionAds = 5
+const MaxOpenCompanionAds, MaxOpenCompanionAdsPlus = 5, 15
 
-func (s *Store) CreateCompanionAd(ctx context.Context, a NewCompanionAd) (int64, error) {
+func (s *Store) CreateCompanionAd(ctx context.Context, a NewCompanionAd, maxOpen int) (int64, error) {
 	var id int64
 	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		// блокировка автора: два одновременных запроса не обойдут лимит
@@ -96,7 +96,7 @@ func (s *Store) CreateCompanionAd(ctx context.Context, a NewCompanionAd) (int64,
 			WHERE author_id = $1 AND closed_at IS NULL AND date_to >= current_date`, a.AuthorID).Scan(&open); err != nil {
 			return err
 		}
-		if open >= MaxOpenCompanionAds {
+		if open >= maxOpen {
 			return ErrTooMany
 		}
 		return tx.QueryRow(ctx, `

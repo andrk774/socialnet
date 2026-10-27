@@ -13,6 +13,7 @@ import { OfflinePage } from "./offlinepage.js";
 import { ArticleEditor, ArticlePage, ArticlesPage } from "./articles.js";
 import { RidesPage } from "./rides.js";
 import { AntennasPage } from "./antennas.js";
+import { PlusPage } from "./plus.js";
 import { AdminPage } from "./admin.js";
 import { BookmarksPage, DocumentsPage, ScheduledPage } from "./library.js";
 import { on, startRealtime, stopRealtime } from "./realtime.js";
@@ -59,6 +60,8 @@ function routes(path, onRead, myId) {
         return h(RidesPage, null);
     if (match("/feeds", path))
         return h(AntennasPage, null);
+    if (match("/plus", path))
+        return h(PlusPage, null);
     if (match("/articles/new", path))
         return h(ArticleEditor, null);
     if ((p = match("/articles/:id/edit", path)))
@@ -95,7 +98,7 @@ function routes(path, onRead, myId) {
 const nav = [
     ["/", "Лента"], ["/feeds", "Мои ленты"], ["/hikes", "Походы"], ["/companions", "Попутчики"], ["/rides", "Подвоз"], ["/articles", "Статьи"], ["/im", "Сообщения"], ["/notifications", "Уведомления"],
     ["/communities", "Сообщества"], ["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"],
-    ["/scheduled", "Отложенные"], ["/offline", "Офлайн"], ["/wallet", "Кошелёк"], ["/settings", "Безопасность"],
+    ["/scheduled", "Отложенные"], ["/offline", "Офлайн"], ["/wallet", "Кошелёк"], ["/plus", "Плюс"], ["/settings", "Безопасность"],
 ];
 function Shell() {
     const path = usePath();

@@ -6,7 +6,7 @@ import { navigate } from "./router.js";
 import { Avatar, ErrorLine, Loading, useLoad } from "./ui.js";
 
 interface Profile extends UserCard {
-  closed: boolean; status_text?: string; city?: string; about?: string;
+  closed: boolean; plus?: boolean; status_text?: string; city?: string; about?: string;
   relationship: { status: "self" | "friends" | "request_sent" | "request_received" | "none"; i_blocked: boolean; can_write: boolean };
   presence?: { online?: boolean; last_seen_approx?: string };
 }
@@ -37,7 +37,7 @@ export function ProfilePage({ username }: { username: string }) {
       <header class="profile-head">
         <Avatar user={u} size={96} />
         <div>
-          <h1>{fullName(u)}</h1>
+          <h1>{fullName(u)}{u.plus && <span class="plus-badge" title="Подписка «Плюс»">Плюс</span>}</h1>
           <p class="muted">@{u.username}{u.presence?.online ? " · в сети" : ""}</p>
           {u.status_text && <p class="status">{u.status_text}</p>}
           {u.city && <p class="muted">{u.city}</p>}

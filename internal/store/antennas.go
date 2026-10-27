@@ -18,7 +18,7 @@ type Antenna struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-const MaxAntennas = 5
+const MaxAntennas, MaxAntennasPlus = 5, 20
 
 // orQuery — строка для websearch_to_tsquery: слова через «or». Слова уже
 // проверены (буквы, цифры, пробел, дефис), кавычек в них нет; разбор делает
@@ -82,7 +82,7 @@ func (s *Store) Antenna(ctx context.Context, user, id int64) (*Antenna, error) {
 	return &a, err
 }
 
-func (s *Store) SaveAntenna(ctx context.Context, user, id int64, name string, keywords, excludes []string) (int64, error) {
+func (s *Store) SaveAntenna(ctx context.Context, user, id int64, name string, keywords, excludes []string, max int) (int64, error) {
 	if id > 0 {
 		tag, err := s.pool.Exec(ctx, `UPDATE antennas SET name = $3, keywords = $4, excludes = $5 WHERE id = $1 AND user_id = $2`,
 			id, user, name, keywords, excludes)
@@ -99,7 +99,7 @@ func (s *Store) SaveAntenna(ctx context.Context, user, id int64, name string, ke
 		if err := tx.QueryRow(ctx, `SELECT count(*) FROM antennas WHERE user_id = $1`, user).Scan(&n); err != nil {
 			return err
 		}
-		if n >= MaxAntennas {
+		if n >= max {
 			return ErrTooMany
 		}
 		return tx.QueryRow(ctx, `INSERT INTO antennas (user_id, name, keywords, excludes) VALUES ($1, $2, $3, $4) RETURNING id`,

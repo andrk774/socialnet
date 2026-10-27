@@ -344,6 +344,11 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await bob.page.getByText(/Отклик на объявление/).first().waitFor();
 }
 
+// «Плюс»: что даёт и сколько стоит (покупка — после подтверждения почты, проверена в Go-тестах)
+await anna.page.getByRole("link", { name: "Плюс" }).click();
+await anna.page.locator(".plus-table td", { hasText: "Своих лент" }).waitFor();
+await anna.page.getByRole("button", { name: /Подключить за \d+ монет/ }).waitFor();
+
 // своя лента по словам: «таганай» находит «на Таганае»
 {
   await bob.page.getByRole("link", { name: "Мои ленты" }).click();

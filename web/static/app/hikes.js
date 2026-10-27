@@ -2,7 +2,7 @@
 // заявками, форма организатора. Маршрут похода — карточка из routes.tsx.
 import { Fragment, h } from "../vendor/preact/index.js";
 import { useState } from "../vendor/preact/hooks.js";
-import { del, get, patch, post } from "./api.js";
+import { del, get, patch, post, saveFile } from "./api.js";
 import { navigate } from "./router.js";
 import { RouteCard } from "./routes.js";
 import { Weather } from "./weather.js";
@@ -129,6 +129,7 @@ export function EventPage({ id }) {
                 h("button", { class: "primary" }, e.approval ? "Подать заявку" : e.capacity !== null && e.going_count >= e.capacity ? "Встать в очередь" : "Иду"))),
             e.my_status && !isOrganizer && h("button", { class: "ghost", onClick: () => act(() => del(`/events/${id}/rsvp`)) }, e.my_status === "pending" ? "Отозвать заявку" : e.my_status === "waitlist" ? "Выйти из очереди" : "Не пойду"),
             h("a", { class: "ghost button-link", href: `/events/${id}/print` }, "\u041B\u0438\u0441\u0442 \u0434\u043B\u044F \u043F\u0435\u0447\u0430\u0442\u0438"),
+            isOrganizer && me.plus && h("button", { class: "ghost", onClick: () => saveFile(`/events/${id}/participants.csv`, `участники-${id}.csv`).catch(setError) }, "\u0421\u043F\u0438\u0441\u043E\u043A \u0433\u0440\u0443\u043F\u043F\u044B (CSV)"),
             isOrganizer && h("button", { class: "ghost", onClick: () => setEditing(true) }, "\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C"),
             isOrganizer && h("button", { class: "ghost danger", onClick: () => confirm("Удалить поход? Участники его больше не увидят.") && act(async () => { await del(`/events/${id}`); navigate("/hikes"); }) }, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C")),
         h(ErrorLine, { error: error }),

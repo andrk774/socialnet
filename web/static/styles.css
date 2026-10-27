@@ -513,3 +513,10 @@ img.emoji { vertical-align: -4px; object-fit: contain; display: inline-block; }
 .antenna-tabs { margin-bottom: .75rem; }
 .antenna-tabs .badge { margin-left: .35rem; }
 .antenna-form { margin-bottom: 1rem; }
+
+/* ---------- Плюс ---------- */
+.plus-badge { display: inline-block; margin-left: .5rem; padding: .05rem .5rem; border-radius: 999px; font-size: .75rem; font-weight: 700;
+  vertical-align: middle; color: #fff; background: linear-gradient(90deg, var(--malachite), var(--deep)); letter-spacing: .02em; }
+.plus-table { border-collapse: collapse; margin: 1rem 0; width: 100%; max-width: 36rem; }
+.plus-table th, .plus-table td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--line); }
+.inline-check { display: inline-flex; margin: 0; }

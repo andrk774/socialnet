@@ -99,9 +99,10 @@ func (s *Store) OwnedMedia(ctx context.Context, owner int64, ids []string) (map[
 	return out, err
 }
 
-const MaxArticlesPerDay = 10
+// Лимит статей в сутки: обычный и с «Плюсом».
+const MaxArticlesPerDay, MaxArticlesPerDayPlus = 10, 30
 
-func (s *Store) CreateArticle(ctx context.Context, author int64, f ArticleFields) (int64, error) {
+func (s *Store) CreateArticle(ctx context.Context, author int64, f ArticleFields, perDay int) (int64, error) {
 	var id int64
 	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, author); err != nil {
@@ -112,7 +113,7 @@ func (s *Store) CreateArticle(ctx context.Context, author int64, f ArticleFields
 			author).Scan(&today); err != nil {
 			return err
 		}
-		if today >= MaxArticlesPerDay {
+		if today >= perDay {
 			return ErrRateLimited
 		}
 		return tx.QueryRow(ctx, `

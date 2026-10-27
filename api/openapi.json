@@ -247,6 +247,9 @@
      "consent_required": {
       "type": "boolean"
      },
+     "plus": {
+      "type": "boolean"
+     },
      "email": {
       "type": "string"
      },
@@ -297,6 +300,7 @@
     "required": [
      "id",
      "consent_required",
+     "plus",
      "email",
      "email_verified",
      "username",
@@ -346,6 +350,9 @@
      "id": {
       "type": "integer",
       "format": "int64"
+     },
+     "plus": {
+      "type": "boolean"
      },
      "username": {
       "type": "string"
@@ -408,6 +415,7 @@
     },
     "required": [
      "id",
+     "plus",
      "username",
      "first_name",
      "last_name",
@@ -9087,6 +9095,48 @@
     }
    }
   },
+  "/api/v1/events/{id}/participants.csv": {
+   "get": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Список группы CSV для регистрации в МЧС (организатору с «Плюсом»)",
+    "operationId": "get_api_v1_events_id_participants_csv",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Текст",
+      "content": {
+       "text/plain": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/events/{id}/returned": {
    "post": {
     "tags": [
@@ -10767,6 +10817,252 @@
     "responses": {
      "204": {
       "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/plus": {
+   "get": {
+    "tags": [
+     "wallet"
+    ],
+    "summary": "Подписка «Плюс»: состояние, цена в монетах, лимиты (обычный и с «Плюсом»)",
+    "operationId": "get_api_v1_plus",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "active": {
+           "type": "boolean"
+          },
+          "expires_at": {
+           "type": "string",
+           "format": "date-time",
+           "nullable": true
+          },
+          "auto_renew": {
+           "type": "boolean"
+          },
+          "price": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "days": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "limits": {
+           "type": "object",
+           "properties": {}
+          }
+         },
+         "required": [
+          "active",
+          "expires_at",
+          "auto_renew",
+          "price",
+          "days",
+          "limits"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "wallet"
+    ],
+    "summary": "Автопродление",
+    "operationId": "patch_api_v1_plus",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "auto_renew": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "auto_renew"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "active": {
+           "type": "boolean"
+          },
+          "expires_at": {
+           "type": "string",
+           "format": "date-time",
+           "nullable": true
+          },
+          "auto_renew": {
+           "type": "boolean"
+          },
+          "price": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "days": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "limits": {
+           "type": "object",
+           "properties": {}
+          }
+         },
+         "required": [
+          "active",
+          "expires_at",
+          "auto_renew",
+          "price",
+          "days",
+          "limits"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/plus/buy": {
+   "post": {
+    "tags": [
+     "wallet"
+    ],
+    "summary": "Купить или продлить на 30 дней за монеты (ключ идемпотентности обязателен)",
+    "operationId": "post_api_v1_plus_buy",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "idempotency_key": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "idempotency_key"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "allOf": [
+          {
+           "type": "object",
+           "properties": {
+            "active": {
+             "type": "boolean"
+            },
+            "expires_at": {
+             "type": "string",
+             "format": "date-time",
+             "nullable": true
+            },
+            "auto_renew": {
+             "type": "boolean"
+            },
+            "price": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "days": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "limits": {
+             "type": "object",
+             "properties": {}
+            }
+           },
+           "required": [
+            "active",
+            "expires_at",
+            "auto_renew",
+            "price",
+            "days",
+            "limits"
+           ]
+          },
+          {
+           "type": "object",
+           "properties": {
+            "replayed": {
+             "type": "boolean"
+            },
+            "balance": {
+             "type": "integer",
+             "format": "int64"
+            }
+           },
+           "required": [
+            "replayed",
+            "balance"
+           ]
+          }
+         ]
+        }
+       }
+      }
      },
      "default": {
       "description": "Ошибка",

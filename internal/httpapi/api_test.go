@@ -57,6 +57,7 @@ func setupFull(t *testing.T, burst int) (*httptest.Server, *Server, *mailer.Memo
 		JWTSecret:  []byte(strings.Repeat("s", 32)),
 		AccessTTL:  time.Minute,
 		RefreshTTL: time.Hour,
+		PlusPrice:  199,
 
 		AuthRatePerMin: 1,
 		AuthRateBurst:  burst,

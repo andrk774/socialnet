@@ -141,7 +141,7 @@ func (s *Server) handleCreateArticle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	me := userIDFrom(r.Context())
-	id, err := s.store.CreateArticle(r.Context(), me, f)
+	id, err := s.store.CreateArticle(r.Context(), me, f, s.plusLimit(r, me, store.MaxArticlesPerDay, store.MaxArticlesPerDayPlus))
 	if errors.Is(err, store.ErrRateLimited) {
 		writeError(w, http.StatusTooManyRequests, "rate_limited", "too many articles today")
 		return
