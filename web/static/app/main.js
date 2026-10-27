@@ -25,6 +25,7 @@ import { Avatar, ErrorLine, Loading } from "./ui.js";
 import { RecordPage } from "./record.js";
 import { SearchPage } from "./search.js";
 import { Showcase } from "./landing.js";
+import { setupNative } from "./native.js";
 function routes(path, onRead, myId) {
     let p;
     if (path === "/" || path.startsWith("/?"))
@@ -219,6 +220,7 @@ function App() {
         h(AuthPage, null),
         h(Showcase, null)) : h(AuthPage, null);
 }
+setupNative(); // в приложении для Android — фоновая запись трека
 render(h(App, null), document.getElementById("app"));
 if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("service worker", e));

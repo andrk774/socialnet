@@ -25,6 +25,7 @@ import { Avatar, ErrorLine, Loading } from "./ui.js";
 import { RecordPage } from "./record.js";
 import { SearchPage } from "./search.js";
 import { Showcase } from "./landing.js";
+import { setupNative } from "./native.js";
 
 function routes(path: string, onRead: () => void, myId: number): ComponentChildren {
   let p;
@@ -180,6 +181,7 @@ function App() {
   return lp === "/" ? <><AuthPage /><Showcase /></> : <AuthPage />;
 }
 
+setupNative(); // в приложении для Android — фоновая запись трека
 render(<App />, document.getElementById("app")!);
 
 if ("serviceWorker" in navigator) {
