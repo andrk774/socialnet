@@ -1,0 +1,14 @@
+{
+  "name": "socialnet — походы по Южному Уралу",
+  "short_name": "socialnet",
+  "description": "Походы, маршруты GPX, попутчики и сообщения",
+  "lang": "ru",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f3",
+  "theme_color": "#0b4a3a",
+  "icons": [
+    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

@@ -9,6 +9,7 @@ import { EventPage, HikeForm, HikesPage } from "./hikes.js";
 import { CompanionsPage } from "./companions.js";
 import { ConsentGate } from "./legal.js";
 import { PrintPage } from "./print.js";
+import { OfflinePage } from "./offlinepage.js";
 import { AdminPage } from "./admin.js";
 import { BookmarksPage, DocumentsPage, ScheduledPage } from "./library.js";
 import { on, startRealtime, stopRealtime } from "./realtime.js";
@@ -47,6 +48,8 @@ function routes(path, onRead, myId) {
         return h(PrintPage, { eventId: +p.id });
     if ((p = match("/routes/:id/print", path)))
         return h(PrintPage, { routeId: p.id });
+    if (match("/offline", path))
+        return h(OfflinePage, null);
     if ((p = match("/c/:slug", path)))
         return h(CommunityPage, { slug: p.slug });
     if (match("/music", path))
@@ -77,7 +80,7 @@ function routes(path, onRead, myId) {
 const nav = [
     ["/", "Лента"], ["/hikes", "Походы"], ["/companions", "Попутчики"], ["/im", "Сообщения"], ["/notifications", "Уведомления"],
     ["/communities", "Сообщества"], ["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"],
-    ["/scheduled", "Отложенные"], ["/wallet", "Кошелёк"], ["/settings", "Безопасность"],
+    ["/scheduled", "Отложенные"], ["/offline", "Офлайн"], ["/wallet", "Кошелёк"], ["/settings", "Безопасность"],
 ];
 function Shell() {
     const path = usePath();
@@ -150,6 +153,15 @@ function App() {
     }, []);
     if (state === "loading")
         return h(Loading, null);
+    // без сети войти нельзя, но сохранённые маршруты доступны
+    if (state === "out" && (!navigator.onLine || location.pathname === "/offline"))
+        return h("main", { class: "content offline-only" },
+            h(OfflinePage, null),
+            h("p", null,
+                h("a", { href: "/" }, "\u0412\u043E\u0439\u0442\u0438")));
     return state === "in" ? h(Shell, null) : h(AuthPage, null);
 }
 render(h(App, null), document.getElementById("app"));
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("service worker", e));
+}

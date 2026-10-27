@@ -14655,6 +14655,38 @@
     }
    }
   },
+  "/manifest.webmanifest": {
+   "get": {
+    "tags": [
+     "service"
+    ],
+    "summary": "Манифест веб-приложения",
+    "operationId": "get_manifest_webmanifest",
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "JSON",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/media/{id}/{size}": {
    "get": {
     "tags": [
@@ -14690,6 +14722,38 @@
         "schema": {
          "type": "string",
          "format": "binary"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/sw.js": {
+   "get": {
+    "tags": [
+     "service"
+    ],
+    "summary": "Сервис-воркер (офлайн-режим приложения)",
+    "operationId": "get_sw_js",
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "Текст",
+      "content": {
+       "text/plain": {
+        "schema": {
+         "type": "string"
         }
        }
       }

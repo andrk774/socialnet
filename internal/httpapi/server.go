@@ -59,6 +59,7 @@ type Server struct {
 	yookassa       *yookassa.Client // nil — покупка монет выключена
 	m              *serverMetrics
 	static         map[string]staticFile // встроенный фронтенд
+	sw             []byte                // сервис-воркер со списком файлов оболочки
 	redis          *redisx.Client        // nil — один экземпляр, всё в памяти
 	instance       string                // id экземпляра для шины событий
 
@@ -160,6 +161,7 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 	}
 	srv.initMetrics()
 	srv.static = loadStatic()
+	srv.sw = buildServiceWorker(srv.static)
 	return srv, nil
 }
 
@@ -523,6 +525,8 @@ func (s *Server) Router() http.Handler {
 
 	// Фронтенд: файлы и все «страничные» адреса.
 	r.With(deadlines(60*time.Second)).Get("/static/*", s.handleStatic)
+	r.Get("/sw.js", s.handleServiceWorker)
+	r.Get("/manifest.webmanifest", s.handleManifest)
 	r.NotFound(s.handleSPA)
 
 	// WebSocket — долгоживущее соединение: дедлайны снимаем, живость
