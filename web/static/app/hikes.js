@@ -6,6 +6,7 @@ import { del, get, patch, post } from "./api.js";
 import { navigate } from "./router.js";
 import { RouteCard } from "./routes.js";
 import { Weather } from "./weather.js";
+import { Rides } from "./rides.js";
 import { useMe } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, RichText, Time, UserLink, useLoad } from "./ui.js";
 export const difficulties = ["", "Лёгкий", "Средний", "Сложный", "Очень сложный", "Экстремальный"];
@@ -143,6 +144,8 @@ export function EventPage({ id }) {
             h("h2", null, "\u041F\u043E\u0433\u043E\u0434\u0430"),
             h(Weather, { lat: route.data.preview[0][0], lon: route.data.preview[0][1], elevation: route.data.max_ele, from: ymd(e.starts_at), to: ymd(e.ends_at ?? e.starts_at) }))),
         e.kind === "hike" && e.control_at && h(Control, { e: e, canMark: e.my_status === "going" || isOrganizer, onChange: ev.reload }),
+        h("h2", null, "\u041F\u043E\u0434\u0432\u043E\u0437"),
+        h(Rides, { eventId: e.id, meeting: e.meeting_point }),
         isOrganizer && e.pending_count > 0 && h(Applications, { id: id, onChange: ev.reload }),
         h("h2", null, "\u0418\u0434\u0443\u0442"),
         going.data ? h(People, { list: going.data.items, canRemove: isOrganizer, creator: e.creator_id, onRemove: (u) => act(() => del(`/events/${id}/attendees/${u.id}`)) }) : h(Loading, null),

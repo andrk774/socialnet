@@ -15,6 +15,7 @@ type Notification struct {
 	PostID    *int64    `json:"post_id,omitempty"`
 	CommentID *int64    `json:"comment_id,omitempty"`
 	EventID   *int64    `json:"event_id,omitempty"`
+	RideID    *int64    `json:"ride_id,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	Read      bool      `json:"read"`
 }
@@ -26,6 +27,7 @@ type NewNotification struct {
 	PostID    *int64
 	CommentID *int64
 	EventID   *int64
+	RideID    *int64
 }
 
 // CreateNotification не уведомляет самого себя и тех, кто в блокировке
@@ -34,8 +36,8 @@ func (s *Store) CreateNotification(ctx context.Context, n NewNotification) (*Not
 	var id int64
 	var created time.Time
 	err := s.pool.QueryRow(ctx, `
-		INSERT INTO notifications (user_id, type, actor_id, post_id, comment_id, event_id)
-		SELECT $1::bigint, $2::text, NULLIF($3::bigint, 0), $4::bigint, $5::bigint, $6::bigint
+		INSERT INTO notifications (user_id, type, actor_id, post_id, comment_id, event_id, ride_id)
+		SELECT $1::bigint, $2::text, NULLIF($3::bigint, 0), $4::bigint, $5::bigint, $6::bigint, $7::bigint
 		WHERE $1::bigint <> $3::bigint
 		  -- пользователь отключил такой тип уведомлений
 		  AND NOT EXISTS (SELECT 1 FROM notification_settings ns
@@ -43,7 +45,7 @@ func (s *Store) CreateNotification(ctx context.Context, n NewNotification) (*Not
 		  AND NOT EXISTS (SELECT 1 FROM blocks b
 			WHERE (b.blocker_id = $1 AND b.blocked_id = $3) OR (b.blocker_id = $3 AND b.blocked_id = $1))
 		RETURNING id, created_at`,
-		n.UserID, n.Type, n.ActorID, n.PostID, n.CommentID, n.EventID).Scan(&id, &created)
+		n.UserID, n.Type, n.ActorID, n.PostID, n.CommentID, n.EventID, n.RideID).Scan(&id, &created)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -59,7 +61,7 @@ func (s *Store) CreateNotification(ctx context.Context, n NewNotification) (*Not
 
 func (s *Store) Notifications(ctx context.Context, userID, before int64, limit int) ([]Notification, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT n.id, n.type, n.post_id, n.comment_id, n.event_id, n.created_at, n.read_at IS NOT NULL,
+		SELECT n.id, n.type, n.post_id, n.comment_id, n.event_id, n.ride_id, n.created_at, n.read_at IS NOT NULL,
 		       u.id, u.username, u.first_name, u.last_name, u.avatar_media_id::text
 		FROM notifications n LEFT JOIN users u ON u.id = n.actor_id
 		WHERE n.user_id = $1 AND n.id < $2
@@ -76,7 +78,7 @@ func (s *Store) Notifications(ctx context.Context, userID, before int64, limit i
 			aUser, aFirst, aLast *string
 			avatar               *string
 		)
-		if err := rows.Scan(&n.ID, &n.Type, &n.PostID, &n.CommentID, &n.EventID, &n.CreatedAt, &n.Read,
+		if err := rows.Scan(&n.ID, &n.Type, &n.PostID, &n.CommentID, &n.EventID, &n.RideID, &n.CreatedAt, &n.Read,
 			&aID, &aUser, &aFirst, &aLast, &avatar); err != nil {
 			return nil, err
 		}
