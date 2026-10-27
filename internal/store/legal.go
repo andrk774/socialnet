@@ -113,6 +113,8 @@ func (s *Store) DeleteAccount(ctx context.Context, id int64) (DeletedFiles, erro
 			`DELETE FROM events WHERE creator_id = $1`,
 			`DELETE FROM companion_ads WHERE author_id = $1`,
 			`DELETE FROM hike_contacts WHERE user_id = $1`,
+			`DELETE FROM route_points WHERE author_id = $1`,
+			`DELETE FROM route_point_checks WHERE user_id = $1`,
 			`DELETE FROM bookmarks WHERE user_id = $1`,
 			`DELETE FROM scheduled_posts WHERE author_id = $1`,
 			`DELETE FROM notifications WHERE user_id = $1 OR actor_id = $1`,

@@ -21,6 +21,7 @@ export interface LeafletMap {
   invalidateSize(): this;
   remove(): this;
   attributionControl: AttributionControl;
+  on(type: "click", fn: (e: { latlng: { lat: number; lng: number } }) => void): this;
 }
 export interface MapOptions {
   zoomControl?: boolean; attributionControl?: boolean; scrollWheelZoom?: boolean | "center";

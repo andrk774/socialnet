@@ -23,7 +23,12 @@ export interface Route {
   min_ele: number | null; max_ele: number | null; duration_sec: number; moving_sec: number; points: number;
   hidden_ends_m: number; bbox: [number, number, number, number]; preview: [number, number][];
   profile: { d: number; e: number }[]; gpx_url: string; created_at: string;
-  detail?: [number, number][][]; waypoints?: { lat: number; lon: number; ele?: number; name: string }[];
+  detail?: [number, number][][]; waypoints?: { lat: number; lon: number; ele?: number; name: string }[]; marks?: Mark[];
+}
+export type MarkKind = "spring" | "camp" | "ford" | "danger" | "view" | "other";
+export interface Mark {
+  id: number; route_id: string; author: UserCard; kind: MarkKind; lat: number; lon: number; title: string; note: string;
+  photo_url: string | null; thumb_url: string | null; verified_on: string; checks: number; my_check: boolean; created_at: string;
 }
 export interface Post {
   id: number; author: UserCard; community?: { id: number; slug: string; name: string }; text: string;

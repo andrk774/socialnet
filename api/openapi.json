@@ -735,6 +735,12 @@
         "name"
        ]
       }
+     },
+     "marks": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/RouteMark"
+      }
      }
     },
     "required": [
@@ -754,6 +760,84 @@
      "preview",
      "profile",
      "gpx_url",
+     "created_at"
+    ]
+   },
+   "RouteMark": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "route_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "author": {
+      "$ref": "#/components/schemas/UserCard"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "spring",
+       "camp",
+       "ford",
+       "danger",
+       "view",
+       "other"
+      ]
+     },
+     "lat": {
+      "type": "number"
+     },
+     "lon": {
+      "type": "number"
+     },
+     "title": {
+      "type": "string"
+     },
+     "note": {
+      "type": "string"
+     },
+     "photo_url": {
+      "type": "string",
+      "nullable": true
+     },
+     "thumb_url": {
+      "type": "string",
+      "nullable": true
+     },
+     "verified_on": {
+      "type": "string",
+      "format": "date"
+     },
+     "checks": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "my_check": {
+      "type": "boolean"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    },
+    "required": [
+     "id",
+     "route_id",
+     "author",
+     "kind",
+     "lat",
+     "lon",
+     "title",
+     "note",
+     "photo_url",
+     "thumb_url",
+     "verified_on",
+     "checks",
+     "my_check",
      "created_at"
     ]
    },
@@ -10614,7 +10698,8 @@
            "video",
            "document",
            "route",
-           "companion"
+           "companion",
+           "route_point"
           ]
          },
          "target_id": {
@@ -10937,6 +11022,184 @@
         "schema": {
          "type": "string",
          "format": "binary"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/routes/{rid}/marks": {
+   "post": {
+    "tags": [
+     "routes"
+    ],
+    "summary": "Отметить точку: родник, стоянка, брод, опасность, вид (не дальше 2 км от трека; фото — своё)",
+    "operationId": "post_api_v1_routes_rid_marks",
+    "parameters": [
+     {
+      "name": "rid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "kind": {
+          "type": "string",
+          "enum": [
+           "spring",
+           "camp",
+           "ford",
+           "danger",
+           "view",
+           "other"
+          ]
+         },
+         "lat": {
+          "type": "number"
+         },
+         "lon": {
+          "type": "number"
+         },
+         "title": {
+          "type": "string"
+         },
+         "note": {
+          "type": "string"
+         },
+         "photo_id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": true
+         }
+        },
+        "required": [
+         "kind",
+         "lat",
+         "lon",
+         "title"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RouteMark"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/routes/{rid}/marks/{pid}": {
+   "delete": {
+    "tags": [
+     "routes"
+    ],
+    "summary": "Удалить (автор точки или владелец маршрута)",
+    "operationId": "delete_api_v1_routes_rid_marks_pid",
+    "parameters": [
+     {
+      "name": "rid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "pid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/routes/{rid}/marks/{pid}/check": {
+   "post": {
+    "tags": [
+     "routes"
+    ],
+    "summary": "«На месте»: дата проверки — сегодня",
+    "operationId": "post_api_v1_routes_rid_marks_pid_check",
+    "parameters": [
+     {
+      "name": "rid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "pid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RouteMark"
         }
        }
       }

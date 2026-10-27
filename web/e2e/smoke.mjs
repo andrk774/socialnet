@@ -179,6 +179,19 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await map.locator("path.map-waypoint").hover({ force: true });
   await anna.page.locator(".leaflet-tooltip", { hasText: "Родник" }).waitFor();
   assert.equal(await anna.page.locator(".leaflet-tooltip img").count(), 0, "waypoint name rendered as text");
+  // точка на маршруте: щелчок по карте рядом с треком
+  await card.getByRole("button", { name: "Отметить точку" }).click();
+  const mapBox = await map.boundingBox();
+  await map.click({ position: { x: mapBox.width / 2 + 8, y: mapBox.height / 2 } });
+  await card.getByText(/^Место: 55\./).waitFor();
+  await card.locator(".add-mark").getByLabel("Что это").selectOption({ label: "Родник" });
+  await card.locator(".add-mark").getByLabel("Название").fill("Родник у тропы");
+  await card.locator(".add-mark").getByLabel("Заметка").fill("Течёт и в августе");
+  await card.getByRole("button", { name: "Сохранить точку" }).click();
+  await card.locator("li.mark-spring", { hasText: "Родник у тропы" }).waitFor();
+  await card.locator(".route-map path.mark-spring").waitFor();
+  await card.locator("li.mark-spring").getByRole("button", { name: "На месте" }).click();
+  await card.locator("li.mark-spring", { hasText: "подтвердили: 1" }).waitFor();
   await anna.page.screenshot({ path: `${shots}/13-map.png`, fullPage: true });
   // офлайн: маршрут с тайлами сохраняется на устройстве и открывается без сети
   await anna.page.evaluate(() => navigator.serviceWorker.ready.then(() => true));

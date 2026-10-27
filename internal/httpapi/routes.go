@@ -224,9 +224,17 @@ func (s *Server) visibleRoute(w http.ResponseWriter, r *http.Request, withDetail
 }
 
 func (s *Server) handleGetRoute(w http.ResponseWriter, r *http.Request) {
-	if route, ok := s.visibleRoute(w, r, true); ok {
-		writeJSON(w, http.StatusOK, route)
+	route, ok := s.visibleRoute(w, r, true)
+	if !ok {
+		return
 	}
+	marks, err := s.store.RoutePoints(r.Context(), userIDFrom(r.Context()), route.ID)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	route.Marks = marks
+	writeJSON(w, http.StatusOK, route)
 }
 
 func (s *Server) handleMyRoutes(w http.ResponseWriter, r *http.Request) {

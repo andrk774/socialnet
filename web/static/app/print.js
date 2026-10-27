@@ -4,7 +4,7 @@
 import { Fragment, h } from "../vendor/preact/index.js";
 import { get } from "./api.js";
 import { difficulties } from "./hikes.js";
-import { ElevationProfile, hours, km, RouteMap } from "./routes.js";
+import { ElevationProfile, hours, km, markKinds, RouteMap } from "./routes.js";
 import { ErrorLine, Loading, useLoad } from "./ui.js";
 const dateFmt = new Intl.DateTimeFormat("ru", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 const nf0 = new Intl.NumberFormat("ru", { maximumFractionDigits: 0 });
@@ -120,6 +120,30 @@ export function PrintPage({ routeId, eventId }) {
                                 w.lon.toFixed(5))),
                         h("td", null, w.ele !== undefined && w.ele !== null ? `${nf0.format(w.ele)} м` : "—"),
                         h("td", null, km(alongTrack(segs, [w.lat, w.lon])))))),
+                    (r.marks ?? []).map((mk, i) => (h("tr", { key: "m" + mk.id },
+                        h("td", null, (r.waypoints?.length ?? 0) + i + 1),
+                        h("td", null,
+                            h("strong", null,
+                                markKinds[mk.kind],
+                                ":"),
+                            " ",
+                            mk.title,
+                            mk.note && h(Fragment, null,
+                                h("br", null),
+                                h("span", { class: "muted" }, mk.note)),
+                            h("br", null),
+                            h("span", { class: "muted" },
+                                "\u043F\u0440\u043E\u0432\u0435\u0440\u0435\u043D\u043E ",
+                                mk.verified_on)),
+                        h("td", null,
+                            coords(mk.lat, mk.lon),
+                            h("br", null),
+                            h("span", { class: "muted" },
+                                mk.lat.toFixed(5),
+                                ", ",
+                                mk.lon.toFixed(5))),
+                        h("td", null, "\u2014"),
+                        h("td", null, km(alongTrack(segs, [mk.lat, mk.lon])))))),
                     finish && h("tr", null,
                         h("td", null, "\u0424"),
                         h("td", null, "\u0424\u0438\u043D\u0438\u0448"),
