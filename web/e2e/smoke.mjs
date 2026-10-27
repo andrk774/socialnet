@@ -215,6 +215,11 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await anna.page.waitForFunction(() => document.body.classList.contains("no-scroll"));
   await anna.page.keyboard.press("Escape");
   await anna.page.waitForFunction(() => !document.querySelector(".route-map-full") && !document.body.classList.contains("no-scroll"));
+  // открытый каталог: страница без входа и без скриптов
+  await card.getByRole("button", { name: "Открыть в каталоге маршрутов…" }).click();
+  await card.getByLabel("Описание для каталога").fill("Старт от Белого ключа, вода у родника");
+  await card.getByRole("button", { name: "Открыть для всех" }).click();
+  await card.getByRole("link", { name: "страница маршрута" }).waitFor();
   const dl = anna.page.waitForEvent("download");
   await card.getByRole("button", { name: "Скачать GPX" }).click();
   const gpxFile = await (await import("node:fs")).readFileSync(await (await dl).path(), "utf8");

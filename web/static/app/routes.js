@@ -4,7 +4,7 @@
 import { h } from "../vendor/preact/index.js";
 import { useEffect, useLayoutEffect, useRef, useState } from "../vendor/preact/hooks.js";
 import * as L from "../vendor/leaflet/leaflet-src.esm.js";
-import { del, get, post, saveFile, upload } from "./api.js";
+import { del, get, patch, post, saveFile, upload } from "./api.js";
 import { useMe } from "./session.js";
 import { WeatherToggle } from "./weather.js";
 import { isSaved, offlineSupported, removeOffline, saveOffline } from "./offline.js";
@@ -47,6 +47,7 @@ export function hours(sec) {
     return h > 0 ? `${h} ч${m ? ` ${m} мин` : ""}` : `${m} мин`;
 }
 export function RouteCard({ route }) {
+    const me = useMe();
     const [error, setError] = useState(null);
     const [map, setMap] = useState(false);
     const [canMap, setCanMap] = useState(false);
@@ -99,6 +100,7 @@ export function RouteCard({ route }) {
         h("div", { class: "route-graphics" },
             h(TrackSketch, { points: route.preview }),
             route.profile.length > 1 && h(ElevationProfile, { profile: route.profile })),
+        me?.id === route.owner_id && h(Publish, { route: route }),
         canWeather && route.preview.length > 0 && h(WeatherToggle, { lat: route.preview[0][0], lon: route.preview[0][1], elevation: route.max_ele }),
         route.hidden_ends_m > 0 && h("p", { class: "muted route-note" },
             "\u041F\u0435\u0440\u0432\u044B\u0435 \u0438 \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 ",
@@ -345,4 +347,40 @@ function AddMark({ route, picked, onDone }) {
         h("div", { class: "row" },
             h("button", { class: "primary", disabled: !picked || busy }, "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0442\u043E\u0447\u043A\u0443"),
             h("button", { type: "button", class: "ghost", onClick: () => onDone(false) }, "\u041E\u0442\u043C\u0435\u043D\u0430"))));
+}
+// Publish — владелец открывает маршрут в каталоге /trails (без входа).
+function Publish({ route }) {
+    const [pub, setPub] = useState(route.public);
+    const [note, setNote] = useState(route.public_note);
+    const [open, setOpen] = useState(false);
+    const [error, setError] = useState(null);
+    const save = async (next) => {
+        setError(null);
+        try {
+            const r = await patch(`/routes/${route.id}`, { public: next, public_note: note });
+            setPub(r.public);
+            setOpen(false);
+        }
+        catch (e) {
+            setError(e);
+        }
+    };
+    return (h("div", { class: "publish" },
+        pub ? h("p", { class: "muted" },
+            "\u0412 \u043E\u0442\u043A\u0440\u044B\u0442\u043E\u043C \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0435: ",
+            h("a", { href: `/trails/${route.id}` }, "\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u043C\u0430\u0440\u0448\u0440\u0443\u0442\u0430"),
+            " \u00B7 ",
+            h("button", { class: "link", onClick: () => save(false) }, "\u0423\u0431\u0440\u0430\u0442\u044C \u0438\u0437 \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0430"))
+            : !open ? h("button", { class: "link", onClick: () => setOpen(true) }, "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0432 \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0435 \u043C\u0430\u0440\u0448\u0440\u0443\u0442\u043E\u0432\u2026") : (h("div", { class: "stack" },
+                h("p", { class: "hint" },
+                    "\u0422\u0440\u0435\u043A, \u0442\u043E\u0447\u043A\u0438 \u0438 \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u0435 \u0443\u0432\u0438\u0434\u044F\u0442 \u0432\u0441\u0435, \u0432 \u0442\u043E\u043C \u0447\u0438\u0441\u043B\u0435 \u0431\u0435\u0437 \u0432\u0445\u043E\u0434\u0430 \u0438 \u043F\u043E\u0438\u0441\u043A\u043E\u0432\u0438\u043A\u0438. \u041D\u0430\u0447\u0430\u043B\u043E \u0438 \u043A\u043E\u043D\u0435\u0446 \u043E\u0441\u0442\u0430\u044E\u0442\u0441\u044F \u0441\u043A\u0440\u044B\u0442\u044B\u043C\u0438 (",
+                    route.hidden_ends_m,
+                    " \u043C)."),
+                h("label", null,
+                    "\u041E\u043F\u0438\u0441\u0430\u043D\u0438\u0435 \u0434\u043B\u044F \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0430",
+                    h("textarea", { rows: 3, maxLength: 2000, value: note, onInput: (e) => setNote(e.target.value), placeholder: "\u041E\u0442\u043A\u0443\u0434\u0430 \u0441\u0442\u0430\u0440\u0442\u043E\u0432\u0430\u0442\u044C, \u0433\u0434\u0435 \u0432\u043E\u0434\u0430, \u043A\u043E\u0433\u0434\u0430 \u043B\u0443\u0447\u0448\u0435 \u0438\u0434\u0442\u0438" })),
+                h("div", { class: "row" },
+                    h("button", { class: "primary", onClick: () => save(true) }, "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0434\u043B\u044F \u0432\u0441\u0435\u0445"),
+                    h("button", { class: "ghost", onClick: () => setOpen(false) }, "\u041E\u0442\u043C\u0435\u043D\u0430")))),
+        h(ErrorLine, { error: error })));
 }

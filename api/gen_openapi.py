@@ -57,7 +57,7 @@ schemas = {
     "Route": obj(id=uuid, owner_id=int_, title=str_, distance_m=int_, gain_m=int_, loss_m=int_,
                  min_ele=nullable(num), max_ele=nullable(num), duration_sec=int_, moving_sec=int_, points=int_,
                  hidden_ends_m=enum_int(0, 200, 500, 1000), bbox=arr(num), preview=arr(arr(num)),
-                 profile=arr(obj(d=num, e=num)), gpx_url=str_, created_at=dt,
+                 profile=arr(obj(d=num, e=num)), gpx_url=str_, public=bool_, public_note=str_, created_at=dt,
                  **{"detail?": arr(arr(arr(num))), "waypoints?": arr(obj(lat=num, lon=num, name=str_, **{"ele?": num})),
                     "marks?": arr(S("RouteMark"))}),
     "RouteMark": obj(id=int_, route_id=uuid, author=S("UserCard"), kind=enum("spring", "camp", "ford", "danger", "view", "other"),
@@ -146,6 +146,10 @@ SCOPES = {"profile": "Профиль, друзья, поиск", "friends": "З�
 # --- служебные ---
 r("GET", "/health", "service", "Проверка живости", resp=obj(status=str_), auth=False)
 r("GET", "/.well-known/security.txt", "service", "security.txt (RFC 9116)", auth=False, resp="text")
+r("GET", "/trails", "service", "Открытый каталог маршрутов (HTML без входа): ?page=", auth=False, resp="text")
+r("GET", "/trails/{id}", "service", "Страница маршрута (HTML); {id}.gpx — очищенный GPX", auth=False, resp="text")
+r("GET", "/robots.txt", "service", "robots.txt: в поиск — каталог и документы", auth=False, resp="text")
+r("GET", "/sitemap.xml", "service", "Карта сайта: каталог и документы", auth=False, resp="text")
 r("GET", "/sw.js", "service", "Сервис-воркер (офлайн-режим приложения)", auth=False, resp="text")
 r("GET", "/manifest.webmanifest", "service", "Манифест веб-приложения", auth=False, resp="json")
 r("GET", A + "/openapi.json", "service", "Эта спецификация", auth=False, resp="json")
@@ -224,7 +228,8 @@ r("POST", A + "/routes", "routes", "Загрузить GPX (до 15 МБ): се�
   resp=S("Route"), code=201, content=upload_form(**{"title?": str_, "hidden_ends_m?": enum("0", "200", "500", "1000")}))
 r("GET", A + "/routes", "routes", "Мои маршруты", resp=lst(S("Route")))
 r("GET", A + "/routes/{rid}", "routes", "Маршрут с подробной геометрией (владелец и зрители записи)", resp=S("Route"))
-r("PATCH", A + "/routes/{rid}", "routes", "Переименовать", obj(title=str_), S("Route"))
+r("PATCH", A + "/routes/{rid}", "routes", "Название; public — показать в открытом каталоге /trails (без входа и поисковикам)",
+  obj(**{"title?": str_, "public?": bool_, "public_note?": str_}), S("Route"))
 r("DELETE", A + "/routes/{rid}", "routes", "Удалить (пропадёт из записей)", code=204)
 r("GET", A + "/routes/{rid}/gpx", "routes", "Скачать очищенный GPX", resp="binary")
 r("POST", A + "/routes/{rid}/marks", "routes", "Отметить точку: родник, стоянка, брод, опасность, вид (не дальше 2 км от трека; фото — своё)",
