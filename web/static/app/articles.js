@@ -7,6 +7,7 @@ import { navigate } from "./router.js";
 import { RouteCard } from "./routes.js";
 import { useMe } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, UserLink, useLoad } from "./ui.js";
+import { ReportButton } from "./report.js";
 const dateFmt = new Intl.DateTimeFormat("ru", { day: "numeric", month: "long", year: "numeric" });
 function Spans({ spans }) {
     return h(Fragment, null, (spans ?? []).map((s, i) => s.t === "b" ? h("strong", { key: i }, s.text)
@@ -90,7 +91,9 @@ export function ArticlePage({ id }) {
         h(ArticleBody, { blocks: art.blocks ?? [] }),
         route.data && h("section", null,
             h("h2", null, "\u041C\u0430\u0440\u0448\u0440\u0443\u0442"),
-            h(RouteCard, { route: route.data }))));
+            h(RouteCard, { route: route.data })),
+        !mine && me && h("p", { class: "row" },
+            h(ReportButton, { target: { type: "article", id: art.id } }))));
 }
 export function ArticleEditor({ id }) {
     const existing = useLoad(() => (id ? get(`/articles/${id}`) : Promise.resolve(null)), [id]);

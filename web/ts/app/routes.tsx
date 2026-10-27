@@ -9,6 +9,7 @@ import { useMe } from "./session.js";
 import { WeatherToggle } from "./weather.js";
 import { isSaved, offlineSupported, removeOffline, saveOffline } from "./offline.js";
 import { ErrorLine, Loading } from "./ui.js";
+import { ReportButton } from "./report.js";
 
 interface MapConfig { enabled: boolean; tiles: string; attribution: string; max_zoom: number }
 let mapConfig: Promise<MapConfig> | null = null;
@@ -311,6 +312,7 @@ function Marks({ route, onChange }: { route: Route; onChange: () => void }) {
               <div class="row tight">
                 <button class="link" disabled={mk.my_check && mk.verified_on === new Date().toISOString().slice(0, 10)} onClick={() => run(() => post(`/routes/${route.id}/marks/${mk.id}/check`))}>{mk.my_check ? "Снова на месте" : "На месте"}</button>
                 {(mk.author.id === me || route.owner_id === me) && <button class="link" onClick={() => run(() => del(`/routes/${route.id}/marks/${mk.id}`))}>Удалить</button>}
+                {mk.author.id !== me && <ReportButton target={{ type: "route_point", id: mk.id }} />}
               </div>
             </div>
           </li>

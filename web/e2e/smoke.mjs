@@ -396,6 +396,12 @@ await anna.page.getByRole("button", { name: /Подключить за \d+ мо�
   await anna.page.screenshot({ path: `${shots}/19-article.png`, fullPage: true });
   await bob.page.goto(base + "/articles");
   await bob.page.locator(".article-card", { hasText: "Три дня на Таганае" }).waitFor();
+  // жалоба на статью — уйдёт в админку
+  await bob.page.locator(".article-card", { hasText: "Три дня на Таганае" }).getByRole("link").first().click();
+  await bob.page.getByRole("button", { name: "Пожаловаться" }).click();
+  await bob.page.getByLabel("Причина").selectOption("Спам или реклама");
+  await bob.page.getByRole("button", { name: "Отправить жалобу" }).click();
+  await bob.page.getByText("Жалоба отправлена модераторам.").waitFor();
 }
 
 // сообщество со своими эмодзи: администратор добавляет, участник реагирует
@@ -447,6 +453,21 @@ anna.page.on("dialog", (d) => d.accept());
 await anna.page.goto(base + "/admin");
 await anna.page.getByText("Пользователей").waitFor();
 await anna.page.screenshot({ path: `${shots}/10-admin-stats.png`, fullPage: true });
+// жалоба на статью: видно, что обжаловано; скрыть и вернуть
+await anna.page.getByRole("tab", { name: "Жалобы" }).click();
+{
+  const rep = anna.page.locator("li[data-type=article]");
+  await rep.getByText("Три дня на Таганае").waitFor();
+  await rep.getByText(/Спам или реклама/).waitFor();
+  await anna.page.screenshot({ path: `${shots}/10b-admin-reports.png`, fullPage: true });
+  await rep.getByRole("button", { name: "Скрыть" }).click();
+  await anna.page.getByText("Жалоб нет.").waitFor();
+  await anna.page.locator("#rep-status").selectOption("resolved");
+  await rep.getByText("скрыто").waitFor();
+  await rep.getByRole("button", { name: "Вернуть" }).click();
+  await rep.getByRole("button", { name: "Скрыть" }).waitFor();
+  assert.equal(await rep.getByText("скрыто").count(), 0, "article is back");
+}
 await anna.page.getByRole("tab", { name: "Пользователи" }).click();
 await anna.page.getByPlaceholder(/id, почта/).fill("bob");
 await anna.page.getByRole("button", { name: "Найти" }).click();

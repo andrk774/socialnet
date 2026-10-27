@@ -9,6 +9,7 @@ import { useMe } from "./session.js";
 import { WeatherToggle } from "./weather.js";
 import { isSaved, offlineSupported, removeOffline, saveOffline } from "./offline.js";
 import { ErrorLine, Loading } from "./ui.js";
+import { ReportButton } from "./report.js";
 let mapConfig = null;
 let clientConfig = null;
 export function loadClientConfig() {
@@ -303,7 +304,8 @@ function Marks({ route, onChange }) {
                     h("a", { href: `/u/${mk.author.username}` }, mk.author.first_name || mk.author.username)),
                 h("div", { class: "row tight" },
                     h("button", { class: "link", disabled: mk.my_check && mk.verified_on === new Date().toISOString().slice(0, 10), onClick: () => run(() => post(`/routes/${route.id}/marks/${mk.id}/check`)) }, mk.my_check ? "Снова на месте" : "На месте"),
-                    (mk.author.id === me || route.owner_id === me) && h("button", { class: "link", onClick: () => run(() => del(`/routes/${route.id}/marks/${mk.id}`)) }, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C"))))))),
+                    (mk.author.id === me || route.owner_id === me) && h("button", { class: "link", onClick: () => run(() => del(`/routes/${route.id}/marks/${mk.id}`)) }, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C"),
+                    mk.author.id !== me && h(ReportButton, { target: { type: "route_point", id: mk.id } }))))))),
         h(ErrorLine, { error: error })));
 }
 function AddMark({ route, picked, onDone }) {

@@ -4,6 +4,7 @@ import { Audience, Comment, Doc, Page, Photo, Poll, Post, PostDocument, Reaction
 import { me } from "./session.js";
 import { RouteCard, km } from "./routes.js";
 import { Avatar, Empty, ErrorLine, Loading, RichText, Time, UserLink, duration, useLoad } from "./ui.js";
+import { ReportButton } from "./report.js";
 
 const reactions: [Reaction, string, string][] = [
   ["like", "👍", "Нравится"], ["love", "❤️", "Люблю"], ["haha", "😄", "Смешно"],
@@ -381,6 +382,7 @@ export function PostView({ initial, onDelete }: { initial: Post; onDelete?: () =
             {(Object.keys(audienceLabel) as Audience[]).filter((a) => a !== "list" || p.audience === "list").map((a) => <option key={a} value={a}>{audienceLabel[a]}</option>)}
           </select>
         )}
+        {!mine && <ReportButton target={{ type: "post", id: p.id }} cls="chip" />}
       </footer>
       <ErrorLine error={error} />
       {open && <Comments post={p} onCount={(n) => setP({ ...p, comments_count: n })} />}

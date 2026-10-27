@@ -6,6 +6,7 @@ import { del, get, Page, patch, post, Route, UserCard } from "./api.js";
 import { difficulties } from "./hikes.js";
 import { useMe } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, UserLink, useLoad } from "./ui.js";
+import { ReportButton } from "./report.js";
 
 interface Ad {
   id: number; author: UserCard; region: string; title: string; body: string; date_from: string; date_to: string;
@@ -87,6 +88,7 @@ function AdCard({ ad, mine, onChange }: { ad: Ad; mine: boolean; onChange: () =>
         {sent && <span class="muted">Отклик отправлен — переписка в <a href={`/im/u/${ad.author.id}`}>Сообщениях</a>.</span>}
         {mine && <button class="ghost" onClick={() => run(() => patch(`/companions/${ad.id}`, { closed: !ad.closed }))}>{ad.closed ? "Открыть снова" : "Нашёл попутчиков"}</button>}
         {mine && <button class="ghost danger" onClick={() => run(() => del(`/companions/${ad.id}`))}>Удалить</button>}
+        {!mine && <ReportButton target={{ type: "companion", id: ad.id }} />}
       </div>
       {open && (
         <form class="reply" onSubmit={reply}>

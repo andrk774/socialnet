@@ -24,7 +24,8 @@ interface Card extends AdminUser {
   open_reports_against: number; reports_filed: number; balance: number; debt: number; last_login_at?: string;
   recent_security_events: SecEvent[];
 }
-interface Report { id: number; reporter: UserCard; target_type: string; target_id: number; target_uuid?: string; reason: string; status: string; created_at: string }
+interface ReportTarget { title: string; snippet: string; author_id: number; author: string; hidden: boolean; ref?: string }
+interface Report { id: number; reporter: UserCard; target_type: string; target_id: number; target_uuid?: string; reason: string; status: string; created_at: string; target?: ReportTarget }
 interface Alert { id: number; rule: string; subject: string; severity: "low" | "medium" | "high"; details: Record<string, unknown>; created_at: string; acknowledged_by: number | null }
 interface Audit { id: number; actor_id: number; actor_role: string; action: string; target: string; status: number; ip: string; created_at: string }
 
@@ -220,7 +221,52 @@ function UserCardView({ id }: { id: number }) {
   );
 }
 
-const targetLabel: Record<string, string> = { post: "Запись", comment: "Комментарий", user: "Пользователь", community: "Сообщество", track: "Трек", video: "Видео", document: "Документ" };
+const targetLabel: Record<string, string> = {
+  post: "Запись", comment: "Комментарий", user: "Пользователь", community: "Сообщество", track: "Трек", video: "Видео",
+  document: "Документ", companion: "Объявление о попутчиках", article: "Статья", route_point: "Точка на маршруте", route: "Маршрут",
+};
+// путь /mod/{type}/{id}/hide|unhide для каждого типа жалобы
+const modPath: Record<string, string> = {
+  post: "posts", comment: "comments", community: "communities", track: "tracks", video: "videos", document: "documents",
+  companion: "companions", article: "articles", route_point: "route-points", route: "routes",
+};
+
+// reportLink — куда смотреть объект целиком; null — отдельной страницы нет.
+export function reportLink(r: Report): string | null {
+  const ref = r.target?.ref;
+  switch (r.target_type) {
+    case "post": return `/p/${r.target_id}`;
+    case "comment": return ref ? `/p/${ref}` : null;
+    case "user": return `/admin?tab=users&user=${r.target_id}`;
+    case "community": return ref ? `/c/${encodeURIComponent(ref)}` : null;
+    case "article": return `/articles/${r.target_id}`;
+    case "companion": return "/companions";
+    case "route": return r.target_uuid ? `/trails/${r.target_uuid}` : null;
+    case "route_point": return ref ? `/trails/${ref}` : null;
+    default: return null;
+  }
+}
+
+function ReportCard({ r }: { r: Report }) {
+  const label = targetLabel[r.target_type] ?? r.target_type;
+  const link = reportLink(r);
+  const t = r.target;
+  // маршруты — серверные страницы каталога, не SPA
+  const external = r.target_type === "route" || r.target_type === "route_point";
+  return (
+    <div class="report-target">
+      <div>
+        {link ? <a href={link} target={external ? "_blank" : undefined} rel={external ? "noopener" : undefined}>{label}</a> : <span>{label}</span>}
+        {" "}<span class="muted">{r.target_uuid ?? `#${r.target_id}`}</span>
+        {t?.hidden && <span class="badge">{r.target_type === "user" ? "заблокирован" : "скрыто"}</span>}
+        {!t && <span class="badge">удалено</span>}
+      </div>
+      {t?.title && <strong>{t.title}</strong>}
+      {t?.snippet && <p class="report-snippet">{t.snippet}</p>}
+      {t && r.target_type !== "user" && <span class="muted">автор: <a href={`/admin?tab=users&user=${t.author_id}`}>@{t.author}</a></span>}
+    </div>
+  );
+}
 
 function ReportsTab() {
   const [status, setStatus] = useState("open");
@@ -231,10 +277,8 @@ function ReportsTab() {
     if (note === null || (action === "ban" && !note)) return;
     post(`/mod/reports/${r.id}/resolve`, { action, note }).then(list.reload, setError);
   };
-  const target = (r: Report) =>
-    r.target_type === "post" ? <a href={`/p/${r.target_id}`}>{targetLabel.post} #{r.target_id}</a> :
-    r.target_type === "user" ? <a href={`/admin?tab=users&user=${r.target_id}`}>{targetLabel.user} #{r.target_id}</a> :
-    <span>{targetLabel[r.target_type] ?? r.target_type} {r.target_uuid ?? `#${r.target_id}`}</span>;
+  const setHidden = (r: Report, hidden: boolean) =>
+    post(`/mod/${modPath[r.target_type]}/${r.target_uuid ?? r.target_id}/${hidden ? "hide" : "unhide"}`).then(list.reload, setError);
   return (
     <Fragment>
       <div class="row">
@@ -247,15 +291,21 @@ function ReportsTab() {
       {!list.data ? <Loading /> : list.data.items.length === 0 ? <Empty>Жалоб нет.</Empty> : (
         <ul class="plain-list reports">
           {list.data.items.map((r) => (
-            <li key={r.id}>
-              <span>{target(r)} — «{r.reason}»<br /><span class="muted">от {fullName(r.reporter)} · <Time iso={r.created_at} /></span></span>
-              {r.status === "open" && (
-                <span class="row tight">
-                  <button class="ghost" onClick={() => resolve(r, "dismiss")}>Отклонить</button>
-                  {r.target_type !== "user" && <button class="ghost" onClick={() => resolve(r, "hide")}>Скрыть</button>}
-                  <button class="ghost danger" onClick={() => resolve(r, "ban")}>Бан автора</button>
-                </span>
-              )}
+            <li key={r.id} data-type={r.target_type}>
+              <span>
+                <ReportCard r={r} />
+                «{r.reason}»<br /><span class="muted">от {fullName(r.reporter)} · <Time iso={r.created_at} /></span>
+              </span>
+              <span class="row tight">
+                {r.status === "open" && <button class="ghost" onClick={() => resolve(r, "dismiss")}>Отклонить</button>}
+                {r.status === "open" && r.target_type !== "user" && r.target && !r.target.hidden && <button class="ghost" onClick={() => resolve(r, "hide")}>Скрыть</button>}
+                {r.status !== "open" && r.target && r.target_type !== "user" && modPath[r.target_type] && (
+                  r.target.hidden
+                    ? <button class="ghost" onClick={() => setHidden(r, false)}>Вернуть</button>
+                    : <button class="ghost" onClick={() => setHidden(r, true)}>Скрыть</button>
+                )}
+                {r.status === "open" && r.target && <button class="ghost danger" onClick={() => resolve(r, "ban")}>Бан автора</button>}
+              </span>
             </li>
           ))}
         </ul>

@@ -2074,6 +2074,37 @@
      "created_at": {
       "type": "string",
       "format": "date-time"
+     },
+     "target": {
+      "type": "object",
+      "properties": {
+       "title": {
+        "type": "string"
+       },
+       "snippet": {
+        "type": "string"
+       },
+       "author_id": {
+        "type": "integer",
+        "format": "int64"
+       },
+       "author": {
+        "type": "string"
+       },
+       "hidden": {
+        "type": "boolean"
+       },
+       "ref": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "title",
+       "snippet",
+       "author_id",
+       "author",
+       "hidden"
+      ]
      }
     },
     "required": [

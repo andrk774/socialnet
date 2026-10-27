@@ -6,6 +6,7 @@ import { del, get, patch, post } from "./api.js";
 import { difficulties } from "./hikes.js";
 import { useMe } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, UserLink, useLoad } from "./ui.js";
+import { ReportButton } from "./report.js";
 const dayFmt = new Intl.DateTimeFormat("ru", { day: "numeric", month: "long", weekday: "short" });
 const day = (d) => dayFmt.format(new Date(d + "T12:00:00"));
 const dates = (a) => (a.date_from === a.date_to ? day(a.date_from) : `${day(a.date_from)} — ${day(a.date_to)}`);
@@ -92,7 +93,8 @@ function AdCard({ ad, mine, onChange }) {
                 h("a", { href: `/im/u/${ad.author.id}` }, "\u0421\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F\u0445"),
                 "."),
             mine && h("button", { class: "ghost", onClick: () => run(() => patch(`/companions/${ad.id}`, { closed: !ad.closed })) }, ad.closed ? "Открыть снова" : "Нашёл попутчиков"),
-            mine && h("button", { class: "ghost danger", onClick: () => run(() => del(`/companions/${ad.id}`)) }, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C")),
+            mine && h("button", { class: "ghost danger", onClick: () => run(() => del(`/companions/${ad.id}`)) }, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C"),
+            !mine && h(ReportButton, { target: { type: "companion", id: ad.id } })),
         open && (h("form", { class: "reply", onSubmit: reply },
             h("label", null,
                 "\u0421\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435 \u0430\u0432\u0442\u043E\u0440\u0443",
