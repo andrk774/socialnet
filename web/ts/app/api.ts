@@ -49,7 +49,7 @@ export interface Attachment {
   artist?: string; duration_sec?: number; ext?: string; size?: number;
 }
 export interface Message { id: number; conversation_id: number; sender_id: number; kind: "text" | "service"; body?: string; encrypted: boolean; attachments: Attachment[]; created_at: string }
-export interface Conversation { id: number; kind: "direct" | "group"; title?: string; members_count?: number; peer?: UserCard; last_message: Message; unread: number }
+export interface Conversation { id: number; kind: "direct" | "group"; title?: string; members_count?: number; event_id?: number; peer?: UserCard; last_message: Message; unread: number }
 export interface Page<T> { items: T[]; next_cursor: number | null }
 export interface ApiErrorBody { error: { code: string; message: string; fields?: Record<string, string> } }
 

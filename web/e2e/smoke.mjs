@@ -280,6 +280,14 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await anna.page.locator(".weather-days li.hike-day").first().waitFor();
   await anna.page.locator(".weather-days li.warn", { hasText: "гроза" }).waitFor();
   const hikeURL = anna.page.url();
+  // гость на главной видит поход в витрине под формой входа
+  {
+    const g = await (await anna.ctx.browser().newContext({ locale: "ru-RU" })).newPage();
+    await g.goto(base + "/");
+    await g.locator(".showcase-hikes").getByRole("link", { name: "Двуглавая сопка с ночёвкой" }).waitFor();
+    await g.screenshot({ path: `${shots}/00-guest.png`, fullPage: true });
+    await g.context().close();
+  }
 
   await bob.page.goto(base + "/hikes");
   await bob.page.getByRole("link", { name: "Двуглавая сопка с ночёвкой" }).click();
@@ -295,6 +303,29 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await bob.page.reload();
   await bob.page.getByText("Вы идёте").waitFor();
   await bob.page.getByRole("heading", { name: "Мои доверенные контакты" }).waitFor();
+  // чат похода: Борис в нём, пишет группе, Анна видит
+  await bob.page.getByRole("link", { name: "Чат похода" }).click();
+  await bob.page.getByText("Чат похода: в нём все, кто идёт.").waitFor();
+  await bob.page.locator(".msg-service", { hasText: "в группе похода" }).waitFor();
+  await bob.page.getByLabel("Сообщение").fill("Кто берёт котелок?");
+  await bob.page.locator(".chat-form").getByRole("button", { name: "Отправить" }).click();
+  await anna.page.goto(hikeURL);
+  await anna.page.getByRole("link", { name: "Чат похода" }).click();
+  await anna.page.locator(".msg", { hasText: "Кто берёт котелок?" }).waitFor();
+  await bob.page.goto(hikeURL);
+  await anna.page.goto(hikeURL);
+  // отзыв о маршруте каталога: звёзды и текст, средняя оценка
+  {
+    const rc = bob.page.locator("section", { has: bob.page.getByRole("heading", { name: "Маршрут", exact: true }) });
+    await rc.getByRole("button", { name: "Показать на карте" }).click();
+    await rc.locator(".route-reviews").getByText("отзывов пока нет").waitFor();
+    await rc.locator(".star-input label").nth(3).click();
+    await rc.locator(".review-form").getByLabel("Отзыв").fill("Курумник после дождя скользкий");
+    await rc.getByRole("button", { name: "Оставить отзыв" }).click();
+    await rc.locator(".route-reviews .rating-line", { hasText: "4.0 · 1 отзыв" }).waitFor();
+    await rc.locator(".reviews li", { hasText: "Курумник после дождя скользкий" }).waitFor();
+    await rc.getByRole("button", { name: "Показать на карте" }).or(rc.getByRole("button", { name: "Скрыть карту" })).click();
+  }
   // подвоз: Борис предлагает места, Анна просится, Борис берёт
   await bob.page.getByText("Предложить места в машине").click();
   const dep = new Date(Date.now() + 5 * 864e5 - 2 * 36e5);
@@ -403,6 +434,15 @@ await anna.page.getByRole("button", { name: /Подключить за \d+ мо�
   await anna.page.screenshot({ path: `${shots}/19-article.png`, fullPage: true });
   await bob.page.goto(base + "/articles");
   await bob.page.locator(".article-card", { hasText: "Три дня на Таганае" }).waitFor();
+  // общий поиск из шапки: поход и статья
+  await bob.page.locator("#q").fill("двуглав");
+  await bob.page.locator("#q").press("Enter");
+  await bob.page.locator(".search-section[data-kind=hikes]").getByRole("link", { name: "Двуглавая сопка с ночёвкой" }).waitFor();
+  await bob.page.locator("#q").fill("белого ключа");
+  await bob.page.locator("#q").press("Enter");
+  await bob.page.locator(".search-section[data-kind=articles]").getByRole("link", { name: "Три дня на Таганае" }).waitFor();
+  await bob.page.screenshot({ path: `${shots}/23-search.png` });
+  await bob.page.goto(base + "/articles");
   // жалоба на статью — уйдёт в админку
   await bob.page.locator(".article-card", { hasText: "Три дня на Таганае" }).getByRole("link").first().click();
   await bob.page.getByRole("button", { name: "Пожаловаться" }).click();

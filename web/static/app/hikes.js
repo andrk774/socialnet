@@ -9,6 +9,7 @@ import { Weather } from "./weather.js";
 import { Rides } from "./rides.js";
 import { useMe } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, RichText, Time, UserLink, useLoad } from "./ui.js";
+import { ReviewForm } from "./reviews.js";
 export const difficulties = ["", "Лёгкий", "Средний", "Сложный", "Очень сложный", "Экстремальный"];
 const dateFmt = new Intl.DateTimeFormat("ru", { weekday: "short", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 const when = (iso) => dateFmt.format(new Date(iso));
@@ -129,11 +130,15 @@ export function EventPage({ id }) {
                 h("button", { class: "primary" }, e.approval ? "Подать заявку" : e.capacity !== null && e.going_count >= e.capacity ? "Встать в очередь" : "Иду"))),
             e.my_status && !isOrganizer && h("button", { class: "ghost", onClick: () => act(() => del(`/events/${id}/rsvp`)) }, e.my_status === "pending" ? "Отозвать заявку" : e.my_status === "waitlist" ? "Выйти из очереди" : "Не пойду"),
             h("a", { class: "ghost button-link", href: `/events/${id}/print` }, "\u041B\u0438\u0441\u0442 \u0434\u043B\u044F \u043F\u0435\u0447\u0430\u0442\u0438"),
+            e.chat_id && h("a", { class: "primary button-link", href: `/im/${e.chat_id}` }, "\u0427\u0430\u0442 \u043F\u043E\u0445\u043E\u0434\u0430"),
             h("button", { class: "ghost", onClick: () => saveFile(`/api/v1/events/${id}/calendar.ics`, `${e.title}.ics`).catch(setError) }, "\u0412 \u043A\u0430\u043B\u0435\u043D\u0434\u0430\u0440\u044C"),
             isOrganizer && me.plus && h("button", { class: "ghost", onClick: () => saveFile(`/api/v1/events/${id}/participants.csv`, `участники-${id}.csv`).catch(setError) }, "\u0421\u043F\u0438\u0441\u043E\u043A \u0433\u0440\u0443\u043F\u043F\u044B (CSV)"),
             isOrganizer && h("button", { class: "ghost", onClick: () => setEditing(true) }, "\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C"),
             isOrganizer && h("button", { class: "ghost danger", onClick: () => confirm("Удалить поход? Участники его больше не увидят.") && act(async () => { await del(`/events/${id}`); navigate("/hikes"); }) }, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C")),
         h(ErrorLine, { error: error }),
+        e.can_review && h("section", { class: "hike-review" },
+            h("h2", null, "\u041A\u0430\u043A \u043F\u0440\u043E\u0448\u0451\u043B \u043F\u043E\u0445\u043E\u0434?"),
+            h(ReviewForm, { path: `/events/${id}/review`, initial: e.my_review ?? null, label: "\u041E\u0446\u0435\u043D\u0438\u0442\u0435 \u043F\u043E\u0445\u043E\u0434 \u0438 \u043E\u0440\u0433\u0430\u043D\u0438\u0437\u0430\u0442\u043E\u0440\u0430", onSaved: ev.reload })),
         e.description && h("div", { class: "event-text" },
             h(RichText, { text: e.description })),
         e.gear && (h("section", { class: "gear" },

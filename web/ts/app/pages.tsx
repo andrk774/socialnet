@@ -1,6 +1,6 @@
 import { h, Fragment } from "../vendor/preact/index.js";
 import { useEffect, useState } from "../vendor/preact/hooks.js";
-import { Page, Post, UserCard, del, fullName, get, post, upload } from "./api.js";
+import { Page, Post, UserCard, del, get, post, upload } from "./api.js";
 import { Composer, Emoji, PostList, PostView, communityEmoji } from "./posts.js";
 import { query } from "./router.js";
 import { Avatar, Empty, ErrorLine, Loading, Time, UserLink, duration, useLoad } from "./ui.js";
@@ -376,27 +376,3 @@ export function MusicPage({ userId }: { userId: number }) {
   );
 }
 
-export function SearchPage() {
-  const q = query("q") ?? "";
-  const [type, setType] = useState("users");
-  const res = useLoad(() => (q ? get<{ items: any[] }>(`/search?q=${encodeURIComponent(q)}&type=${type}`) : Promise.resolve({ items: [] })), [q, type]);
-  return (
-    <section>
-      <h1>Поиск{q && `: ${q}`}</h1>
-      <div class="tabs" role="tablist">
-        {[["users", "Люди"], ["communities", "Сообщества"], ["tracks", "Музыка"]].map(([k, label]) => (
-          <button role="tab" aria-selected={type === k} class={type === k ? "tab on" : "tab"} onClick={() => setType(k)}>{label}</button>
-        ))}
-      </div>
-      {!q ? <Empty>Введите запрос в строке поиска.</Empty> : res.error ? <ErrorLine error={res.error} /> : !res.data ? <Loading /> :
-        res.data.items.length === 0 ? <Empty>Ничего не нашлось. Попробуйте другое написание.</Empty> : (
-          <ul class="plain-list">
-            {res.data.items.map((x) =>
-              type === "users" ? <li key={x.id}><Avatar user={x} size={32} /> <a href={`/u/${x.username}`}>{fullName(x)}</a> <span class="muted">@{x.username}</span></li> :
-              type === "communities" ? <li key={x.id}><a href={`/c/${x.slug}`}>{x.name}</a> <span class="muted">{x.members_count} уч.</span></li> :
-              <li key={x.id}>{x.artist} — {x.title} <audio controls preload="none" src={x.url} /></li>)}
-          </ul>
-        )}
-    </section>
-  );
-}

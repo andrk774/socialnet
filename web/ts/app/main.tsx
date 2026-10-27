@@ -1,9 +1,9 @@
-import { h, render, ComponentChildren } from "../vendor/preact/index.js";
+import { h, Fragment, render, ComponentChildren } from "../vendor/preact/index.js";
 import { useEffect, useState } from "../vendor/preact/hooks.js";
 import { get, logout, onAuthChange, post, refresh, signedIn } from "./api.js";
 import { AuthPage } from "./auth.js";
 import { ChatPage, ConversationsPage, DirectPage } from "./messages.js";
-import { CommunitiesPage, CommunityPage, FeedPage, MusicPage, NotificationsPage, OAuthPage, PostPage, SearchPage, SettingsPage, TagPage, WalletPage } from "./pages.js";
+import { CommunitiesPage, CommunityPage, FeedPage, MusicPage, NotificationsPage, OAuthPage, PostPage, SettingsPage, TagPage, WalletPage } from "./pages.js";
 import { ProfilePage } from "./profile.js";
 import { EventPage, HikeForm, HikesPage } from "./hikes.js";
 import { CompanionsPage } from "./companions.js";
@@ -23,6 +23,8 @@ import { match, navigate, query, usePath } from "./router.js";
 import { loadMe, setMe, useMe } from "./session.js";
 import { Avatar, ErrorLine, Loading } from "./ui.js";
 import { RecordPage } from "./record.js";
+import { SearchPage } from "./search.js";
+import { Showcase } from "./landing.js";
 
 function routes(path: string, onRead: () => void, myId: number): ComponentChildren {
   let p;
@@ -106,7 +108,7 @@ function Shell() {
         <a href="/" class="wordmark" aria-label="socialnet — лента">socialnet</a>
         <form class="search" role="search" onSubmit={(e) => { e.preventDefault(); navigate(`/search?q=${encodeURIComponent(q)}`); }}>
           <label class="sr-only" for="q">Поиск</label>
-          <input id="q" type="search" placeholder="Поиск людей, сообществ, музыки" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
+          <input id="q" type="search" placeholder="Поиск: походы, маршруты, люди" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
         </form>
         <a href={`/u/${user.username}`} class="me" aria-label="Мой профиль"><Avatar user={user} size={32} /></a>
       </div></header>
@@ -173,7 +175,9 @@ function App() {
   if (state === "loading") return <Loading />;
   // без сети войти нельзя, но сохранённые маршруты доступны
   if (state === "out" && (!navigator.onLine || location.pathname === "/offline")) return <main class="content offline-only"><OfflinePage /><p><a href="/">Войти</a></p></main>;
-  return state === "in" ? <Shell /> : <AuthPage />;
+  if (state === "in") return <Shell />;
+  // гость на главной — форма входа и витрина; по ссылке вглубь — только вход
+  return lp === "/" ? <><AuthPage /><Showcase /></> : <AuthPage />;
 }
 
 render(<App />, document.getElementById("app")!);

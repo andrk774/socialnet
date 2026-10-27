@@ -236,12 +236,12 @@ function UserCardView({ id }) {
 }
 const targetLabel = {
     post: "Запись", comment: "Комментарий", user: "Пользователь", community: "Сообщество", track: "Трек", video: "Видео",
-    document: "Документ", companion: "Объявление о попутчиках", article: "Статья", route_point: "Точка на маршруте", route: "Маршрут",
+    document: "Документ", companion: "Объявление о попутчиках", article: "Статья", route_point: "Точка на маршруте", route: "Маршрут", review: "Отзыв",
 };
 // путь /mod/{type}/{id}/hide|unhide для каждого типа жалобы
 const modPath = {
     post: "posts", comment: "comments", community: "communities", track: "tracks", video: "videos", document: "documents",
-    companion: "companions", article: "articles", route_point: "route-points", route: "routes",
+    companion: "companions", article: "articles", route_point: "route-points", route: "routes", review: "reviews",
 };
 // reportLink — куда смотреть объект целиком; null — отдельной страницы нет.
 export function reportLink(r) {

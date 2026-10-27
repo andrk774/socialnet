@@ -356,8 +356,10 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"items": items})
+	case "hikes", "articles", "routes", "all":
+		s.searchHiking(w, r, r.URL.Query().Get("type"), q, limit)
 	default:
-		writeError(w, http.StatusBadRequest, "bad_request", "type must be users, communities or tracks")
+		writeError(w, http.StatusBadRequest, "bad_request", "type must be all, users, communities, tracks, hikes, articles or routes")
 	}
 }
 

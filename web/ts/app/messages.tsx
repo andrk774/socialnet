@@ -125,6 +125,7 @@ export function ChatPage({ id }: { id: number }) {
   return (
     <section class="chat">
       <h1><a href="/im" class="back" aria-label="Все диалоги">‹</a> {conv ? title(conv) : "Диалог"}</h1>
+      {conv?.event_id && <p class="muted">Чат похода: в нём все, кто идёт. <a href={`/events/${conv.event_id}`}>Страница похода</a></p>}
       <ErrorLine error={error} />
       <div class="chat-log" role="log" aria-live="polite">
         {msgs === null ? <Loading /> : msgs.map((m) => (

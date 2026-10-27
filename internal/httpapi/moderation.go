@@ -26,7 +26,7 @@ func (s *Server) handleCreateReport(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Reason = strings.TrimSpace(req.Reason)
 	errs := map[string]string{}
-	oneOf(errs, "target_type", &req.TargetType, "post", "comment", "user", "community", "track", "video", "document", "route", "companion", "route_point", "article")
+	oneOf(errs, "target_type", &req.TargetType, "post", "comment", "user", "community", "track", "video", "document", "route", "companion", "route_point", "article", "review")
 	var targetUUID *string
 	if req.TargetType == "track" || req.TargetType == "video" || req.TargetType == "document" || req.TargetType == "route" {
 		u := strings.ToLower(req.TargetUUID)
@@ -338,7 +338,7 @@ func (s *Server) handleSetHidden(hidden bool) http.HandlerFunc {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		typ := map[string]string{"posts": "post", "comments": "comment", "communities": "community", "companions": "companion", "route-points": "route_point", "articles": "article"}[chi.URLParam(r, "type")]
+		typ := map[string]string{"posts": "post", "comments": "comment", "communities": "community", "companions": "companion", "route-points": "route_point", "articles": "article", "reviews": "review"}[chi.URLParam(r, "type")]
 		id, ok := pathID(w, r, "id")
 		if !ok || typ == "" {
 			if ok {

@@ -240,7 +240,8 @@ fieldset { border: 0; padding: 0; margin: 0; }
 .track-btn.on { background: var(--malachite); color: #fff; }
 .player { position: sticky; bottom: 1rem; background: var(--deep); color: #fff; border-radius: var(--radius-m); padding: .75rem 1rem; display: grid; gap: .5rem; }
 .player audio { width: 100%; }
-.tabs { display: flex; gap: .25rem; margin-bottom: 1rem; border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: .25rem; margin-bottom: 1rem; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.tabs .tab { flex: none; }
 .tab { background: none; border: 0; padding: .5rem .75rem; color: var(--ink-2); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .tab.on { color: var(--malachite); border-bottom-color: var(--malachite); font-weight: 600; }
 .banner { border-left: 4px solid var(--band); background: var(--tint); padding: .75rem 1rem; border-radius: 0 var(--radius-s) var(--radius-s) 0; margin-bottom: 1.25rem; }
@@ -554,3 +555,26 @@ img.emoji { vertical-align: -4px; object-fit: contain; display: inline-block; }
 .rec-stats > div { display: grid; padding: .8rem; border-radius: var(--radius-m); background: var(--tint); }
 .rec-stats.paused > div { background: var(--line); }
 .rec-num { font-size: var(--step-3); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--deep); line-height: 1.1; }
+
+/* витрина для гостей под формой входа */
+.showcase { max-width: 40rem; margin: 0 auto 4rem; padding: 0 1rem; }
+.showcase-points { list-style: none; padding: 0; display: grid; gap: .5rem; margin: 0 0 2rem; }
+.showcase-points li { padding: .7rem .9rem; border-radius: var(--radius-m); background: var(--tint); color: var(--ink-2); }
+.showcase-points strong { color: var(--deep); }
+.showcase-hikes { list-style: none; padding: 0; display: grid; gap: .6rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
+.showcase-hikes li { display: grid; gap: .15rem; padding: .8rem; border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface); }
+.showcase-hikes a { font-weight: 600; }
+
+/* отзывы */
+.stars { color: #C98A0B; letter-spacing: .05em; }
+.stars-off { color: var(--line); }
+.reviews { list-style: none; padding: 0; display: grid; gap: .8rem; }
+.reviews p { margin: .2rem 0; }
+.star-input { border: 0; padding: 0; margin: 0; display: flex; gap: .15rem; align-items: center; }
+.star-input legend { padding: 0; margin-bottom: .3rem; }
+.star-input label { cursor: pointer; font-size: 1.8rem; line-height: 1; color: var(--line); }
+.star-input label.on { color: #C98A0B; }
+.star-input input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.star-input input:focus-visible + span { outline: 2px solid var(--malachite); outline-offset: 2px; border-radius: 4px; }
+.organizer-reviews { margin: .8rem 0; }
+.organizer-reviews summary { cursor: pointer; }

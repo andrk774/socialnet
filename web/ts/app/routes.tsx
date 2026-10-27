@@ -10,6 +10,7 @@ import { WeatherToggle } from "./weather.js";
 import { isSaved, offlineSupported, removeOffline, saveOffline } from "./offline.js";
 import { ErrorLine, Loading } from "./ui.js";
 import { ReportButton } from "./report.js";
+import { RouteReviews } from "./reviews.js";
 
 interface MapConfig { enabled: boolean; tiles: string; attribution: string; max_zoom: number }
 let mapConfig: Promise<MapConfig> | null = null;
@@ -284,6 +285,7 @@ function MapPanel({ route }: { route: Route }) {
     <div class="map-panel">
       <RouteMap route={detail} onPick={adding ? (lat, lon) => setPicked([lat, lon]) : undefined} picked={adding ? picked : null} />
       <Marks route={detail} onChange={load} />
+      {detail.public && <RouteReviews routeId={detail.id} ownerId={detail.owner_id} />}
       {!adding ? <button class="ghost" onClick={() => { setAdding(true); setPicked(null); }}>Отметить точку</button>
         : <AddMark route={detail} picked={picked} onDone={(ok) => { setAdding(false); setPicked(null); if (ok) load(); }} />}
     </div>

@@ -1395,6 +1395,16 @@
      "created_at": {
       "type": "string",
       "format": "date-time"
+     },
+     "chat_id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "can_review": {
+      "type": "boolean"
+     },
+     "my_review": {
+      "$ref": "#/components/schemas/Review"
      }
     },
     "required": [
@@ -1849,6 +1859,10 @@
       "type": "integer",
       "format": "int64"
      },
+     "event_id": {
+      "type": "integer",
+      "format": "int64"
+     },
      "peer": {
       "$ref": "#/components/schemas/UserCard"
      },
@@ -2115,6 +2129,81 @@
      "reason",
      "status",
      "created_at"
+    ]
+   },
+   "Review": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "author": {
+      "$ref": "#/components/schemas/UserCard"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "organizer",
+       "route"
+      ]
+     },
+     "event_id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "event_title": {
+      "type": "string"
+     },
+     "route_id": {
+      "type": "string"
+     },
+     "rating": {
+      "type": "integer",
+      "enum": [
+       1,
+       2,
+       3,
+       4,
+       5
+      ]
+     },
+     "text": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    },
+    "required": [
+     "id",
+     "author",
+     "kind",
+     "rating",
+     "text",
+     "created_at",
+     "updated_at"
+    ]
+   },
+   "Rating": {
+    "type": "object",
+    "properties": {
+     "avg": {
+      "type": "number"
+     },
+     "count": {
+      "type": "integer",
+      "format": "int64"
+     }
+    },
+    "required": [
+     "avg",
+     "count"
     ]
    },
    "ModAction": {
@@ -9537,6 +9626,118 @@
     }
    }
   },
+  "/api/v1/events/{id}/review": {
+   "delete": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Удалить свой отзыв о походе",
+    "operationId": "delete_api_v1_events_id_review",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Отзыв участника об организаторе (после похода, 90 дней; повторно — исправить)",
+    "operationId": "post_api_v1_events_id_review",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "rating": {
+          "type": "integer",
+          "enum": [
+           1,
+           2,
+           3,
+           4,
+           5
+          ]
+         },
+         "text": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "rating"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "integer",
+           "format": "int64"
+          }
+         },
+         "required": [
+          "id"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/events/{id}/rsvp": {
    "delete": {
     "tags": [
@@ -13039,7 +13240,8 @@
            "route",
            "companion",
            "route_point",
-           "article"
+           "article",
+           "review"
           ]
          },
          "target_id": {
@@ -13982,6 +14184,176 @@
     }
    }
   },
+  "/api/v1/routes/{rid}/reviews": {
+   "delete": {
+    "tags": [
+     "routes"
+    ],
+    "summary": "Удалить свой отзыв о маршруте",
+    "operationId": "delete_api_v1_routes_rid_reviews",
+    "parameters": [
+     {
+      "name": "rid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "routes"
+    ],
+    "summary": "Отзывы о маршруте и средняя оценка",
+    "operationId": "get_api_v1_routes_rid_reviews",
+    "parameters": [
+     {
+      "name": "rid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "rating": {
+           "$ref": "#/components/schemas/Rating"
+          },
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Review"
+           }
+          },
+          "next_cursor": {
+           "type": "integer",
+           "format": "int64",
+           "nullable": true
+          }
+         },
+         "required": [
+          "rating",
+          "items",
+          "next_cursor"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "routes"
+    ],
+    "summary": "Отзыв о маршруте каталога (не своём; повторно — исправить)",
+    "operationId": "post_api_v1_routes_rid_reviews",
+    "parameters": [
+     {
+      "name": "rid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "rating": {
+          "type": "integer",
+          "enum": [
+           1,
+           2,
+           3,
+           4,
+           5
+          ]
+         },
+         "text": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "rating"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "integer",
+           "format": "int64"
+          }
+         },
+         "required": [
+          "id"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/scheduled-posts": {
    "get": {
     "tags": [
@@ -14221,7 +14593,7 @@
     "tags": [
      "search"
     ],
-    "summary": "Поиск: ?q=…&type=users|communities|tracks",
+    "summary": "Поиск: ?q=…&type=users|communities|tracks|hikes|articles|routes — {items}; type=all — по 5 из каждого раздела: {hikes, routes, articles, users, communities}",
     "operationId": "get_api_v1_search",
     "responses": {
      "200": {
@@ -14229,16 +14601,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "type": "object",
-         "properties": {
-          "items": {
-           "type": "array",
-           "items": {}
-          }
-         },
-         "required": [
-          "items"
-         ]
+         "type": "object"
         }
        }
       }
@@ -14461,6 +14824,125 @@
     "responses": {
      "204": {
       "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/showcase": {
+   "get": {
+    "tags": [
+     "service"
+    ],
+    "summary": "Витрина для гостей: ближайшие походы (без мест сбора и участников) и свежие маршруты каталога; без входа, кеш минута",
+    "operationId": "get_api_v1_showcase",
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "hikes": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "title": {
+              "type": "string"
+             },
+             "place": {
+              "type": "string"
+             },
+             "starts_at": {
+              "type": "string",
+              "format": "date-time"
+             },
+             "difficulty": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+             },
+             "capacity": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+             },
+             "going_count": {
+              "type": "integer",
+              "format": "int64"
+             }
+            },
+            "required": [
+             "id",
+             "title",
+             "place",
+             "starts_at",
+             "difficulty",
+             "capacity",
+             "going_count"
+            ]
+           }
+          },
+          "routes": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "id": {
+              "type": "string"
+             },
+             "title": {
+              "type": "string"
+             },
+             "distance_m": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "gain_m": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "author": {
+              "$ref": "#/components/schemas/UserCard"
+             },
+             "url": {
+              "type": "string"
+             }
+            },
+            "required": [
+             "id",
+             "title",
+             "distance_m",
+             "gain_m",
+             "author",
+             "url"
+            ]
+           }
+          }
+         },
+         "required": [
+          "hikes",
+          "routes"
+         ]
+        }
+       }
+      }
      },
      "default": {
       "description": "Ошибка",
@@ -16571,6 +17053,69 @@
           }
          },
          "required": [
+          "items",
+          "next_cursor"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/users/{id}/reviews": {
+   "get": {
+    "tags": [
+     "users"
+    ],
+    "summary": "Отзывы об организаторе и средняя оценка",
+    "operationId": "get_api_v1_users_id_reviews",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "rating": {
+           "$ref": "#/components/schemas/Rating"
+          },
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Review"
+           }
+          },
+          "next_cursor": {
+           "type": "integer",
+           "format": "int64",
+           "nullable": true
+          }
+         },
+         "required": [
+          "rating",
           "items",
           "next_cursor"
          ]

@@ -430,6 +430,9 @@ func (s *Server) handleRenameChat(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if hikeChatLocked(w, conv) {
+		return
+	}
 	var req struct {
 		Title string `json:"title"`
 	}
@@ -457,6 +460,9 @@ func (s *Server) handleRenameChat(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAddChatMember(w http.ResponseWriter, r *http.Request) {
 	conv, ok := s.groupConv(w, r)
 	if !ok {
+		return
+	}
+	if hikeChatLocked(w, conv) {
 		return
 	}
 	var req struct {
@@ -500,6 +506,9 @@ func (s *Server) handleAddChatMember(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleRemoveChatMember(w http.ResponseWriter, r *http.Request) {
 	conv, ok := s.groupConv(w, r)
 	if !ok {
+		return
+	}
+	if hikeChatLocked(w, conv) {
 		return
 	}
 	uid, ok := pathID(w, r, "uid")
@@ -546,6 +555,9 @@ func (s *Server) handleRemoveChatMember(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleSetChatRole(w http.ResponseWriter, r *http.Request) {
 	conv, ok := s.groupConv(w, r)
 	if !ok {
+		return
+	}
+	if hikeChatLocked(w, conv) {
 		return
 	}
 	uid, ok := pathID(w, r, "uid")
