@@ -418,6 +418,13 @@ r("DELETE", A + "/events/{id}/contacts/{cid}", "events", "Удалить кон�
 r("POST", A + "/events/{id}/returned", "events", "Группа вернулась: контакты удаляются; если тревога уже ушла — им «отбой»", code=204)
 art = obj(**{"title?": str_, "body?": str_, "cover_media_id?": nullable(uuid), "route_id?": nullable(uuid),
             "status?": enum("draft", "published")})
+antenna = obj(id=int_, name=str_, keywords=arr(str_), excludes=arr(str_), unread=int_, created_at=dt)
+antenna_body = obj(name=str_, keywords=arr(str_), **{"excludes?": arr(str_)})
+r("GET", A + "/antennas", "wall", "Мои ленты по ключевым словам («антенны») с числом новых записей", resp=obj(items=arr(antenna)))
+r("POST", A + "/antennas", "wall", "Новая лента: 1–10 слов (русские словоформы), до 10 исключений; до 5 лент", antenna_body, antenna, 201)
+r("PUT", A + "/antennas/{id}", "wall", "Изменить ленту", antenna_body, antenna)
+r("DELETE", A + "/antennas/{id}", "wall", "Удалить ленту", code=204)
+r("GET", A + "/antennas/{id}/posts", "wall", "Записи ленты (только видимые); первая страница отмечает их просмотренными", resp=lst(S("Post")))
 r("POST", A + "/articles", "wall", "Статья: разметка ## ### - 1. > --- **жирный** *курсив* [ссылка](https://…) ![подпись](media:UUID); фото и маршрут — свои",
   art, S("Article"), 201)
 r("GET", A + "/articles", "wall", "Опубликованные статьи (без текста, с анонсом)", resp=lst(S("Article")))

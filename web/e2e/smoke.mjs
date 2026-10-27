@@ -344,6 +344,17 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await bob.page.getByText(/Отклик на объявление/).first().waitFor();
 }
 
+// своя лента по словам: «таганай» находит «на Таганае»
+{
+  await bob.page.getByRole("link", { name: "Мои ленты" }).click();
+  await bob.page.getByRole("button", { name: "Новая лента" }).click();
+  await bob.page.getByLabel("Название").fill("Таганай");
+  await bob.page.getByLabel("Слова через запятую").fill("таганай, иремель");
+  await bob.page.getByLabel("Кроме слов").fill("продам");
+  await bob.page.getByRole("button", { name: "Создать ленту" }).click();
+  await bob.page.locator(".antenna article.post", { hasText: "Утро на Таганае" }).waitFor();
+}
+
 // статья: разметка, фото в тексте, предпросмотр; HTML из текста остаётся текстом
 {
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");

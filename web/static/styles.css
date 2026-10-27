@@ -508,3 +508,8 @@ img.emoji { vertical-align: -4px; object-fit: contain; display: inline-block; }
 .emoji-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
 .emoji-list li { display: flex; align-items: center; gap: .35rem; }
 .emoji-manager { margin-top: .75rem; }
+
+/* ---------- свои ленты ---------- */
+.antenna-tabs { margin-bottom: .75rem; }
+.antenna-tabs .badge { margin-left: .35rem; }
+.antenna-form { margin-bottom: 1rem; }
