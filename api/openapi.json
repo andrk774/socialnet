@@ -1279,6 +1279,19 @@
       "type": "integer",
       "format": "int64"
      },
+     "control_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+     },
+     "returned_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+     },
+     "alert_sent": {
+      "type": "boolean"
+     },
      "created_at": {
       "type": "string",
       "format": "date-time"
@@ -1303,6 +1316,9 @@
      "pending_count",
      "waitlist_count",
      "my_status",
+     "control_at",
+     "returned_at",
+     "alert_sent",
      "created_at"
     ]
    },
@@ -7117,6 +7133,11 @@
          },
          "approval": {
           "type": "boolean"
+         },
+         "control_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": true
          }
         }
        }
@@ -7302,6 +7323,11 @@
          },
          "approval": {
           "type": "boolean"
+         },
+         "control_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": true
          }
         }
        }
@@ -7545,6 +7571,247 @@
      },
      {
       "name": "uid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/events/{id}/contacts": {
+   "get": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Мои доверенные контакты в походе (чужие не видны никому)",
+    "operationId": "get_api_v1_events_id_contacts",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "name": {
+              "type": "string"
+             },
+             "email": {
+              "type": "string"
+             },
+             "created_at": {
+              "type": "string",
+              "format": "date-time"
+             }
+            },
+            "required": [
+             "id",
+             "name",
+             "email",
+             "created_at"
+            ]
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Добавить доверенный контакт (до 3; нужен контрольный срок, участие и подтверждённая почта)",
+    "operationId": "post_api_v1_events_id_contacts",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "email": {
+          "type": "string"
+         },
+         "consent": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "name",
+         "email",
+         "consent"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "name": {
+           "type": "string"
+          },
+          "email": {
+           "type": "string"
+          },
+          "created_at": {
+           "type": "string",
+           "format": "date-time"
+          }
+         },
+         "required": [
+          "id",
+          "name",
+          "email",
+          "created_at"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/events/{id}/contacts/{cid}": {
+   "delete": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Удалить контакт",
+    "operationId": "delete_api_v1_events_id_contacts_cid",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     },
+     {
+      "name": "cid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/events/{id}/returned": {
+   "post": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Группа вернулась: контакты удаляются; если тревога уже ушла — им «отбой»",
+    "operationId": "post_api_v1_events_id_returned",
+    "parameters": [
+     {
+      "name": "id",
       "in": "path",
       "required": true,
       "schema": {

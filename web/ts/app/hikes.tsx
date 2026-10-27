@@ -13,8 +13,10 @@ export interface HikeEvent {
   title: string; description: string; place: string; starts_at: string; ends_at?: string;
   difficulty: number | null; capacity: number | null; gear: string; route_id: string | null; meeting_point: string; approval: boolean;
   going_count: number; maybe_count: number; pending_count: number; waitlist_count: number;
-  my_status: "going" | "maybe" | "pending" | "waitlist" | null; my_waitlist_position?: number; created_at: string;
+  my_status: "going" | "maybe" | "pending" | "waitlist" | null; my_waitlist_position?: number;
+  control_at: string | null; returned_at: string | null; alert_sent: boolean; created_at: string;
 }
+interface Contact { id: number; name: string; email: string; created_at: string }
 interface Application { user: UserCard; note: string; created_at: string }
 
 export const difficulties = ["", "Лёгкий", "Средний", "Сложный", "Очень сложный", "Экстремальный"];
@@ -134,6 +136,8 @@ export function EventPage({ id }: { id: number }) {
       )}
       {route.data && <section><h2>Маршрут</h2><RouteCard route={route.data} /></section>}
 
+      {e.kind === "hike" && e.control_at && <Control e={e} canMark={e.my_status === "going" || isOrganizer} onChange={ev.reload} />}
+
       {isOrganizer && e.pending_count > 0 && <Applications id={id} onChange={ev.reload} />}
 
       <h2>Идут</h2>
@@ -142,6 +146,50 @@ export function EventPage({ id }: { id: number }) {
         <h2>Лист ожидания</h2>
         <People list={queue.data.items} canRemove={isOrganizer} creator={e.creator_id} onRemove={(u) => act(() => del(`/events/${id}/attendees/${u.id}`))} />
       </>}
+    </section>
+  );
+}
+
+// Control — контрольный срок: «вернулись» и доверенные контакты участника.
+function Control({ e, canMark, onChange }: { e: HikeEvent; canMark: boolean; onChange: () => void }) {
+  const going = e.my_status === "going";
+  const contacts = useLoad(() => (going && !e.returned_at ? get<{ items: Contact[] }>(`/events/${e.id}/contacts`) : Promise.resolve({ items: [] as Contact[] })), [e.id, going, e.returned_at]);
+  const [f, setF] = useState({ name: "", email: "", consent: false });
+  const [error, setError] = useState<unknown>(null);
+  const run = async (fn: () => Promise<unknown>, after: () => void) => { setError(null); try { await fn(); after(); } catch (err) { setError(err); } };
+  const open = !e.returned_at;
+  return (
+    <section class={`control ${e.returned_at ? "ok" : e.alert_sent ? "alert" : ""}`}>
+      <h2>Контрольный срок</h2>
+      <p><strong><time dateTime={e.control_at!}>{when(e.control_at!)}</time></strong>
+        {e.returned_at ? <> — группа вернулась <time dateTime={e.returned_at}>{when(e.returned_at)}</time>.</>
+          : e.alert_sent ? " — срок прошёл, доверенным контактам отправлены письма. Отметьте возвращение, как только будет связь." : null}</p>
+      {open && <p class="muted">Если к сроку никто из группы не нажмёт «Мы вернулись», доверенные контакты участников получат письмо: что сообщить по номеру 112. Контакты видите только вы; они удаляются после возвращения или через 7 дней после срока.</p>}
+      {open && canMark && <button class="primary" onClick={() => run(() => post(`/events/${e.id}/returned`), onChange)}>Мы вернулись</button>}
+      {open && going && !e.alert_sent && contacts.data && (
+        <div class="contacts">
+          <h3>Мои доверенные контакты</h3>
+          {contacts.data.items.length === 0 ? <p class="muted">Пока нет. Добавьте того, кто будет знать, что вы в походе.</p> : (
+            <ul class="people">
+              {contacts.data.items.map((c) => (
+                <li key={c.id}><span class="grow">{c.name} · <span class="muted">{c.email}</span></span>
+                  <button class="link" onClick={() => run(() => del(`/events/${e.id}/contacts/${c.id}`), contacts.reload)}>Удалить</button></li>
+              ))}
+            </ul>
+          )}
+          {contacts.data.items.length < 3 && (
+            <form class="stack" onSubmit={(x) => { x.preventDefault(); run(() => post(`/events/${e.id}/contacts`, f), () => { setF({ name: "", email: "", consent: false }); contacts.reload(); }); }}>
+              <div class="row-2">
+                <label>Кто это<input value={f.name} required maxLength={80} placeholder="Мама" onInput={(x) => setF({ ...f, name: (x.target as HTMLInputElement).value })} /></label>
+                <label>Почта<input type="email" value={f.email} required onInput={(x) => setF({ ...f, email: (x.target as HTMLInputElement).value })} /></label>
+              </div>
+              <label class="check"><input type="checkbox" checked={f.consent} required onChange={(x) => setF({ ...f, consent: (x.target as HTMLInputElement).checked })} /> Этот человек знает о походе и согласен получить письмо</label>
+              <button class="ghost">Добавить контакт</button>
+            </form>
+          )}
+        </div>
+      )}
+      <ErrorLine error={error} />
     </section>
   );
 }
@@ -199,7 +247,7 @@ export function HikeForm({ initial, onDone }: { initial?: HikeEvent; onDone?: ()
     title: initial?.title ?? "", starts_at: localInput(initial?.starts_at), ends_at: localInput(initial?.ends_at),
     difficulty: initial?.difficulty ? String(initial.difficulty) : "", capacity: initial?.capacity ? String(initial.capacity) : "",
     meeting_point: initial?.meeting_point ?? "", gear: initial?.gear ?? "", description: initial?.description ?? "",
-    route_id: initial?.route_id ?? "", approval: initial?.approval ?? false,
+    route_id: initial?.route_id ?? "", approval: initial?.approval ?? false, control_at: localInput(initial?.control_at ?? undefined),
   });
   const [error, setError] = useState<unknown>(null);
   const set = (k: keyof typeof f) => (e: Event) => {
@@ -213,6 +261,7 @@ export function HikeForm({ initial, onDone }: { initial?: HikeEvent; onDone?: ()
       title: f.title, starts_at: new Date(f.starts_at).toISOString(), ends_at: f.ends_at ? new Date(f.ends_at).toISOString() : null,
       difficulty: f.difficulty ? +f.difficulty : null, capacity: f.capacity ? +f.capacity : null,
       meeting_point: f.meeting_point, gear: f.gear, description: f.description, route_id: f.route_id || null, approval: f.approval,
+      ...(initial?.alert_sent ? {} : { control_at: f.control_at ? new Date(f.control_at).toISOString() : null }),
     };
     try {
       if (initial) { await patch(`/events/${initial.id}`, body); onDone?.(); }
@@ -237,6 +286,8 @@ export function HikeForm({ initial, onDone }: { initial?: HikeEvent; onDone?: ()
           </label>
           <label>Мест (с организатором)<input type="number" min={1} max={500} value={f.capacity} onInput={set("capacity")} placeholder="без ограничения" /></label>
         </div>
+        <label>Контрольный срок возвращения<input type="datetime-local" value={f.control_at} disabled={initial?.alert_sent} onInput={set("control_at")} />
+          <span class="hint">Не отметитесь к этому времени — доверенным контактам участников уйдёт письмо</span></label>
         <label>Место сбора<input value={f.meeting_point} maxLength={300} onInput={set("meeting_point")} placeholder="Ж/д вокзал Златоуста, 7:00" /></label>
         <label>Маршрут
           <select value={f.route_id} onChange={set("route_id")}>

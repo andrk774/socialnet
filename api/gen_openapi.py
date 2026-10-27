@@ -84,7 +84,8 @@ schemas = {
                  difficulty=nullable(enum_int(1, 2, 3, 4, 5)), capacity=nullable(int_), gear=str_, route_id=nullable(str_),
                  meeting_point=str_, approval=bool_,
                  going_count=int_, maybe_count=int_, pending_count=int_, waitlist_count=int_,
-                 my_status=nullable(enum("going", "maybe", "pending", "waitlist")), **{"my_waitlist_position?": int_}, created_at=dt),
+                 my_status=nullable(enum("going", "maybe", "pending", "waitlist")), **{"my_waitlist_position?": int_},
+                 control_at=nullable(dt), returned_at=nullable(dt), alert_sent=bool_, created_at=dt),
     "CompanionAd": obj(id=int_, author=S("UserCard"), region=str_, title=str_, body=str_,
                        date_from={"type": "string", "format": "date"}, date_to={"type": "string", "format": "date"},
                        difficulty=nullable(enum_int(1, 2, 3, 4, 5)), seats=int_, route_id=nullable(str_), closed=bool_, created_at=dt),
@@ -355,7 +356,8 @@ r("DELETE", A + "/stories/{id}", "stories", "Удалить историю", cod
 # --- мероприятия ---
 ev = obj(**{"kind?": enum("event", "hike"), "title?": str_, "description?": str_, "place?": str_, "starts_at?": dt,
             "ends_at?": nullable(dt), "community_id?": int_, "difficulty?": nullable(enum_int(1, 2, 3, 4, 5)),
-            "capacity?": nullable(int_), "gear?": str_, "route_id?": nullable(str_), "meeting_point?": str_, "approval?": bool_})
+            "capacity?": nullable(int_), "gear?": str_, "route_id?": nullable(str_), "meeting_point?": str_, "approval?": bool_,
+            "control_at?": nullable(dt)})
 r("POST", A + "/events", "events", "Создать мероприятие", ev, S("Event"), 201)
 r("GET", A + "/events", "events", "Мои предстоящие мероприятия", resp=obj(items=arr(S("Event"))))
 r("GET", A + "/events/{id}", "events", "Мероприятие", resp=S("Event"))
@@ -380,6 +382,12 @@ r("PATCH", A + "/companions/{id}", "events", "Закрыть (нашёл поп�
 r("DELETE", A + "/companions/{id}", "events", "Удалить", code=204)
 r("POST", A + "/companions/{id}/reply", "messages", "Откликнуться: личное сообщение автору (даже если он принимает сообщения только от друзей)",
   obj(text=str_), S("Message"), 201)
+hike_contact = obj(id=int_, name=str_, email=str_, created_at=dt)
+r("GET", A + "/events/{id}/contacts", "events", "Мои доверенные контакты в походе (чужие не видны никому)", resp=obj(items=arr(hike_contact)))
+r("POST", A + "/events/{id}/contacts", "events", "Добавить доверенный контакт (до 3; нужен контрольный срок, участие и подтверждённая почта)",
+  obj(name=str_, email=str_, consent=bool_), hike_contact, 201)
+r("DELETE", A + "/events/{id}/contacts/{cid}", "events", "Удалить контакт", code=204)
+r("POST", A + "/events/{id}/returned", "events", "Группа вернулась: контакты удаляются; если тревога уже ушла — им «отбой»", code=204)
 r("GET", A + "/hikes", "events", "Ближайшие походы: ?max_difficulty=1..5", resp=obj(items=arr(S("Event"))))
 # --- журнал аудита и тревоги ---
 audit = obj(id=int_, actor_id=int_, actor_role=str_, action=str_, target=str_, **{"details?": {"type": "object"}},

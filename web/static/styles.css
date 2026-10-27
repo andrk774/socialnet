@@ -386,3 +386,13 @@ body.legal-page { background: var(--surface, #fff); }
 .legal h2 { margin-top: 1.75rem; font-size: var(--step-1, 1.2rem); }
 .legal ul { padding-left: 1.25rem; }
 .legal-nav { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: var(--step--1); }
+
+/* ---------- контрольный срок ---------- */
+.control { border: 1px solid var(--line); border-left: 4px solid var(--band); border-radius: var(--radius-m); padding: .75rem 1rem; margin: 1rem 0; }
+.control.alert { border-left-color: var(--garnet); }
+.control.ok { border-left-color: var(--malachite); }
+.control h2 { margin-top: 0; }
+.control h3 { font-size: var(--step-0); margin: 1rem 0 .5rem; }
+.control .people li { overflow-wrap: anywhere; }
+.hint { display: block; margin-top: .25rem; font-size: var(--step--1); color: var(--ink-2); }
+.control .stack button { justify-self: start; }

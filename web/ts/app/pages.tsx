@@ -42,6 +42,8 @@ const notifText: Record<string, string> = {
   gift: "отправил(а) вам подарок", transfer: "перевёл(а) вам монеты", donation: "поддержал(а) сообщество", join_request: "просит вступить в сообщество", video_ready: "Видео обработано и опубликовано",
   hike_application: "подал(а) заявку в поход", hike_approved: "принял(а) вашу заявку в поход", hike_rejected: "отклонил(а) заявку в поход",
   hike_removed: "убрал(а) вас из похода", event_seat: "Освободилось место — вы в походе",
+  hike_control_soon: "Через час контрольный срок похода — отметьте возвращение", hike_alert_sent: "Контрольный срок прошёл: доверенным контактам отправлены письма",
+  hike_returned: "отметил(а), что группа вернулась",
 };
 
 export function NotificationsPage({ onRead }: { onRead: () => void }) {

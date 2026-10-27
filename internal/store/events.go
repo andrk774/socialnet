@@ -30,6 +30,9 @@ type Event struct {
 	Waitlist     int           `json:"waitlist_count"`
 	MyStatus     *string       `json:"my_status"` // going | maybe | pending | waitlist | null
 	MyPosition   *int          `json:"my_waitlist_position,omitempty"`
+	ControlAt    *time.Time    `json:"control_at"`  // контрольный срок возвращения
+	ReturnedAt   *time.Time    `json:"returned_at"` // группа отметила, что вернулась
+	AlertSent    bool          `json:"alert_sent"`  // срок прошёл — доверенным контактам ушли письма
 	CreatedAt    time.Time     `json:"created_at"`
 }
 
@@ -50,7 +53,7 @@ const eventSelect = `
 	       CASE WHEN me.status = 'waitlist' THEN (SELECT count(*) FROM event_attendees x
 	            WHERE x.event_id = e.id AND x.status = 'waitlist'
 	              AND (x.updated_at, x.user_id) <= (me.updated_at, me.user_id)) END,
-	       e.created_at
+	       e.control_at, e.returned_at, e.alert_sent_at IS NOT NULL, e.created_at
 	FROM events e LEFT JOIN communities c ON c.id = e.community_id
 	LEFT JOIN event_attendees me ON me.event_id = e.id AND me.user_id = $1
 	WHERE ` + eventVisible
@@ -70,7 +73,8 @@ func (s *Store) queryEvents(ctx context.Context, sql string, args ...any) ([]Eve
 		var pos *int64
 		if err := rows.Scan(&e.ID, &e.CreatorID, &cID, &cSlug, &cName, &e.Kind, &e.Title, &e.Description, &e.Place,
 			&e.StartsAt, &e.EndsAt, &diff, &e.Capacity, &e.Gear, &e.RouteID, &e.MeetingPoint, &e.Approval,
-			&e.Going, &e.Maybe, &e.Pending, &e.Waitlist, &e.MyStatus, &pos, &e.CreatedAt); err != nil {
+			&e.Going, &e.Maybe, &e.Pending, &e.Waitlist, &e.MyStatus, &pos,
+			&e.ControlAt, &e.ReturnedAt, &e.AlertSent, &e.CreatedAt); err != nil {
 			return nil, err
 		}
 		if cID != nil {
@@ -103,6 +107,7 @@ type EventFields struct {
 	RouteID      *string
 	MeetingPoint string
 	Approval     bool
+	ControlAt    *time.Time
 }
 
 type NewEvent struct {
@@ -119,10 +124,10 @@ func (s *Store) CreateEvent(ctx context.Context, e NewEvent) (int64, error) {
 	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		if err := tx.QueryRow(ctx, `
 			INSERT INTO events (creator_id, community_id, kind, title, description, place, starts_at, ends_at,
-			                    difficulty, capacity, gear, route_id, meeting_point, approval)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::uuid, $13, $14) RETURNING id`,
+			                    difficulty, capacity, gear, route_id, meeting_point, approval, control_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::uuid, $13, $14, $15) RETURNING id`,
 			e.CreatorID, e.CommunityID, e.Kind, e.Title, e.Description, e.Place, e.StartsAt, e.EndsAt,
-			e.Difficulty, e.Capacity, e.Gear, e.RouteID, e.MeetingPoint, e.Approval).Scan(&id); err != nil {
+			e.Difficulty, e.Capacity, e.Gear, e.RouteID, e.MeetingPoint, e.Approval, e.ControlAt).Scan(&id); err != nil {
 			return err
 		}
 		// организатор идёт на своё мероприятие и занимает место
@@ -149,9 +154,11 @@ func (s *Store) UpdateEvent(ctx context.Context, id int64, f EventFields) (promo
 	err = s.inTx(ctx, func(tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `
 			UPDATE events SET title = $2, description = $3, place = $4, starts_at = $5, ends_at = $6,
-			       difficulty = $7, capacity = $8, gear = $9, route_id = $10::uuid, meeting_point = $11, approval = $12
+			       difficulty = $7, capacity = $8, gear = $9, route_id = $10::uuid, meeting_point = $11, approval = $12,
+			       control_at = $13,
+			       reminder_sent_at = CASE WHEN control_at IS DISTINCT FROM $13 THEN NULL ELSE reminder_sent_at END
 			WHERE id = $1`, id, f.Title, f.Description, f.Place, f.StartsAt, f.EndsAt,
-			f.Difficulty, f.Capacity, f.Gear, f.RouteID, f.MeetingPoint, f.Approval)
+			f.Difficulty, f.Capacity, f.Gear, f.RouteID, f.MeetingPoint, f.Approval, f.ControlAt)
 		if err != nil {
 			return err
 		}
