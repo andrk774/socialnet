@@ -370,6 +370,17 @@ r("GET", A + "/communities/{id}/requests", "communities", "Заявки на в�
 r("POST", A + "/communities/{id}/requests/{userID}/approve", "communities", "Принять заявку", code=204)
 r("POST", A + "/communities/{id}/requests/{userID}/reject", "communities", "Отклонить заявку", code=204)
 emoji_s = obj(id=int_, community_id=int_, shortcode=str_, url=str_, reaction=str_, created_at=dt)
+fund = obj(id=int_, community=obj(id=int_, slug=str_, name=str_), title=str_, description=str_, goal=int_, raised=int_,
+           donors=int_, deadline=dt, open=bool_, closed_at=nullable(dt), created_at=dt)
+r("GET", A + "/communities/{id}/fundraisers", "communities", "Сборы сообщества", resp=obj(items=arr(fund)))
+r("POST", A + "/communities/{id}/fundraisers", "communities", "Объявить сбор (админ): цель в монетах, срок до 180 дней",
+  obj(title=str_, goal=int_, deadline=dt, **{"description?": str_}), fund, 201)
+r("GET", A + "/fundraisers", "communities", "Открытые сборы", resp=obj(items=arr(fund)))
+r("GET", A + "/fundraisers/{id}", "communities", "Сбор и последние пожертвования (анонимные — без имени)",
+  resp=obj(fundraiser=fund, donations=arr(obj(user=nullable(S("UserCard")), amount=int_, message=str_, created_at=dt))))
+r("POST", A + "/fundraisers/{id}/donate", "wallet", "Пожертвовать монеты (на счёт сообщества; ключ идемпотентности)",
+  obj(amount=int_, idempotency_key=str_, **{"memo?": str_, "anonymous?": bool_}), obj(transaction_id=int_, amount=int_, replayed=bool_, balance=int_), 201)
+r("POST", A + "/fundraisers/{id}/close", "communities", "Завершить сбор досрочно (админ)", resp=fund)
 r("GET", A + "/communities/{id}/emoji", "communities", "Эмодзи сообщества (реакция e:<id> — на записях сообщества)", resp=obj(items=arr(emoji_s)))
 r("POST", A + "/communities/{id}/emoji", "communities", "Добавить эмодзи (админ; картинка — своё фото; до 50)", obj(shortcode=str_, media_id=uuid), emoji_s, 201)
 r("DELETE", A + "/communities/{id}/emoji/{eid}", "communities", "Удалить эмодзи (реакции им станут «нравится»)", code=204)

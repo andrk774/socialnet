@@ -5,6 +5,7 @@ import { Composer, Emoji, PostList, PostView, communityEmoji } from "./posts.js"
 import { query } from "./router.js";
 import { Avatar, Empty, ErrorLine, Loading, Time, UserLink, duration, useLoad } from "./ui.js";
 import { DeleteAccount } from "./legal.js";
+import { CommunityFundraisers } from "./fundraisers.js";
 
 // ---------- лента, запись, хэштег ----------
 
@@ -144,6 +145,7 @@ export function CommunityPage({ slug }: { slug: string }) {
         <ErrorLine error={error} />
         {["admin", "owner"].includes(com.my_role) && <EmojiManager communityId={com.id} />}
       </header>
+      <CommunityFundraisers communityId={com.id} admin={["admin", "owner"].includes(com.my_role)} />
       <PostList path={`/communities/${com.id}/posts`} empty={com.visibility === "closed" && !com.my_role ? "Записи видят только участники." : "Записей пока нет."}
         header={(add) => (canPost ? <Composer communityId={com.id} onPosted={add} /> : null)} />
     </section>

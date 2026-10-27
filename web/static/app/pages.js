@@ -5,6 +5,7 @@ import { Composer, PostList, PostView, communityEmoji } from "./posts.js";
 import { query } from "./router.js";
 import { Avatar, Empty, ErrorLine, Loading, Time, UserLink, duration, useLoad } from "./ui.js";
 import { DeleteAccount } from "./legal.js";
+import { CommunityFundraisers } from "./fundraisers.js";
 // ---------- лента, запись, хэштег ----------
 export function FeedPage() {
     return (h("section", null,
@@ -136,6 +137,7 @@ export function CommunityPage({ slug }) {
             msg && h("p", { class: "note" }, msg),
             h(ErrorLine, { error: error }),
             ["admin", "owner"].includes(com.my_role) && h(EmojiManager, { communityId: com.id })),
+        h(CommunityFundraisers, { communityId: com.id, admin: ["admin", "owner"].includes(com.my_role) }),
         h(PostList, { path: `/communities/${com.id}/posts`, empty: com.visibility === "closed" && !com.my_role ? "Записи видят только участники." : "Записей пока нет.", header: (add) => (canPost ? h(Composer, { communityId: com.id, onPosted: add }) : null) })));
 }
 // EmojiManager — свои эмодзи сообщества (администраторам).

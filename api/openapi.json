@@ -6544,6 +6544,276 @@
     }
    }
   },
+  "/api/v1/communities/{id}/fundraisers": {
+   "get": {
+    "tags": [
+     "communities"
+    ],
+    "summary": "Сборы сообщества",
+    "operationId": "get_api_v1_communities_id_fundraisers",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "community": {
+              "type": "object",
+              "properties": {
+               "id": {
+                "type": "integer",
+                "format": "int64"
+               },
+               "slug": {
+                "type": "string"
+               },
+               "name": {
+                "type": "string"
+               }
+              },
+              "required": [
+               "id",
+               "slug",
+               "name"
+              ]
+             },
+             "title": {
+              "type": "string"
+             },
+             "description": {
+              "type": "string"
+             },
+             "goal": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "raised": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "donors": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "deadline": {
+              "type": "string",
+              "format": "date-time"
+             },
+             "open": {
+              "type": "boolean"
+             },
+             "closed_at": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+             },
+             "created_at": {
+              "type": "string",
+              "format": "date-time"
+             }
+            },
+            "required": [
+             "id",
+             "community",
+             "title",
+             "description",
+             "goal",
+             "raised",
+             "donors",
+             "deadline",
+             "open",
+             "closed_at",
+             "created_at"
+            ]
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "communities"
+    ],
+    "summary": "Объявить сбор (админ): цель в монетах, срок до 180 дней",
+    "operationId": "post_api_v1_communities_id_fundraisers",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "goal": {
+          "type": "integer",
+          "format": "int64"
+         },
+         "deadline": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "description": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "title",
+         "goal",
+         "deadline"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "community": {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "slug": {
+             "type": "string"
+            },
+            "name": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "id",
+            "slug",
+            "name"
+           ]
+          },
+          "title": {
+           "type": "string"
+          },
+          "description": {
+           "type": "string"
+          },
+          "goal": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "raised": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "donors": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "deadline": {
+           "type": "string",
+           "format": "date-time"
+          },
+          "open": {
+           "type": "boolean"
+          },
+          "closed_at": {
+           "type": "string",
+           "format": "date-time",
+           "nullable": true
+          },
+          "created_at": {
+           "type": "string",
+           "format": "date-time"
+          }
+         },
+         "required": [
+          "id",
+          "community",
+          "title",
+          "description",
+          "goal",
+          "raised",
+          "donors",
+          "deadline",
+          "open",
+          "closed_at",
+          "created_at"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/communities/{id}/join": {
    "post": {
     "tags": [
@@ -9364,6 +9634,483 @@
          "required": [
           "items",
           "next_cursor"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/fundraisers": {
+   "get": {
+    "tags": [
+     "communities"
+    ],
+    "summary": "Открытые сборы",
+    "operationId": "get_api_v1_fundraisers",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "community": {
+              "type": "object",
+              "properties": {
+               "id": {
+                "type": "integer",
+                "format": "int64"
+               },
+               "slug": {
+                "type": "string"
+               },
+               "name": {
+                "type": "string"
+               }
+              },
+              "required": [
+               "id",
+               "slug",
+               "name"
+              ]
+             },
+             "title": {
+              "type": "string"
+             },
+             "description": {
+              "type": "string"
+             },
+             "goal": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "raised": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "donors": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "deadline": {
+              "type": "string",
+              "format": "date-time"
+             },
+             "open": {
+              "type": "boolean"
+             },
+             "closed_at": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+             },
+             "created_at": {
+              "type": "string",
+              "format": "date-time"
+             }
+            },
+            "required": [
+             "id",
+             "community",
+             "title",
+             "description",
+             "goal",
+             "raised",
+             "donors",
+             "deadline",
+             "open",
+             "closed_at",
+             "created_at"
+            ]
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/fundraisers/{id}": {
+   "get": {
+    "tags": [
+     "communities"
+    ],
+    "summary": "Сбор и последние пожертвования (анонимные — без имени)",
+    "operationId": "get_api_v1_fundraisers_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "fundraiser": {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "community": {
+             "type": "object",
+             "properties": {
+              "id": {
+               "type": "integer",
+               "format": "int64"
+              },
+              "slug": {
+               "type": "string"
+              },
+              "name": {
+               "type": "string"
+              }
+             },
+             "required": [
+              "id",
+              "slug",
+              "name"
+             ]
+            },
+            "title": {
+             "type": "string"
+            },
+            "description": {
+             "type": "string"
+            },
+            "goal": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "raised": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "donors": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "deadline": {
+             "type": "string",
+             "format": "date-time"
+            },
+            "open": {
+             "type": "boolean"
+            },
+            "closed_at": {
+             "type": "string",
+             "format": "date-time",
+             "nullable": true
+            },
+            "created_at": {
+             "type": "string",
+             "format": "date-time"
+            }
+           },
+           "required": [
+            "id",
+            "community",
+            "title",
+            "description",
+            "goal",
+            "raised",
+            "donors",
+            "deadline",
+            "open",
+            "closed_at",
+            "created_at"
+           ]
+          },
+          "donations": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "user": {
+              "$ref": "#/components/schemas/UserCard",
+              "nullable": true
+             },
+             "amount": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "message": {
+              "type": "string"
+             },
+             "created_at": {
+              "type": "string",
+              "format": "date-time"
+             }
+            },
+            "required": [
+             "user",
+             "amount",
+             "message",
+             "created_at"
+            ]
+           }
+          }
+         },
+         "required": [
+          "fundraiser",
+          "donations"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/fundraisers/{id}/close": {
+   "post": {
+    "tags": [
+     "communities"
+    ],
+    "summary": "Завершить сбор досрочно (админ)",
+    "operationId": "post_api_v1_fundraisers_id_close",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "community": {
+           "type": "object",
+           "properties": {
+            "id": {
+             "type": "integer",
+             "format": "int64"
+            },
+            "slug": {
+             "type": "string"
+            },
+            "name": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "id",
+            "slug",
+            "name"
+           ]
+          },
+          "title": {
+           "type": "string"
+          },
+          "description": {
+           "type": "string"
+          },
+          "goal": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "raised": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "donors": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "deadline": {
+           "type": "string",
+           "format": "date-time"
+          },
+          "open": {
+           "type": "boolean"
+          },
+          "closed_at": {
+           "type": "string",
+           "format": "date-time",
+           "nullable": true
+          },
+          "created_at": {
+           "type": "string",
+           "format": "date-time"
+          }
+         },
+         "required": [
+          "id",
+          "community",
+          "title",
+          "description",
+          "goal",
+          "raised",
+          "donors",
+          "deadline",
+          "open",
+          "closed_at",
+          "created_at"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/fundraisers/{id}/donate": {
+   "post": {
+    "tags": [
+     "wallet"
+    ],
+    "summary": "Пожертвовать монеты (на счёт сообщества; ключ идемпотентности)",
+    "operationId": "post_api_v1_fundraisers_id_donate",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "amount": {
+          "type": "integer",
+          "format": "int64"
+         },
+         "idempotency_key": {
+          "type": "string"
+         },
+         "memo": {
+          "type": "string"
+         },
+         "anonymous": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "amount",
+         "idempotency_key"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "transaction_id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "amount": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "replayed": {
+           "type": "boolean"
+          },
+          "balance": {
+           "type": "integer",
+           "format": "int64"
+          }
+         },
+         "required": [
+          "transaction_id",
+          "amount",
+          "replayed",
+          "balance"
          ]
         }
        }
