@@ -553,6 +553,14 @@ for (const width of [390, 320]) { // 320 — самые узкие телефо�
 }
 await mp.setViewportSize({ width: 390, height: 844 });
 await mp.screenshot({ path: `${shots}/06-phone.png`, fullPage: true });
+// телефон: нижняя панель из пяти разделов, остальное — в «Ещё» по группам
+assert.equal(await mp.locator(".tabbar > *").count(), 5, "five tabs on a phone");
+await mp.locator(".tabbar").getByRole("button", { name: "Ещё" }).click();
+await mp.locator(".more-sheet").getByRole("heading", { name: "Походы" }).waitFor();
+await mp.screenshot({ path: `${shots}/06b-phone-more.png` });
+await mp.locator(".more-sheet").getByRole("link", { name: "Попутчики" }).click();
+await mp.getByRole("heading", { name: "Ищу попутчиков" }).waitFor();
+assert.equal(await mp.locator(".more-sheet").count(), 0, "sheet closes after navigation");
 
 // тёмная тема
 const dark = await browser.newContext({ viewport: { width: 1280, height: 860 }, colorScheme: "dark" });

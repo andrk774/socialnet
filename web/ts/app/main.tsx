@@ -62,17 +62,25 @@ function routes(path: string, onRead: () => void, myId: number): ComponentChildr
   return <section><h1>Страница не найдена</h1><p><a href="/">Вернуться в ленту</a></p></section>;
 }
 
-const nav: [string, string][] = [
-  ["/", "Лента"], ["/feeds", "Мои ленты"], ["/hikes", "Походы"], ["/companions", "Попутчики"], ["/rides", "Подвоз"], ["/articles", "Статьи"], ["/im", "Сообщения"], ["/notifications", "Уведомления"],
-  ["/communities", "Сообщества"], ["/fundraisers", "Сборы"], ["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"],
-  ["/scheduled", "Отложенные"], ["/offline", "Офлайн"], ["/wallet", "Кошелёк"], ["/plus", "Плюс"], ["/settings", "Безопасность"],
+// Разделы по группам: на компьютере — боковое меню с заголовками, на
+// телефоне — нижняя панель из главных разделов и экран «Ещё».
+type NavItem = [string, string];
+const navGroups: [string, NavItem[]][] = [
+  ["Походы", [["/hikes", "Походы"], ["/companions", "Попутчики"], ["/rides", "Подвоз"], ["/articles", "Статьи"], ["/fundraisers", "Сборы"], ["/offline", "Офлайн"]]],
+  ["Общение", [["/", "Лента"], ["/feeds", "Мои ленты"], ["/im", "Сообщения"], ["/notifications", "Уведомления"], ["/communities", "Сообщества"]]],
+  ["Моё", [["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"], ["/scheduled", "Отложенные"],
+    ["/wallet", "Кошелёк"], ["/plus", "Плюс"], ["/settings", "Безопасность"]]],
 ];
+// короткие подписи для узкой панели; полные — в aria-label
+const tabs: [string, string, string][] = [["/", "Лента", "Лента"], ["/hikes", "Походы", "Походы"], ["/im", "Чаты", "Сообщения"], ["/notifications", "Новое", "Уведомления"]];
 
 function Shell() {
   const path = usePath();
   const user = useMe();
   const [unread, setUnread] = useState(0);
   const [q, setQ] = useState("");
+  const [more, setMore] = useState(false);
+  useEffect(() => setMore(false), [path]);
 
   const countUnread = () => get<{ unread: number }>("/notifications?limit=1").then((r) => setUnread(r.unread), () => {});
   useEffect(() => {
@@ -83,6 +91,13 @@ function Shell() {
   if (!user) return <Loading />;
   if (user.consent_required && !path.startsWith("/settings")) return <ConsentGate />;
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  const groups: [string, NavItem[]][] = user.role === "user" ? navGroups
+    : [...navGroups.slice(0, 2), [navGroups[2][0], [...navGroups[2][1], ["/admin", user.role === "admin" ? "Админка" : "Модерация"]]]];
+  const link = (href: string, label: string, cls?: string, full?: string) => (
+    <a key={href} href={href} class={cls} aria-label={full && full !== label ? (href === "/notifications" && unread > 0 ? `${full}, новых: ${unread}` : full) : undefined} aria-current={active(href) ? "page" : undefined}>
+      {label}{href === "/notifications" && unread > 0 && <span class="badge" aria-label={`новых: ${unread}`}>{unread}</span>}
+    </a>
+  );
   return (
     <div class="shell">
       <header class="topbar"><div class="topbar-in">
@@ -95,17 +110,26 @@ function Shell() {
       </div></header>
       <div class="layout">
       <nav class="sidenav" aria-label="Разделы">
-        <ul>
-          {[...nav, ...(user.role === "admin" ? [["/admin", "Админка"]] : user.role === "moderator" ? [["/admin", "Модерация"]] : [])].map(([href, label]) => (
-            <li key={href}>
-              <a href={href} aria-current={active(href) ? "page" : undefined}>
-                {label}{href === "/notifications" && unread > 0 && <span class="badge" aria-label={`новых: ${unread}`}>{unread}</span>}
-              </a>
-            </li>
-          ))}
-          <li><button class="link" onClick={() => logout()}>Выйти</button></li>
-        </ul>
+        {groups.map(([title, items]) => (
+          <section key={title} class="nav-group">
+            <h2 class="nav-title">{title}</h2>
+            <ul>{items.map(([href, label]) => <li key={href}>{link(href, label)}</li>)}</ul>
+          </section>
+        ))}
+        <ul><li><button class="link" onClick={() => logout()}>Выйти</button></li></ul>
       </nav>
+      <nav class="tabbar" aria-label="Главные разделы">
+        {tabs.map(([href, label, full]) => link(href, label, "tab", full))}
+        <button class={more ? "tab active" : "tab"} aria-expanded={more} onClick={() => setMore(!more)}>Ещё</button>
+      </nav>
+      {more && (
+        <div class="more-sheet" role="dialog" aria-label="Все разделы" onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setMore(false); }}>
+          {groups.map(([title, items]) => (
+            <section key={title}><h2 class="nav-title">{title}</h2><div class="more-grid">{items.map(([href, label]) => link(href, label, "more-item"))}</div></section>
+          ))}
+          <button class="ghost" onClick={() => logout()}>Выйти</button>
+        </div>
+      )}
       <main class="content" id="main">
         {!user.email_verified && <VerifyBanner email={user.email} />}
         {routes(path, () => setUnread(0), user.id)}
