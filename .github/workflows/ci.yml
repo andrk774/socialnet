@@ -114,6 +114,15 @@ jobs:
           EOF
       - run: docker compose up -d --build --wait --wait-timeout 300
       - run: python3 deploy/smoke.py
+      # Учения: копию, снятую smoke-проверкой, восстанавливаем «на пустом
+      # сервере» тем же скриптом, что и на настоящих учениях.
+      - name: Восстановление из резервной копии с нуля
+        run: |
+          mkdir drill && docker compose cp backup:/backups/. drill/
+          dump=$(ls drill/socialnet-*.dump.enc | tail -1)
+          users=$(docker compose exec -T db psql -U socialnet -d socialnet -Atc "SELECT count(*) FROM users")
+          docker compose down -v
+          MIN_USERS=$users MAX_AGE_HOURS=1 deploy/restore-drill.sh "$dump"
       - if: failure()
         name: Причина сбоя — в аннотации (видны в сводке прогона без открытия логов)
         run: |
@@ -152,7 +161,7 @@ jobs:
       - run: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait --wait-timeout 300
       - run: python3 deploy/prod_check.py
       - name: Скрипты деплоя
-        run: bash -n deploy/setup-server.sh deploy/update.sh && shellcheck deploy/setup-server.sh deploy/update.sh
+        run: bash -n deploy/setup-server.sh deploy/update.sh deploy/restore-drill.sh && shellcheck deploy/setup-server.sh deploy/update.sh deploy/restore-drill.sh
       - if: failure()
         name: Причина сбоя — в аннотации
         run: |
