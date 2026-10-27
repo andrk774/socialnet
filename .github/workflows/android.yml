@@ -1,0 +1,79 @@
+# Приложение для Android: Capacitor-оболочка сайта с фоновой записью трека.
+#
+# Настройки репозитория (Settings → Secrets and variables → Actions):
+#   переменная APP_URL                 — адрес сайта, https://ваш-домен
+#   переменные APP_ID, APP_NAME        — по желанию (ru.socialnet.app, socialnet)
+#   секреты для подписанного релиза (для RuStore):
+#     ANDROID_KEYSTORE_BASE64          — base64 от .jks
+#     ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+# Без секретов собирается только отладочный APK — поставить на свой телефон.
+name: android
+
+on:
+  push:
+    branches: [master]
+    paths: ["mobile/**", "web/ts/app/native.ts", "web/ts/app/track.ts", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      APP_URL: ${{ vars.APP_URL || 'https://socialnet.example' }}
+      APP_ID: ${{ vars.APP_ID || 'ru.socialnet.app' }}
+      APP_NAME: ${{ vars.APP_NAME || 'socialnet' }}
+      VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm install --no-audit --no-fund
+      - name: Android-проект (Capacitor)
+        run: node scripts/prepare.mjs
+      - name: Отладочный APK
+        working-directory: mobile/android
+        run: ./gradlew --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: socialnet-debug-apk
+          path: mobile/android/app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+      - name: Подписанный релиз (если заданы секреты)
+        id: release
+        working-directory: mobile/android
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then echo "секретов подписи нет — релиз не собираем"; exit 0; fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          export ANDROID_KEYSTORE="$RUNNER_TEMP/release.jks"
+          ./gradlew --no-daemon assembleRelease bundleRelease
+          rm -f "$RUNNER_TEMP/release.jks"
+          echo "built=true" >> "$GITHUB_OUTPUT"
+      - if: steps.release.outputs.built == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: socialnet-release
+          path: |
+            mobile/android/app/build/outputs/apk/release/*.apk
+            mobile/android/app/build/outputs/bundle/release/*.aab
+          retention-days: 30

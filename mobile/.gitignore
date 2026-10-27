@@ -1,0 +1,4 @@
+node_modules/
+# создаются scripts/prepare.mjs — в CI каждый раз заново
+android/
+capacitor.config.json

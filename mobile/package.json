@@ -1,0 +1,16 @@
+{
+  "name": "socialnet-android",
+  "private": true,
+  "description": "Приложение для Android: оболочка сайта (Capacitor) с фоновой записью трека",
+  "scripts": {
+    "prepare-android": "node scripts/prepare.mjs"
+  },
+  "dependencies": {
+    "@capacitor-community/background-geolocation": "^1.2.19",
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0"
+  }
+}
