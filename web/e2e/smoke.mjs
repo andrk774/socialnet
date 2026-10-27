@@ -555,7 +555,8 @@ if (clip) {
 }
 
 // телефон
-const phone = await anna.ctx.browser().newContext({ viewport: { width: 390, height: 844 }, locale: "ru-RU" });
+const phone = await anna.ctx.browser().newContext({ viewport: { width: 390, height: 844 }, locale: "ru-RU",
+  permissions: ["geolocation"], geolocation: { latitude: 55.06, longitude: 60.1, accuracy: 8 } });
 const mp = await phone.newPage();
 await mp.goto(base + "/");
 await mp.getByRole("button", { name: "Войти" }).first().waitFor();
@@ -582,6 +583,34 @@ await mp.screenshot({ path: `${shots}/06b-phone-more.png` });
 await mp.locator(".more-sheet").getByRole("link", { name: "Попутчики" }).click();
 await mp.getByRole("heading", { name: "Ищу попутчиков" }).waitFor();
 assert.equal(await mp.locator(".more-sheet").count(), 0, "sheet closes after navigation");
+
+// запись трека: GPS подменяет браузер; пауза, сохранение маршрутом, публикация
+{
+  await mp.locator(".tabbar").getByRole("button", { name: "Ещё" }).click();
+  await mp.locator(".more-sheet").getByRole("link", { name: "Записать трек" }).click();
+  await mp.getByRole("button", { name: "Начать запись" }).click();
+  for (let i = 1; i <= 6; i++) {
+    await mp.waitForTimeout(400); // не быстрее 60 м/с — иначе это скачок GPS
+    await phone.setGeolocation({ latitude: 55.06 + i * 0.0001, longitude: 60.1, accuracy: 8 });
+  }
+  await mp.waitForFunction(() => +document.querySelector("[data-stat=points]")?.textContent >= 5);
+  await phone.setGeolocation({ latitude: 55.07, longitude: 60.1, accuracy: 300 }); // плохая точность — мимо
+  await mp.getByRole("button", { name: "Пауза" }).click();
+  await mp.getByText("Пауза — точки не пишутся.").waitFor();
+  await mp.screenshot({ path: `${shots}/22-record.png` });
+  // черновик переживает перезагрузку страницы
+  await mp.reload();
+  await mp.getByText(/Есть незавершённая запись/).waitFor();
+  await mp.getByRole("button", { name: "Завершить" }).click();
+  await mp.getByLabel("Название").fill("Утро на Таганае");
+  await mp.getByRole("button", { name: "Сохранить маршрут" }).click();
+  await mp.getByRole("heading", { name: "Маршрут сохранён" }).waitFor();
+  await mp.getByLabel("Рассказать в ленте").fill("Прогулка до родника");
+  await mp.getByRole("button", { name: "Опубликовать" }).click();
+  await mp.getByRole("link", { name: "открыть запись" }).click();
+  await mp.locator("article.post", { hasText: "Прогулка до родника" }).getByText("Утро на Таганае").waitFor();
+  assert.equal(await mp.evaluate(() => localStorage.getItem("sn-track-draft")), null, "draft cleared after save");
+}
 
 // тёмная тема
 const dark = await browser.newContext({ viewport: { width: 1280, height: 860 }, colorScheme: "dark" });

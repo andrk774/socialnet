@@ -547,3 +547,10 @@ img.emoji { vertical-align: -4px; object-fit: contain; display: inline-block; }
 .report-target .badge { background: var(--ink-2); }
 .report-snippet { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 4.6em; overflow: hidden; }
 .report-form { display: grid; gap: .4rem; padding: .6rem; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); flex-basis: 100%; }
+
+/* запись трека */
+.record .big { font-size: var(--step-1); padding: .8rem 1.4rem; }
+.rec-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6rem; margin: 1rem 0; }
+.rec-stats > div { display: grid; padding: .8rem; border-radius: var(--radius-m); background: var(--tint); }
+.rec-stats.paused > div { background: var(--line); }
+.rec-num { font-size: var(--step-3); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--deep); line-height: 1.1; }

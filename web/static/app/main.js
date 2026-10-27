@@ -22,6 +22,7 @@ import { on, startRealtime, stopRealtime } from "./realtime.js";
 import { match, navigate, query, usePath } from "./router.js";
 import { loadMe, setMe, useMe } from "./session.js";
 import { Avatar, ErrorLine, Loading } from "./ui.js";
+import { RecordPage } from "./record.js";
 function routes(path, onRead, myId) {
     let p;
     if (path === "/" || path.startsWith("/?"))
@@ -56,6 +57,8 @@ function routes(path, onRead, myId) {
         return h(PrintPage, { routeId: p.id });
     if (match("/offline", path))
         return h(OfflinePage, null);
+    if (match("/record", path))
+        return h(RecordPage, null);
     if (match("/articles", path))
         return h(ArticlesPage, null);
     if (match("/rides", path))
@@ -100,7 +103,7 @@ function routes(path, onRead, myId) {
             h("a", { href: "/" }, "\u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u0432 \u043B\u0435\u043D\u0442\u0443")));
 }
 const navGroups = [
-    ["Походы", [["/hikes", "Походы"], ["/companions", "Попутчики"], ["/rides", "Подвоз"], ["/articles", "Статьи"], ["/fundraisers", "Сборы"], ["/offline", "Офлайн"]]],
+    ["Походы", [["/hikes", "Походы"], ["/record", "Записать трек"], ["/companions", "Попутчики"], ["/rides", "Подвоз"], ["/articles", "Статьи"], ["/fundraisers", "Сборы"], ["/offline", "Офлайн"]]],
     ["Общение", [["/", "Лента"], ["/feeds", "Мои ленты"], ["/im", "Сообщения"], ["/notifications", "Уведомления"], ["/communities", "Сообщества"]]],
     ["Моё", [["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"], ["/scheduled", "Отложенные"],
             ["/wallet", "Кошелёк"], ["/plus", "Плюс"], ["/settings", "Безопасность"]]],

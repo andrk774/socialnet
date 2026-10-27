@@ -77,7 +77,7 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request, name string
 	h.Set("Content-Type", f.ctype)
 	h.Set("ETag", f.etag)
 	h.Set("Content-Security-Policy", s.pageCSP())
-	h.Set("Permissions-Policy", "camera=(), microphone=(self), geolocation=(), payment=()")
+	h.Set("Permissions-Policy", "camera=(), microphone=(self), geolocation=(self), payment=()")
 	// имена файлов без хеша — браузер переспрашивает (дёшево: 304 по ETag)
 	h.Set("Cache-Control", "no-cache")
 	h.Set("Cross-Origin-Opener-Policy", "same-origin")
