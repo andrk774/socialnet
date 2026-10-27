@@ -1,0 +1,33 @@
+# Caddy перед API: сертификат Let's Encrypt получает и продлевает сам,
+# HTTP → HTTPS, HTTP/3. Домен и почта для Let's Encrypt — из .env
+# (DOMAIN, ACME_EMAIL). DNS-запись A домена должна указывать на сервер
+# до первого запуска, а порты 80 и 443 — быть открыты.
+{
+	email {$ACME_EMAIL}
+	# сервер стоит первым: заголовкам X-Forwarded-* от клиентов не верим
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+		-Via
+	}
+
+	# X-Forwarded-For Caddy ставит сам (адрес клиента), прежнее значение
+	# от клиента отбрасывает; API верит ему только от сети Caddy (TRUSTED_PROXIES).
+	reverse_proxy api:8080 {
+		# видео до 1 ГБ на медленном канале грузится долго: не обрывать
+		transport http {
+			read_timeout 65m
+			write_timeout 65m
+		}
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

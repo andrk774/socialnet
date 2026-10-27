@@ -1,0 +1,64 @@
+# Боевой сервер: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# (deploy/update.sh делает это сам). Отличия от разработки:
+#   - Caddy с HTTPS на 80/443 — единственное, что открыто наружу;
+#   - API и база не публикуют порты даже на localhost;
+#   - cookie только по HTTPS, реальный IP клиента — из заголовка Caddy;
+#   - Mailpit выключен: письма идут через настоящий SMTP.
+services:
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [default]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+
+  api:
+    ports: !reset []
+    environment:
+      APP_URL: https://${DOMAIN:?set DOMAIN in .env}
+      COOKIE_SECURE: "true"
+      TRUST_PROXY: "true"
+      TRUSTED_PROXIES: 172.30.0.0/24
+      SMTP_HOST: "${SMTP_HOST:?set SMTP_HOST in .env (production mail needs a real SMTP)}"
+
+  worker:
+    environment:
+      APP_URL: https://${DOMAIN}
+
+  backup:
+    environment:
+      APP_URL: https://${DOMAIN}
+
+  db:
+    ports: !reset []
+
+  mailpit:
+    profiles: [dev]
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24   # из неё приходит Caddy — см. TRUSTED_PROXIES
+
+volumes:
+  caddy_data:
+  caddy_config:

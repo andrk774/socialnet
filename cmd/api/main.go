@@ -21,6 +21,7 @@ import (
 	"socialnet/internal/httpapi"
 	"socialnet/internal/realtime"
 	"socialnet/internal/redisx"
+	"socialnet/internal/s3"
 	"socialnet/internal/store"
 	"socialnet/internal/webpush"
 	"socialnet/internal/worker"
@@ -120,6 +121,18 @@ func run(log *slog.Logger) error {
 
 	// Собрать MP4 для видео, обработанных до его появления: `api backfill-mp4`.
 	// Задачи выполнит воркер.
+	if len(os.Args) == 2 && os.Args[1] == "restore-media" {
+		c := offsiteS3(cfg)
+		if c == nil {
+			return errors.New("restore-media needs BACKUP_S3_ENDPOINT and the other BACKUP_S3_* settings")
+		}
+		n, err := backup.MediaSync{Dir: cfg.MediaDir, S3: c, Prefix: "media/", Key: cfg.BackupKey, Log: log}.Restore(ctx)
+		if err != nil {
+			return err
+		}
+		log.Info("media restored", "files", n)
+		return nil
+	}
 	if len(os.Args) == 2 && os.Args[1] == "backfill-mp4" {
 		n, err := store.New(pool).EnqueueMP4Backfill(ctx)
 		if err != nil {
@@ -229,11 +242,25 @@ func run(log *slog.Logger) error {
 	return srv.Shutdown(shCtx)
 }
 
+// offsiteS3 — внешнее хранилище копий (BACKUP_S3_*), nil — не задано.
+func offsiteS3(cfg config.Config) *s3.Client {
+	if cfg.OffsiteEndpoint == "" {
+		return nil
+	}
+	return &s3.Client{Endpoint: cfg.OffsiteEndpoint, Region: cfg.OffsiteRegion, Bucket: cfg.OffsiteBucket,
+		AccessKey: cfg.OffsiteAccessKey, SecretKey: cfg.OffsiteSecretKey, PathStyle: cfg.OffsitePathStyle,
+		HTTP: &http.Client{Timeout: 10 * time.Minute}}
+}
+
 func runBackups(ctx context.Context, cfg config.Config, st *store.Store, log *slog.Logger, loop bool) error {
 	o := backup.Options{DatabaseURL: cfg.DatabaseURL, Dir: cfg.BackupDir, Key: cfg.BackupKey, Keep: cfg.BackupKeep,
 		S3Prefix: "backups/", Log: log}
 	if cfg.BackupS3 {
 		o.S3 = httpapi.NewS3(cfg)
+	}
+	offsite := offsiteS3(cfg)
+	if offsite != nil {
+		o.S3 = offsite // внешнее хранилище важнее: копия переживёт сервер
 	}
 	if o.Key == nil {
 		log.Warn("BACKUP_ENC_KEY is not set: backups are stored unencrypted")
@@ -256,6 +283,16 @@ func runBackups(ctx context.Context, cfg config.Config, st *store.Store, log *sl
 			return err
 		}
 		log.Info("backup ok", "name", res.Name, "size", res.Size, "tables", res.Tables, "duration", res.Duration.String())
+		// медиафайлы на локальном диске — их копия тоже уходит наружу
+		if offsite != nil && cfg.BackupMedia && cfg.S3Endpoint == "" {
+			m := backup.MediaSync{Dir: cfg.MediaDir, S3: offsite, Prefix: "media/", Key: cfg.BackupKey, Log: log}
+			mr, err := m.Run(ctx)
+			if err != nil {
+				log.Error("media backup failed", "err", err)
+				return err
+			}
+			log.Info("media backup ok", "uploaded", mr.Uploaded, "deleted", mr.Deleted, "skipped", mr.Skipped, "total", mr.Total)
+		}
 		return nil
 	}
 	if !loop {

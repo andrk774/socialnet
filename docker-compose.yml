@@ -99,6 +99,13 @@ services:
       BACKUP_KEEP: ${BACKUP_KEEP:-14}
       BACKUP_HOUR: ${BACKUP_HOUR:-3}
       BACKUP_S3: ${BACKUP_S3:-false}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-ru-1}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_ACCESS_KEY: ${BACKUP_S3_ACCESS_KEY:-}
+      BACKUP_S3_SECRET_KEY: ${BACKUP_S3_SECRET_KEY:-}
+      BACKUP_S3_PATH_STYLE: ${BACKUP_S3_PATH_STYLE:-true}
+      BACKUP_MEDIA: ${BACKUP_MEDIA:-true}
       # По умолчанию письма уходят в Mailpit (http://127.0.0.1:8025).
       # Для настоящей почты укажите в .env свой SMTP.
       SMTP_HOST: ${SMTP_HOST:-mailpit}
@@ -160,7 +167,9 @@ services:
       TMPDIR: /backups/.tmp   # дамп может быть больше, чем влезет в tmpfs
     volumes:
       - backups:/backups
-    networks: [backend]
+      - media:/data/media:ro   # для шифрованной копии медиа во внешнее хранилище
+    # default — выход в интернет к внешнему хранилищу копий (BACKUP_S3_*)
+    networks: [backend, default]
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
