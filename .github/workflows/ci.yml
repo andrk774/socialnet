@@ -216,7 +216,16 @@ jobs:
       - name: ${{ matrix.target.fn }}
         run: |
           set -o pipefail
-          go test ${{ matrix.target.pkg }} -run '^$' -fuzz '^${{ matrix.target.fn }}$' -fuzztime 60s 2>&1 | tee fuzz.log
+          if go test ${{ matrix.target.pkg }} -run '^$' -fuzz '^${{ matrix.target.fn }}$' -fuzztime 60s 2>&1 | tee fuzz.log; then exit 0; fi
+          # Известный сбой самого go fuzz (golang/go#56238): воркер не успел
+          # остановиться к концу времени. Если нового падающего входа нет —
+          # это не ошибка кода; повторяем один раз.
+          if grep -q 'context deadline exceeded' fuzz.log && ! grep -q 'Failing input written' fuzz.log; then
+            echo "::warning title=fuzz::go fuzz timed out on shutdown without a crasher; retrying once"
+            go test ${{ matrix.target.pkg }} -run '^$' -fuzz '^${{ matrix.target.fn }}$' -fuzztime 60s 2>&1 | tee fuzz.log
+          else
+            exit 1
+          fi
       - if: failure()
         name: Причина и найденный вход — в аннотации
         run: |
