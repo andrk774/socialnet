@@ -3651,6 +3651,384 @@
     }
    }
   },
+  "/api/v1/antennas": {
+   "get": {
+    "tags": [
+     "wall"
+    ],
+    "summary": "Мои ленты по ключевым словам («антенны») с числом новых записей",
+    "operationId": "get_api_v1_antennas",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "id": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "name": {
+              "type": "string"
+             },
+             "keywords": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "excludes": {
+              "type": "array",
+              "items": {
+               "type": "string"
+              }
+             },
+             "unread": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "created_at": {
+              "type": "string",
+              "format": "date-time"
+             }
+            },
+            "required": [
+             "id",
+             "name",
+             "keywords",
+             "excludes",
+             "unread",
+             "created_at"
+            ]
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "wall"
+    ],
+    "summary": "Новая лента: 1–10 слов (русские словоформы), до 10 исключений; до 5 лент",
+    "operationId": "post_api_v1_antennas",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "keywords": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "excludes": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        },
+        "required": [
+         "name",
+         "keywords"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "name": {
+           "type": "string"
+          },
+          "keywords": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "excludes": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "unread": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "created_at": {
+           "type": "string",
+           "format": "date-time"
+          }
+         },
+         "required": [
+          "id",
+          "name",
+          "keywords",
+          "excludes",
+          "unread",
+          "created_at"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/antennas/{id}": {
+   "delete": {
+    "tags": [
+     "wall"
+    ],
+    "summary": "Удалить ленту",
+    "operationId": "delete_api_v1_antennas_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "wall"
+    ],
+    "summary": "Изменить ленту",
+    "operationId": "put_api_v1_antennas_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "keywords": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "excludes": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        },
+        "required": [
+         "name",
+         "keywords"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "name": {
+           "type": "string"
+          },
+          "keywords": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "excludes": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "unread": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "created_at": {
+           "type": "string",
+           "format": "date-time"
+          }
+         },
+         "required": [
+          "id",
+          "name",
+          "keywords",
+          "excludes",
+          "unread",
+          "created_at"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/antennas/{id}/posts": {
+   "get": {
+    "tags": [
+     "wall"
+    ],
+    "summary": "Записи ленты (только видимые); первая страница отмечает их просмотренными",
+    "operationId": "get_api_v1_antennas_id_posts",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Post"
+           }
+          },
+          "next_cursor": {
+           "type": "integer",
+           "format": "int64",
+           "nullable": true
+          }
+         },
+         "required": [
+          "items",
+          "next_cursor"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/apps": {
    "get": {
     "tags": [

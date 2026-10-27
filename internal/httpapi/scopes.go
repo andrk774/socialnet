@@ -53,6 +53,8 @@ var scopeRoutes = map[string][]string{
 		"POST /api/v1/users/{id}/friend/reject", "GET /api/v1/friends/requests",
 	},
 	"wall": {
+		"GET /api/v1/antennas", "POST /api/v1/antennas", "PUT /api/v1/antennas/{id}", "DELETE /api/v1/antennas/{id}",
+		"GET /api/v1/antennas/{id}/posts",
 		"POST /api/v1/articles", "GET /api/v1/articles", "GET /api/v1/articles/mine", "POST /api/v1/articles/preview",
 		"GET /api/v1/articles/{id}", "PATCH /api/v1/articles/{id}", "DELETE /api/v1/articles/{id}",
 		"POST /api/v1/posts", "GET /api/v1/posts/{id}", "PATCH /api/v1/posts/{id}", "DELETE /api/v1/posts/{id}",
