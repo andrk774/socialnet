@@ -99,16 +99,21 @@ function routes(path, onRead, myId) {
         h("p", null,
             h("a", { href: "/" }, "\u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u0432 \u043B\u0435\u043D\u0442\u0443")));
 }
-const nav = [
-    ["/", "Лента"], ["/feeds", "Мои ленты"], ["/hikes", "Походы"], ["/companions", "Попутчики"], ["/rides", "Подвоз"], ["/articles", "Статьи"], ["/im", "Сообщения"], ["/notifications", "Уведомления"],
-    ["/communities", "Сообщества"], ["/fundraisers", "Сборы"], ["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"],
-    ["/scheduled", "Отложенные"], ["/offline", "Офлайн"], ["/wallet", "Кошелёк"], ["/plus", "Плюс"], ["/settings", "Безопасность"],
+const navGroups = [
+    ["Походы", [["/hikes", "Походы"], ["/companions", "Попутчики"], ["/rides", "Подвоз"], ["/articles", "Статьи"], ["/fundraisers", "Сборы"], ["/offline", "Офлайн"]]],
+    ["Общение", [["/", "Лента"], ["/feeds", "Мои ленты"], ["/im", "Сообщения"], ["/notifications", "Уведомления"], ["/communities", "Сообщества"]]],
+    ["Моё", [["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"], ["/scheduled", "Отложенные"],
+            ["/wallet", "Кошелёк"], ["/plus", "Плюс"], ["/settings", "Безопасность"]]],
 ];
+// короткие подписи для узкой панели; полные — в aria-label
+const tabs = [["/", "Лента", "Лента"], ["/hikes", "Походы", "Походы"], ["/im", "Чаты", "Сообщения"], ["/notifications", "Новое", "Уведомления"]];
 function Shell() {
     const path = usePath();
     const user = useMe();
     const [unread, setUnread] = useState(0);
     const [q, setQ] = useState("");
+    const [more, setMore] = useState(false);
+    useEffect(() => setMore(false), [path]);
     const countUnread = () => get("/notifications?limit=1").then((r) => setUnread(r.unread), () => { });
     useEffect(() => {
         countUnread();
@@ -119,6 +124,11 @@ function Shell() {
     if (user.consent_required && !path.startsWith("/settings"))
         return h(ConsentGate, null);
     const active = (href) => (href === "/" ? path === "/" : path.startsWith(href));
+    const groups = user.role === "user" ? navGroups
+        : [...navGroups.slice(0, 2), [navGroups[2][0], [...navGroups[2][1], ["/admin", user.role === "admin" ? "Админка" : "Модерация"]]]];
+    const link = (href, label, cls, full) => (h("a", { key: href, href: href, class: cls, "aria-label": full && full !== label ? (href === "/notifications" && unread > 0 ? `${full}, новых: ${unread}` : full) : undefined, "aria-current": active(href) ? "page" : undefined },
+        label,
+        href === "/notifications" && unread > 0 && h("span", { class: "badge", "aria-label": `новых: ${unread}` }, unread)));
     return (h("div", { class: "shell" },
         h("header", { class: "topbar" },
             h("div", { class: "topbar-in" },
@@ -130,13 +140,21 @@ function Shell() {
                     h(Avatar, { user: user, size: 32 })))),
         h("div", { class: "layout" },
             h("nav", { class: "sidenav", "aria-label": "\u0420\u0430\u0437\u0434\u0435\u043B\u044B" },
+                groups.map(([title, items]) => (h("section", { key: title, class: "nav-group" },
+                    h("h2", { class: "nav-title" }, title),
+                    h("ul", null, items.map(([href, label]) => h("li", { key: href }, link(href, label))))))),
                 h("ul", null,
-                    [...nav, ...(user.role === "admin" ? [["/admin", "Админка"]] : user.role === "moderator" ? [["/admin", "Модерация"]] : [])].map(([href, label]) => (h("li", { key: href },
-                        h("a", { href: href, "aria-current": active(href) ? "page" : undefined },
-                            label,
-                            href === "/notifications" && unread > 0 && h("span", { class: "badge", "aria-label": `новых: ${unread}` }, unread))))),
                     h("li", null,
                         h("button", { class: "link", onClick: () => logout() }, "\u0412\u044B\u0439\u0442\u0438")))),
+            h("nav", { class: "tabbar", "aria-label": "\u0413\u043B\u0430\u0432\u043D\u044B\u0435 \u0440\u0430\u0437\u0434\u0435\u043B\u044B" },
+                tabs.map(([href, label, full]) => link(href, label, "tab", full)),
+                h("button", { class: more ? "tab active" : "tab", "aria-expanded": more, onClick: () => setMore(!more) }, "\u0415\u0449\u0451")),
+            more && (h("div", { class: "more-sheet", role: "dialog", "aria-label": "\u0412\u0441\u0435 \u0440\u0430\u0437\u0434\u0435\u043B\u044B", onClick: (e) => { if (e.target.closest("a"))
+                    setMore(false); } },
+                groups.map(([title, items]) => (h("section", { key: title },
+                    h("h2", { class: "nav-title" }, title),
+                    h("div", { class: "more-grid" }, items.map(([href, label]) => link(href, label, "more-item")))))),
+                h("button", { class: "ghost", onClick: () => logout() }, "\u0412\u044B\u0439\u0442\u0438"))),
             h("main", { class: "content", id: "main" },
                 !user.email_verified && h(VerifyBanner, { email: user.email }),
                 routes(path, () => setUnread(0), user.id)))));
