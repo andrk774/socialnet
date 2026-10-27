@@ -327,6 +327,27 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await bob.page.getByText(/Отклик на объявление/).first().waitFor();
 }
 
+// статья: разметка, фото в тексте, предпросмотр; HTML из текста остаётся текстом
+{
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+  await anna.page.getByRole("link", { name: "Статьи" }).click();
+  await anna.page.getByRole("link", { name: "Написать отчёт" }).click();
+  await anna.page.getByLabel("Заголовок").fill("Три дня на Таганае");
+  await anna.page.locator(".article-editor textarea").fill("## День первый\n\nВышли в **7 утра** от Белого ключа.\n\n<img src=x onerror=\"window.__xss=3\">\n\n- вода\n- палатка\n");
+  await anna.page.locator(".file-chip input").setInputFiles({ name: "вершина.png", mimeType: "image/png", buffer: png });
+  await anna.page.waitForFunction(() => document.querySelector(".article-editor textarea")?.value.includes("](media:")); // фото загрузилось и вставлено
+  await anna.page.getByRole("button", { name: "Предпросмотр" }).click();
+  await anna.page.locator(".preview-box strong", { hasText: "7 утра" }).waitFor();
+  await anna.page.locator(".preview-box figure img").waitFor();
+  await anna.page.getByRole("button", { name: "Опубликовать" }).click();
+  await anna.page.getByRole("heading", { name: "Три дня на Таганае" }).waitFor();
+  assert.equal(await anna.page.locator(".article-body img[src='x']").count(), 0, "html in article text is not rendered");
+  assert.equal(await anna.page.evaluate(() => window.__xss), undefined, "no script from article text");
+  await anna.page.screenshot({ path: `${shots}/19-article.png`, fullPage: true });
+  await bob.page.goto(base + "/articles");
+  await bob.page.locator(".article-card", { hasText: "Три дня на Таганае" }).waitFor();
+}
+
 // отложенная запись
 await anna.page.goto(base + "/");
 await anna.page.getByPlaceholder("Что у вас нового?").fill("Это выйдет через час");

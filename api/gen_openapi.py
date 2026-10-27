@@ -93,6 +93,12 @@ schemas = {
     "CompanionAd": obj(id=int_, author=S("UserCard"), region=str_, title=str_, body=str_,
                        date_from={"type": "string", "format": "date"}, date_to={"type": "string", "format": "date"},
                        difficulty=nullable(enum_int(1, 2, 3, 4, 5)), seats=int_, route_id=nullable(str_), closed=bool_, created_at=dt),
+    "Span": obj(t=enum("text", "b", "i", "a"), text=str_, **{"href?": str_}),
+    "Block": obj(kind=enum("h2", "h3", "p", "ul", "ol", "quote", "hr", "img"),
+                 **{"spans?": arr(S("Span")), "items?": arr(arr(S("Span"))), "media_id?": uuid, "caption?": str_}),
+    "Article": obj(id=int_, author=S("UserCard"), title=str_, cover_url=nullable(str_), cover_thumb_url=nullable(str_),
+                   cover_media_id=nullable(uuid), route_id=nullable(uuid), status=enum("draft", "published"), excerpt=str_,
+                   created_at=dt, updated_at=dt, published_at=nullable(dt), **{"body?": str_, "blocks?": arr(S("Block"))}),
     "Application": obj(user=S("UserCard"), note=str_, created_at=dt),
     "Notification": obj(id=int_, type=str_, **{"actor?": S("UserCard"), "post_id?": int_, "comment_id?": int_, "event_id?": int_},
                         created_at=dt, read=bool_),
@@ -282,7 +288,7 @@ r("POST", A + "/media", "media", "Загрузить фото (JPEG/PNG/GIF до
 r("DELETE", A + "/media/{id}", "media", "Удалить фото", code=204)
 r("GET", "/media/{id}/{size}", "media", "Файл фото: size = full | thumb", auth=False, resp="binary")
 # --- безопасность / модерация ---
-r("POST", A + "/reports", "moderation", "Пожаловаться", obj(target_type=enum("post", "comment", "user", "community", "track", "video", "document", "route", "companion", "route_point"), **{"target_id?": int_, "target_uuid?": uuid}, reason=str_), obj(id=int_, status=str_), 201)
+r("POST", A + "/reports", "moderation", "Пожаловаться", obj(target_type=enum("post", "comment", "user", "community", "track", "video", "document", "route", "companion", "route_point", "article"), **{"target_id?": int_, "target_uuid?": uuid}, reason=str_), obj(id=int_, status=str_), 201)
 r("GET", A + "/mod/reports", "moderation", "Очередь жалоб (модератор)", resp=lst(S("Report")))
 r("POST", A + "/mod/reports/{id}/resolve", "moderation", "Решение по жалобе", obj(action=enum("dismiss", "hide", "ban"), **{"note?": str_}), code=204)
 r("POST", A + "/mod/users/{id}/ban", "moderation", "Забанить", obj(**{"reason?": str_}), code=204)
@@ -404,6 +410,16 @@ r("POST", A + "/events/{id}/contacts", "events", "Добавить довере�
   obj(name=str_, email=str_, consent=bool_), hike_contact, 201)
 r("DELETE", A + "/events/{id}/contacts/{cid}", "events", "Удалить контакт", code=204)
 r("POST", A + "/events/{id}/returned", "events", "Группа вернулась: контакты удаляются; если тревога уже ушла — им «отбой»", code=204)
+art = obj(**{"title?": str_, "body?": str_, "cover_media_id?": nullable(uuid), "route_id?": nullable(uuid),
+            "status?": enum("draft", "published")})
+r("POST", A + "/articles", "wall", "Статья: разметка ## ### - 1. > --- **жирный** *курсив* [ссылка](https://…) ![подпись](media:UUID); фото и маршрут — свои",
+  art, S("Article"), 201)
+r("GET", A + "/articles", "wall", "Опубликованные статьи (без текста, с анонсом)", resp=lst(S("Article")))
+r("GET", A + "/articles/mine", "wall", "Мои статьи и черновики", resp=obj(items=arr(S("Article"))))
+r("POST", A + "/articles/preview", "wall", "Предпросмотр разметки", obj(body=str_), obj(blocks=arr(S("Block"))))
+r("GET", A + "/articles/{id}", "wall", "Статья с деревом блоков (черновик — только автору)", resp=S("Article"))
+r("PATCH", A + "/articles/{id}", "wall", "Изменить, опубликовать (status=published) или снять в черновики", art, S("Article"))
+r("DELETE", A + "/articles/{id}", "wall", "Удалить", code=204)
 r("GET", A + "/weather", "routes", "Прогноз на 10 дней (Open-Meteo через сервер, кеш час, район ~5 км): ?lat=&lon=&elevation=",
   resp=obj(lat=num, lon=num, elevation=nullable(num), source=str_, fetched_at=dt,
            days=arr(obj(date={"type": "string", "format": "date"}, code=int_, t_max=nullable(num), t_min=nullable(num),

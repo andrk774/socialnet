@@ -1483,6 +1483,152 @@
      "created_at"
     ]
    },
+   "Span": {
+    "type": "object",
+    "properties": {
+     "t": {
+      "type": "string",
+      "enum": [
+       "text",
+       "b",
+       "i",
+       "a"
+      ]
+     },
+     "text": {
+      "type": "string"
+     },
+     "href": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "t",
+     "text"
+    ]
+   },
+   "Block": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "h2",
+       "h3",
+       "p",
+       "ul",
+       "ol",
+       "quote",
+       "hr",
+       "img"
+      ]
+     },
+     "spans": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/Span"
+      }
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "type": "array",
+       "items": {
+        "$ref": "#/components/schemas/Span"
+       }
+      }
+     },
+     "media_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "caption": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "kind"
+    ]
+   },
+   "Article": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "author": {
+      "$ref": "#/components/schemas/UserCard"
+     },
+     "title": {
+      "type": "string"
+     },
+     "cover_url": {
+      "type": "string",
+      "nullable": true
+     },
+     "cover_thumb_url": {
+      "type": "string",
+      "nullable": true
+     },
+     "cover_media_id": {
+      "type": "string",
+      "format": "uuid",
+      "nullable": true
+     },
+     "route_id": {
+      "type": "string",
+      "format": "uuid",
+      "nullable": true
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "draft",
+       "published"
+      ]
+     },
+     "excerpt": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "published_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+     },
+     "body": {
+      "type": "string"
+     },
+     "blocks": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/Block"
+      }
+     }
+    },
+    "required": [
+     "id",
+     "author",
+     "title",
+     "cover_url",
+     "cover_thumb_url",
+     "cover_media_id",
+     "route_id",
+     "status",
+     "excerpt",
+     "created_at",
+     "updated_at",
+     "published_at"
+    ]
+   },
    "Application": {
     "type": "object",
     "properties": {
@@ -3701,6 +3847,370 @@
          "required": [
           "client_secret"
          ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/articles": {
+   "get": {
+    "tags": [
+     "wall"
+    ],
+    "summary": "Опубликованные статьи (без текста, с анонсом)",
+    "operationId": "get_api_v1_articles",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Article"
+           }
+          },
+          "next_cursor": {
+           "type": "integer",
+           "format": "int64",
+           "nullable": true
+          }
+         },
+         "required": [
+          "items",
+          "next_cursor"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "wall"
+    ],
+    "summary": "Статья: разметка ## ### - 1. > --- **жирный** *курсив* [ссылка](https://…) ![подпись](media:UUID); фото и маршрут — свои",
+    "operationId": "post_api_v1_articles",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "body": {
+          "type": "string"
+         },
+         "cover_media_id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": true
+         },
+         "route_id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": true
+         },
+         "status": {
+          "type": "string",
+          "enum": [
+           "draft",
+           "published"
+          ]
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Article"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/articles/mine": {
+   "get": {
+    "tags": [
+     "wall"
+    ],
+    "summary": "Мои статьи и черновики",
+    "operationId": "get_api_v1_articles_mine",
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "items": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Article"
+           }
+          }
+         },
+         "required": [
+          "items"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/articles/preview": {
+   "post": {
+    "tags": [
+     "wall"
+    ],
+    "summary": "Предпросмотр разметки",
+    "operationId": "post_api_v1_articles_preview",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "body": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "body"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "blocks": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Block"
+           }
+          }
+         },
+         "required": [
+          "blocks"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/articles/{id}": {
+   "delete": {
+    "tags": [
+     "wall"
+    ],
+    "summary": "Удалить",
+    "operationId": "delete_api_v1_articles_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "wall"
+    ],
+    "summary": "Статья с деревом блоков (черновик — только автору)",
+    "operationId": "get_api_v1_articles_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Article"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "wall"
+    ],
+    "summary": "Изменить, опубликовать (status=published) или снять в черновики",
+    "operationId": "patch_api_v1_articles_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "title": {
+          "type": "string"
+         },
+         "body": {
+          "type": "string"
+         },
+         "cover_media_id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": true
+         },
+         "route_id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": true
+         },
+         "status": {
+          "type": "string",
+          "enum": [
+           "draft",
+           "published"
+          ]
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Article"
         }
        }
       }
@@ -10719,7 +11229,8 @@
            "document",
            "route",
            "companion",
-           "route_point"
+           "route_point",
+           "article"
           ]
          },
          "target_id": {
