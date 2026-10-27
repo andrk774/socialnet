@@ -402,6 +402,17 @@ await anna.page.getByRole("button", { name: /Подключить за \d+ мо�
   await cpost.getByRole("button", { name: "Выбрать реакцию" }).click();
   await cpost.getByRole("menuitem", { name: "gora" }).click();
   await cpost.locator(".react-wrap button.chip.active img.emoji").waitFor();
+
+  // сбор клуба: цель, срок, прогресс (пожертвования — в Go-тестах: нужна подтверждённая почта)
+  await anna.page.getByText("Объявить сбор").click();
+  await anna.page.getByLabel("На что").fill("Рации для клуба");
+  await anna.page.getByLabel("Цель, монет").fill("500");
+  const until = new Date(Date.now() + 10 * 864e5);
+  await anna.page.locator(".fundraisers").getByLabel("До").fill(new Date(until.getTime() - until.getTimezoneOffset() * 6e4).toISOString().slice(0, 16));
+  await anna.page.getByRole("button", { name: "Объявить" }).click();
+  await anna.page.locator("li.fund", { hasText: "Собрано 0 из 500" }).waitFor();
+  await bob.page.goto(base + "/fundraisers");
+  await bob.page.locator("li.fund", { hasText: "Рации для клуба" }).getByRole("button", { name: "Поддержать" }).waitFor();
 }
 
 // отложенная запись

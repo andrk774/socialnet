@@ -107,6 +107,7 @@ var scopeRoutes = map[string][]string{
 		"GET /api/v1/communities", "GET /api/v1/communities/by-slug/{slug}", "GET /api/v1/communities/{id}",
 		"POST /api/v1/communities/{id}/join", "POST /api/v1/communities/{id}/leave",
 		"GET /api/v1/communities/{id}/members", "GET /api/v1/communities/{id}/events",
+		"GET /api/v1/communities/{id}/fundraisers", "GET /api/v1/fundraisers", "GET /api/v1/fundraisers/{id}",
 		"GET /api/v1/communities/{id}/emoji", "POST /api/v1/communities/{id}/emoji", "DELETE /api/v1/communities/{id}/emoji/{eid}",
 	},
 	"stories": {

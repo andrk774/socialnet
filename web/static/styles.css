@@ -520,3 +520,10 @@ img.emoji { vertical-align: -4px; object-fit: contain; display: inline-block; }
 .plus-table { border-collapse: collapse; margin: 1rem 0; width: 100%; max-width: 36rem; }
 .plus-table th, .plus-table td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--line); }
 .inline-check { display: inline-flex; margin: 0; }
+
+/* ---------- сборы ---------- */
+.fund-title { font-size: var(--step-0); }
+.progress { height: .6rem; background: var(--tint); border-radius: 999px; overflow: hidden; margin: .5rem 0 .25rem; }
+.progress-bar { height: 100%; background: var(--malachite); border-radius: 999px; }
+.fundraisers { margin: 1rem 0; }
+.donations { margin-top: .5rem; }

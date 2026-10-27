@@ -407,6 +407,12 @@ func (s *Server) Router() http.Handler {
 				r.Post("/communities/{id}/requests/{userID}/reject", s.handleResolveJoin(false))
 				r.Get("/communities/{id}/events", s.handleCommunityEvents)
 				r.Get("/communities/{id}/emoji", s.handleCommunityEmoji)
+				r.Get("/communities/{id}/fundraisers", s.handleCommunityFundraisers)
+				r.Post("/communities/{id}/fundraisers", s.handleCreateFundraiser)
+				r.Get("/fundraisers", s.handleFundraisers)
+				r.Get("/fundraisers/{id}", s.handleGetFundraiser)
+				r.Post("/fundraisers/{id}/donate", s.handleDonateFundraiser)
+				r.Post("/fundraisers/{id}/close", s.handleCloseFundraiser)
 				r.Post("/communities/{id}/emoji", s.handleAddEmoji)
 				r.Delete("/communities/{id}/emoji/{eid}", s.handleDeleteEmoji)
 
