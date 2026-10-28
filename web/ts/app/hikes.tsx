@@ -3,7 +3,7 @@
 import { Fragment, h } from "../vendor/preact/index.js";
 import { useState } from "../vendor/preact/hooks.js";
 import { del, get, Page, patch, post, Route, saveFile, UserCard } from "./api.js";
-import { navigate } from "./router.js";
+import { navigate, query } from "./router.js";
 import { RouteCard } from "./routes.js";
 import { Weather } from "./weather.js";
 import { Rides } from "./rides.js";
@@ -11,6 +11,7 @@ import { useMe } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, RichText, Time, UserLink, useLoad } from "./ui.js";
 import { Review, ReviewForm } from "./reviews.js";
 import { AreaNotice, NoticeBanner } from "./notices.js";
+import { HikeQR } from "./qrcard.js";
 
 export interface HikeEvent {
   id: number; creator_id: number; community?: { id: number; slug: string; name: string }; kind: "event" | "hike";
@@ -119,7 +120,7 @@ export function EventPage({ id }: { id: number }) {
       <div class="event-actions">
         {e.my_status && <span class={`pill st-${e.my_status}`}>{statusText(e)}</span>}
         {!e.my_status && (
-          <form class="join" onSubmit={(x) => { x.preventDefault(); act(() => post(`/events/${id}/rsvp`, { status: "going", note })); }}>
+          <form class="join" onSubmit={(x) => { x.preventDefault(); act(() => post(`/events/${id}/rsvp`, { status: "going", note, ...(query("from") === "qr" ? { source: "qr" } : {}) })); }}>
             {e.approval && <label>Пара слов организатору: опыт, снаряжение
               <textarea value={note} maxLength={500} rows={2} onInput={(x) => setNote((x.target as HTMLTextAreaElement).value)} />
             </label>}
@@ -138,6 +139,7 @@ export function EventPage({ id }: { id: number }) {
       </div>
       <ErrorLine error={error} />
       <NoticeBanner notices={e.notices} />
+      <HikeQR id={id} title={e.title} organizer={isOrganizer} />
       {e.can_review && <section class="hike-review"><h2>Как прошёл поход?</h2>
         <ReviewForm path={`/events/${id}/review`} initial={e.my_review ?? null} label="Оцените поход и организатора" onSaved={ev.reload} /></section>}
 

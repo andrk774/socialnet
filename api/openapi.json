@@ -9658,6 +9658,134 @@
     }
    }
   },
+  "/api/v1/events/{id}/qr-stats": {
+   "get": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Статистика QR-кода организатору: сканы, записи после скана, по дням",
+    "operationId": "get_api_v1_events_id_qr_stats",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "scans": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "joins": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "scans_week": {
+           "type": "integer",
+           "format": "int64"
+          },
+          "days": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "day": {
+              "type": "string"
+             },
+             "scans": {
+              "type": "integer",
+              "format": "int64"
+             },
+             "joins": {
+              "type": "integer",
+              "format": "int64"
+             }
+            },
+            "required": [
+             "day",
+             "scans",
+             "joins"
+            ]
+           }
+          }
+         },
+         "required": [
+          "scans",
+          "joins",
+          "scans_week",
+          "days"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/events/{id}/qr.svg": {
+   "get": {
+    "tags": [
+     "events"
+    ],
+    "summary": "QR-код мероприятия (SVG): ведёт на /qr/e/{id}, где считается скан",
+    "operationId": "get_api_v1_events_id_qr_svg",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Текст",
+      "content": {
+       "text/plain": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/events/{id}/returned": {
    "post": {
     "tags": [
@@ -9872,6 +10000,12 @@
          },
          "note": {
           "type": "string"
+         },
+         "source": {
+          "type": "string",
+          "enum": [
+           "qr"
+          ]
          }
         },
         "required": [
@@ -18719,6 +18853,42 @@
         }
        }
       }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/qr/e/{id}": {
+   "get": {
+    "tags": [
+     "events"
+    ],
+    "summary": "Переход по QR-коду мероприятия: считает скан и перенаправляет на /events/{id}?from=qr",
+    "operationId": "get_qr_e_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "security": [],
+    "responses": {
+     "302": {
+      "description": "Успешно"
      },
      "default": {
       "description": "Ошибка",

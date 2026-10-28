@@ -416,7 +416,7 @@ r("GET", A + "/events/{id}", "events", "Мероприятие", resp=S("Event")
 r("PATCH", A + "/events/{id}", "events", "Изменить (организатор)", ev, S("Event"))
 r("DELETE", A + "/events/{id}", "events", "Удалить (организатор)", code=204)
 r("POST", A + "/events/{id}/rsvp", "events", "Пойду / Возможно. Поход: место, лист ожидания (мест нет) или заявка организатору (approval); «возможно» нельзя",
-  obj(status=enum("going", "maybe"), **{"note?": str_}), obj(status=enum("going", "maybe", "pending", "waitlist")))
+  obj(status=enum("going", "maybe"), **{"note?": str_, "source?": enum("qr")}), obj(status=enum("going", "maybe", "pending", "waitlist")))
 r("DELETE", A + "/events/{id}/rsvp", "events", "Не пойду (место — первому в очереди)", code=204)
 r("GET", A + "/events/{id}/attendees", "events", "Участники: ?status=going|maybe|waitlist", resp=lst(S("UserCard")))
 r("DELETE", A + "/events/{id}/attendees/{uid}", "events", "Убрать участника (организатор)", code=204)
@@ -460,6 +460,9 @@ r("GET", A + "/users/{id}/reviews", "users", "Отзывы об организа
 r("GET", A + "/routes/{rid}/reviews", "routes", "Отзывы о маршруте и средняя оценка", resp=obj(rating=S("Rating"), items=arr(S("Review")), next_cursor=nullable(int_)))
 r("POST", A + "/routes/{rid}/reviews", "routes", "Отзыв о маршруте каталога (не своём; повторно — исправить)", obj(rating=enum_int(1, 2, 3, 4, 5), **{"text?": str_}), obj(id=int_))
 r("DELETE", A + "/routes/{rid}/reviews", "routes", "Удалить свой отзыв о маршруте", code=204)
+r("GET", A + "/events/{id}/qr.svg", "events", "QR-код мероприятия (SVG): ведёт на /qr/e/{id}, где считается скан", resp="text")
+r("GET", A + "/events/{id}/qr-stats", "events", "Статистика QR-кода организатору: сканы, записи после скана, по дням", resp=obj(scans=int_, joins=int_, scans_week=int_, days=arr(obj(day=str_, scans=int_, joins=int_))))
+r("GET", "/qr/e/{id}", "events", "Переход по QR-коду мероприятия: считает скан и перенаправляет на /events/{id}?from=qr", auth=False, code=302)
 r("GET", A + "/events/{id}/calendar.ics", "events", "Мероприятие файлом iCalendar: добавить в календарь телефона, с напоминаниями", resp="text")
 r("GET", A + "/events/{id}/participants.csv", "events", "Список группы CSV для регистрации в МЧС (организатору с «Плюсом»)", resp="text")
 r("POST", A + "/articles", "wall", "Статья: разметка ## ### - 1. > --- **жирный** *курсив* [ссылка](https://…) ![подпись](media:UUID); фото и маршрут — свои",

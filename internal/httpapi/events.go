@@ -370,6 +370,7 @@ func (s *Server) handleRSVP(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Status string `json:"status"`
 		Note   string `json:"note"`
+		Source string `json:"source"` // "qr" — пришёл по QR-коду похода
 	}
 	if !decodeJSON(w, r, &req) {
 		return
@@ -402,6 +403,13 @@ func (s *Server) handleRSVP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.internalError(w, r, err)
 		return
+	}
+	if req.Source == "qr" && e.MyStatus == nil && status != "maybe" {
+		if err := s.store.RecordQRJoin(r.Context(), e.ID); err != nil {
+			s.log.Error("qr join", "err", err)
+		} else {
+			s.m.business.Inc("qr_join")
+		}
 	}
 	if status == "pending" && (e.MyStatus == nil || *e.MyStatus != "pending") {
 		s.notifyEvent(r.Context(), []int64{e.CreatorID}, "hike_application", me, e.ID)

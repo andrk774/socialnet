@@ -280,6 +280,17 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
   await anna.page.locator(".weather-days li.hike-day").first().waitFor();
   await anna.page.locator(".weather-days li.warn", { hasText: "гроза" }).waitFor();
   const hikeURL = anna.page.url();
+  // QR-код похода: картинка, переход по коду считается, организатор видит счётчик
+  {
+    const hikeId = new URL(hikeURL).pathname.split("/").pop();
+    await anna.page.goto(`${base}/qr/e/${hikeId}`);
+    await anna.page.waitForURL(/\/events\/\d+\?from=qr$/);
+    await anna.page.locator(".hike-qr summary").click();
+    await anna.page.locator(".hike-qr img[src^='data:image/svg+xml']").waitFor();
+    await anna.page.locator(".hike-qr [data-stat=scans]", { hasText: "1" }).waitFor();
+    await anna.page.locator(".hike-qr").screenshot({ path: `${shots}/14c-hike-qr.png` });
+    await anna.page.goto(hikeURL);
+  }
   // гость на главной видит поход в витрине под формой входа
   {
     const g = await (await anna.ctx.browser().newContext({ locale: "ru-RU" })).newPage();
