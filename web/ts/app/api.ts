@@ -143,6 +143,16 @@ export async function register(fields: { email: string; username: string; passwo
   setToken(r.access_token);
 }
 
+// Вход по QR-коду: новое устройство показывает код и ждёт подтверждения с телефона.
+export interface QRLoginStart { id: string; poll_token: string; url: string; expires_at: string; qr_svg: string }
+export const qrLoginStart = () => api<QRLoginStart>("POST", "/auth/qr/start");
+export async function qrLoginPoll(id: string, poll_token: string): Promise<boolean> {
+  const r = await api<{ status?: string; access_token?: string }>("POST", "/auth/qr/poll", { id, poll_token });
+  if (!r.access_token) return false;
+  setToken(r.access_token);
+  return true;
+}
+
 export async function logout() {
   try { await api("POST", "/auth/logout"); } finally {
     setToken(null);

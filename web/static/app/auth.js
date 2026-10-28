@@ -4,9 +4,11 @@ import { login, register, verify2FA } from "./api.js";
 import { ConsentChecks, noConsents } from "./legal.js";
 import { Captcha, captchaSiteKey, tokenFrom } from "./captcha.js";
 import { ErrorLine } from "./ui.js";
+import { QRLoginBox } from "./qrlogin.js";
 export function AuthPage() {
     const [mode, setMode] = useState("login");
     const [mfa, setMfa] = useState(null);
+    const [qr, setQr] = useState(false);
     const [f, setF] = useState({ email: "", password: "", username: "", first_name: "", last_name: "", code: "" });
     const [consents, setConsents] = useState(noConsents);
     const [siteKey, setSiteKey] = useState("");
@@ -41,7 +43,7 @@ export function AuthPage() {
         h("div", { class: "auth-mark", "aria-hidden": "true" }),
         h("h1", { class: "wordmark" }, "socialnet"),
         h("p", { class: "auth-lead" }, "\u041F\u043E\u0445\u043E\u0434\u044B \u043F\u043E \u042E\u0436\u043D\u043E\u043C\u0443 \u0423\u0440\u0430\u043B\u0443: \u0433\u0440\u0443\u043F\u043F\u044B, \u043F\u043E\u043F\u0443\u0442\u0447\u0438\u043A\u0438, \u043C\u0430\u0440\u0448\u0440\u0443\u0442\u044B \u0438 \u0447\u0430\u0442 \u043F\u043E\u0445\u043E\u0434\u0430."),
-        h("form", { class: "auth-form", onSubmit: submit },
+        qr ? h(QRLoginBox, { onCancel: () => setQr(false) }) : h("form", { class: "auth-form", onSubmit: submit },
             mfa ? (h("label", null,
                 "\u041A\u043E\u0434 \u0438\u0437 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u044F \u0438\u043B\u0438 \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u044B\u0439 \u043A\u043E\u0434",
                 h("input", { ...field("code"), inputMode: "numeric", autoComplete: "one-time-code", autoFocus: true, required: true }))) : (h("fieldset", null,
@@ -66,10 +68,12 @@ export function AuthPage() {
                 mode === "register" && h(Captcha, { siteKey: siteKey, box: captchaBox }))),
             h(ErrorLine, { error: error }),
             h("button", { class: "primary wide", disabled: busy }, mfa ? "Подтвердить" : mode === "login" ? "Войти" : "Создать аккаунт")),
-        !mfa && (h("p", { class: "auth-switch" },
+        !mfa && !qr && (h("p", { class: "auth-switch" },
             mode === "login" ? "Ещё нет аккаунта? " : "Уже есть аккаунт? ",
             h("button", { class: "link", onClick: () => { setMode(mode === "login" ? "register" : "login"); setError(null); } }, mode === "login" ? "Зарегистрироваться" : "Войти"))),
-        mode === "login" && !mfa && h("p", { class: "auth-switch" },
+        mode === "login" && !mfa && !qr && h("p", { class: "auth-switch" },
+            h("button", { class: "link", onClick: () => setQr(true) }, "\u0412\u0445\u043E\u0434 \u043F\u043E QR-\u043A\u043E\u0434\u0443 \u0441 \u0442\u0435\u043B\u0435\u0444\u043E\u043D\u0430")),
+        mode === "login" && !mfa && !qr && h("p", { class: "auth-switch" },
             h("a", { href: "/forgot-password" }, "\u0417\u0430\u0431\u044B\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C?")),
         h("p", { class: "legal-links muted" },
             h("a", { href: "/legal/terms" }, "\u0421\u043E\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435"),

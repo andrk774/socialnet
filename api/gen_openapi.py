@@ -327,6 +327,11 @@ r("GET", A + "/notices", "routes", "Действующие предупрежд�
 r("POST", A + "/mod/notices", "moderation", "Добавить предупреждение: противопожарный режим, закрытая тропа…", obj(kind=enum("fire", "closure", "flood", "other"), title=str_, **{"body?": str_, "source_url?": str_, "ends_on?": nullable(str_)}, bbox=arr(num), starts_on=str_), S("AreaNotice"), 201)
 r("PATCH", A + "/mod/notices/{id}", "moderation", "Изменить предупреждение", obj(kind=enum("fire", "closure", "flood", "other"), title=str_, **{"body?": str_, "source_url?": str_, "ends_on?": nullable(str_)}, bbox=arr(num), starts_on=str_), S("AreaNotice"))
 r("DELETE", A + "/mod/notices/{id}", "moderation", "Удалить предупреждение", code=204)
+r("POST", A + "/auth/qr/start", "auth", "Вход по QR-коду: новое устройство получает код (2 минуты) и секрет опроса", resp=obj(id=str_, poll_token=str_, url=str_, expires_at=dt, qr_svg=str_), auth=False, code=201)
+r("POST", A + "/auth/qr/poll", "auth", "Вход по QR-коду: опрос; 202 — ждём телефон, 200 — сеанс (как вход), 403 — отклонено, 410 — код истёк", obj(id=str_, poll_token=str_), S("Auth"), auth=False)
+r("GET", A + "/qr-login/{id}", "auth", "Вход по QR-коду: телефону — какое устройство просит вход", resp=obj(id=str_, user_agent=str_, **{"ip?": str_}, created_at=dt, expires_at=dt))
+r("POST", A + "/qr-login/{id}/approve", "auth", "Подтвердить вход на другом устройстве (только из сеанса)", code=204)
+r("POST", A + "/qr-login/{id}/reject", "auth", "Отклонить вход на другом устройстве", code=204)
 r("GET", A + "/search", "search", "Поиск: ?q=…&type=users|communities|tracks|hikes|articles|routes — {items}; type=all — по 5 из каждого раздела: {hikes, routes, articles, users, communities}", resp={"type": "object"})
 # --- кошелёк ---
 r("GET", A + "/wallet", "wallet", "Баланс и история", resp=obj(balance=int_, debt=int_, transactions=lst(S("Tx"))))

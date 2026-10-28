@@ -42,6 +42,29 @@ async function newUser(name, viewport = { width: 1280, height: 860 }) {
 
 const anna = await newUser("anna");
 
+// вход по QR-коду: новое устройство показывает код, телефон Анны подтверждает
+{
+  const g = await (await anna.ctx.browser().newContext({ locale: "ru-RU" })).newPage();
+  await g.goto(base + "/");
+  const started = g.waitForResponse((r) => r.url().endsWith("/api/v1/auth/qr/start"));
+  await g.getByRole("button", { name: "Вход по QR-коду с телефона" }).click();
+  const { url } = await (await started).json();
+  await g.locator(".qr-login img[src^='data:image/svg+xml']").waitFor();
+  await g.getByText(/Код действует ещё \d+ с\./).waitFor();
+  await g.screenshot({ path: `${shots}/01b-qr-login.png` });
+  // «телефон»: Анна открывает ссылку из кода и подтверждает
+  await anna.page.goto(url.replace(/^https?:\/\/[^/]+/, base));
+  await anna.page.getByRole("heading", { name: "Войти на другом устройстве?" }).waitFor();
+  await anna.page.getByText(/это попытка украсть аккаунт/).waitFor();
+  await anna.page.screenshot({ path: `${shots}/01c-qr-approve.png` });
+  await anna.page.getByRole("button", { name: "Подтвердить вход" }).click();
+  await anna.page.getByRole("heading", { name: "Вход подтверждён" }).waitFor();
+  // новое устройство входит само
+  await g.getByPlaceholder("Что у вас нового?").waitFor();
+  await g.context().close();
+  await anna.page.goto(base + "/");
+}
+
 // «Забыли пароль?» и ссылки из писем работают без входа
 {
   const g = await (await anna.ctx.browser().newContext({ locale: "ru-RU" })).newPage();

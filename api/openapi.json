@@ -5166,6 +5166,117 @@
     }
    }
   },
+  "/api/v1/auth/qr/poll": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Вход по QR-коду: опрос; 202 — ждём телефон, 200 — сеанс (как вход), 403 — отклонено, 410 — код истёк",
+    "operationId": "post_api_v1_auth_qr_poll",
+    "security": [],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "poll_token": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "poll_token"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Auth"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/auth/qr/start": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Вход по QR-коду: новое устройство получает код (2 минуты) и секрет опроса",
+    "operationId": "post_api_v1_auth_qr_start",
+    "security": [],
+    "responses": {
+     "201": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "poll_token": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          },
+          "expires_at": {
+           "type": "string",
+           "format": "date-time"
+          },
+          "qr_svg": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "poll_token",
+          "url",
+          "expires_at",
+          "qr_svg"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/auth/refresh": {
    "post": {
     "tags": [
@@ -13646,6 +13757,143 @@
         }
        }
       }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/qr-login/{id}": {
+   "get": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Вход по QR-коду: телефону — какое устройство просит вход",
+    "operationId": "get_api_v1_qr_login_id",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "user_agent": {
+           "type": "string"
+          },
+          "ip": {
+           "type": "string"
+          },
+          "created_at": {
+           "type": "string",
+           "format": "date-time"
+          },
+          "expires_at": {
+           "type": "string",
+           "format": "date-time"
+          }
+         },
+         "required": [
+          "id",
+          "user_agent",
+          "created_at",
+          "expires_at"
+         ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/qr-login/{id}/approve": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Подтвердить вход на другом устройстве (только из сеанса)",
+    "operationId": "post_api_v1_qr_login_id_approve",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/qr-login/{id}/reject": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Отклонить вход на другом устройстве",
+    "operationId": "post_api_v1_qr_login_id_reject",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Успешно"
      },
      "default": {
       "description": "Ошибка",

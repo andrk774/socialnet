@@ -4,10 +4,12 @@ import { login, register, verify2FA } from "./api.js";
 import { ConsentChecks, noConsents } from "./legal.js";
 import { Captcha, captchaSiteKey, tokenFrom } from "./captcha.js";
 import { ErrorLine } from "./ui.js";
+import { QRLoginBox } from "./qrlogin.js";
 
 export function AuthPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [mfa, setMfa] = useState<string | null>(null);
+  const [qr, setQr] = useState(false);
   const [f, setF] = useState({ email: "", password: "", username: "", first_name: "", last_name: "", code: "" });
   const [consents, setConsents] = useState(noConsents);
   const [siteKey, setSiteKey] = useState("");
@@ -32,7 +34,7 @@ export function AuthPage() {
       <div class="auth-mark" aria-hidden="true" />
       <h1 class="wordmark">socialnet</h1>
       <p class="auth-lead">Походы по Южному Уралу: группы, попутчики, маршруты и чат похода.</p>
-      <form class="auth-form" onSubmit={submit}>
+      {qr ? <QRLoginBox onCancel={() => setQr(false)} /> : <form class="auth-form" onSubmit={submit}>
         {mfa ? (
           <label>Код из приложения или резервный код
             <input {...field("code")} inputMode="numeric" autoComplete="one-time-code" autoFocus required />
@@ -55,8 +57,8 @@ export function AuthPage() {
         )}
         <ErrorLine error={error} />
         <button class="primary wide" disabled={busy}>{mfa ? "Подтвердить" : mode === "login" ? "Войти" : "Создать аккаунт"}</button>
-      </form>
-      {!mfa && (
+      </form>}
+      {!mfa && !qr && (
         <p class="auth-switch">
           {mode === "login" ? "Ещё нет аккаунта? " : "Уже есть аккаунт? "}
           <button class="link" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(null); }}>
@@ -64,7 +66,8 @@ export function AuthPage() {
           </button>
         </p>
       )}
-      {mode === "login" && !mfa && <p class="auth-switch"><a href="/forgot-password">Забыли пароль?</a></p>}
+      {mode === "login" && !mfa && !qr && <p class="auth-switch"><button class="link" onClick={() => setQr(true)}>Вход по QR-коду с телефона</button></p>}
+      {mode === "login" && !mfa && !qr && <p class="auth-switch"><a href="/forgot-password">Забыли пароль?</a></p>}
       <p class="legal-links muted"><a href="/legal/terms">Соглашение</a> · <a href="/legal/privacy">Персональные данные</a></p>
     </main>
   );

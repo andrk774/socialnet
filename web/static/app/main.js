@@ -26,6 +26,7 @@ import { RecordPage } from "./record.js";
 import { SearchPage } from "./search.js";
 import { Showcase } from "./landing.js";
 import { setupNative } from "./native.js";
+import { QRApprovePage } from "./qrlogin.js";
 function routes(path, onRead, myId) {
     let p;
     if (path === "/" || path.startsWith("/?"))
@@ -62,6 +63,8 @@ function routes(path, onRead, myId) {
         return h(OfflinePage, null);
     if (match("/record", path))
         return h(RecordPage, null);
+    if (match("/qr-login", path))
+        return h(QRApprovePage, null);
     if (match("/articles", path))
         return h(ArticlesPage, null);
     if (match("/rides", path))
