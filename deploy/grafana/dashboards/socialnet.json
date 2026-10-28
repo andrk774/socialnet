@@ -348,6 +348,65 @@
      "legendFormat": "монет"
     }
    ]
+  },
+  {
+   "id": 13,
+   "type": "stat",
+   "title": "QR-коды походов за сутки: сканы, записи, конверсия",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 40,
+    "w": 12,
+    "h": 6
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum(increase(socialnet_events_total{event=\"qr_scan\"}[24h]))",
+     "legendFormat": "сканы",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    },
+    {
+     "refId": "B",
+     "expr": "sum(increase(socialnet_events_total{event=\"qr_join\"}[24h]))",
+     "legendFormat": "записи",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    },
+    {
+     "refId": "C",
+     "expr": "100 * sum(increase(socialnet_events_total{event=\"qr_join\"}[24h])) / clamp_min(sum(increase(socialnet_events_total{event=\"qr_scan\"}[24h])), 1)",
+     "legendFormat": "конверсия, %",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     }
+    }
+   ],
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "textMode": "value_and_name",
+    "colorMode": "none"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "decimals": 0
+    },
+    "overrides": []
+   }
   }
  ],
  "templating": {

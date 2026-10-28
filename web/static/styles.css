@@ -594,3 +594,9 @@ img.emoji { vertical-align: -4px; object-fit: contain; display: inline-block; }
   :root:not([data-theme="light"]) .notice-fire { background: #43230F; color: #F8D4BE; }
   :root:not([data-theme="light"]) .notice-closure { background: #41161E; color: #F5C9D1; }
 }
+
+/* QR-код похода */
+.hike-qr { margin: .8rem 0; padding: .6rem .9rem; border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface); }
+.hike-qr summary { cursor: pointer; font-weight: 600; }
+.hike-qr img { display: block; margin: .6rem 0; background: #fff; border-radius: var(--radius-s); }
+.qr-stats { color: var(--ink-2); }

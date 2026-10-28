@@ -3,7 +3,7 @@
 import { Fragment, h } from "../vendor/preact/index.js";
 import { useState } from "../vendor/preact/hooks.js";
 import { del, get, patch, post, saveFile } from "./api.js";
-import { navigate } from "./router.js";
+import { navigate, query } from "./router.js";
 import { RouteCard } from "./routes.js";
 import { Weather } from "./weather.js";
 import { Rides } from "./rides.js";
@@ -11,6 +11,7 @@ import { useMe } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, RichText, Time, UserLink, useLoad } from "./ui.js";
 import { ReviewForm } from "./reviews.js";
 import { NoticeBanner } from "./notices.js";
+import { HikeQR } from "./qrcard.js";
 export const difficulties = ["", "Лёгкий", "Средний", "Сложный", "Очень сложный", "Экстремальный"];
 const dateFmt = new Intl.DateTimeFormat("ru", { weekday: "short", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 const when = (iso) => dateFmt.format(new Date(iso));
@@ -124,7 +125,7 @@ export function EventPage({ id }) {
                     h("a", { href: `/c/${e.community.slug}` }, e.community.name)))),
         h("div", { class: "event-actions" },
             e.my_status && h("span", { class: `pill st-${e.my_status}` }, statusText(e)),
-            !e.my_status && (h("form", { class: "join", onSubmit: (x) => { x.preventDefault(); act(() => post(`/events/${id}/rsvp`, { status: "going", note })); } },
+            !e.my_status && (h("form", { class: "join", onSubmit: (x) => { x.preventDefault(); act(() => post(`/events/${id}/rsvp`, { status: "going", note, ...(query("from") === "qr" ? { source: "qr" } : {}) })); } },
                 e.approval && h("label", null,
                     "\u041F\u0430\u0440\u0430 \u0441\u043B\u043E\u0432 \u043E\u0440\u0433\u0430\u043D\u0438\u0437\u0430\u0442\u043E\u0440\u0443: \u043E\u043F\u044B\u0442, \u0441\u043D\u0430\u0440\u044F\u0436\u0435\u043D\u0438\u0435",
                     h("textarea", { value: note, maxLength: 500, rows: 2, onInput: (x) => setNote(x.target.value) })),
@@ -138,6 +139,7 @@ export function EventPage({ id }) {
             isOrganizer && h("button", { class: "ghost danger", onClick: () => confirm("Удалить поход? Участники его больше не увидят.") && act(async () => { await del(`/events/${id}`); navigate("/hikes"); }) }, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C")),
         h(ErrorLine, { error: error }),
         h(NoticeBanner, { notices: e.notices }),
+        h(HikeQR, { id: id, title: e.title, organizer: isOrganizer }),
         e.can_review && h("section", { class: "hike-review" },
             h("h2", null, "\u041A\u0430\u043A \u043F\u0440\u043E\u0448\u0451\u043B \u043F\u043E\u0445\u043E\u0434?"),
             h(ReviewForm, { path: `/events/${id}/review`, initial: e.my_review ?? null, label: "\u041E\u0446\u0435\u043D\u0438\u0442\u0435 \u043F\u043E\u0445\u043E\u0434 \u0438 \u043E\u0440\u0433\u0430\u043D\u0438\u0437\u0430\u0442\u043E\u0440\u0430", onSaved: ev.reload })),
