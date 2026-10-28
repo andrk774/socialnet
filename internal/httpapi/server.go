@@ -236,7 +236,10 @@ func (s *Server) Router() http.Handler {
 				r.Post("/email/verify", s.handleVerifyEmail)
 				r.Post("/password/forgot", s.handleForgotPassword)
 				r.Post("/password/reset", s.handleResetPassword)
+				r.Post("/qr/start", s.handleQRLoginStart)
 			})
+			// опрос входа по QR: раз в 2 секунды до 2 минут — свой лимит, мягче входа по паролю
+			r.With(limitMiddleware(s.limiter("qrpoll", 2, 20))).Post("/auth/qr/poll", s.handleQRLoginPoll)
 
 			// OAuth 2.0: обмен кода на токен и отзыв (RFC 7009) — без входа, по client_id.
 			r.Route("/oauth", func(r chi.Router) {
@@ -250,6 +253,10 @@ func (s *Server) Router() http.Handler {
 
 				// профиль и приватность
 				r.Get("/users/me", s.handleMe)
+				// вход по QR-коду на другом устройстве (только из сеанса, не токеном приложения)
+				r.Get("/qr-login/{id}", s.handleQRLoginInfo)
+				r.Post("/qr-login/{id}/approve", s.handleQRLoginDecide(true))
+				r.Post("/qr-login/{id}/reject", s.handleQRLoginDecide(false))
 				r.Patch("/users/me", s.handleUpdateMe)
 				r.Delete("/users/me", s.handleDeleteAccount)
 				r.Get("/users/me/consents", s.handleConsents)

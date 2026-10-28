@@ -107,7 +107,7 @@ function UsersTab() {
         next ? h("button", { class: "ghost more", onClick: more }, "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0435\u0449\u0451") : null));
 }
 const eventLabel = {
-    register: "Регистрация", login: "Вход", login_new_device: "Вход с нового устройства", login_failed: "Неудачный вход",
+    register: "Регистрация", login: "Вход", login_new_device: "Вход с нового устройства", login_failed: "Неудачный вход", qr_login_approved: "Подтвердил вход по QR-коду",
     "2fa_failed": "Неверный код 2FA", "2fa_enabled": "Включена 2FA", "2fa_disabled": "Отключена 2FA",
     backup_code_used: "Вход по резервному коду", backup_codes_regenerated: "Новые резервные коды",
     password_changed: "Смена пароля", password_reset: "Пароль сброшен по ссылке", admin_password_reset: "Админ отправил ссылку для сброса пароля",

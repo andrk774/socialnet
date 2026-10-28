@@ -600,3 +600,11 @@ img.emoji { vertical-align: -4px; object-fit: contain; display: inline-block; }
 .hike-qr summary { cursor: pointer; font-weight: 600; }
 .hike-qr img { display: block; margin: .6rem 0; background: #fff; border-radius: var(--radius-s); }
 .qr-stats { color: var(--ink-2); }
+
+/* вход по QR-коду */
+.qr-login { display: grid; gap: .6rem; justify-items: start; }
+.qr-login h2 { margin: 0; font-size: var(--step-1); }
+.qr-login ol { margin: 0; padding-left: 1.2rem; }
+.qr-login img { background: #fff; border-radius: var(--radius-s); border: 1px solid var(--line); }
+.qr-approve .warn { padding: .7rem .9rem; border-radius: var(--radius-m); background: #FFF6E0; color: #4A3A12; border-left: 4px solid #C98A0B; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .qr-approve .warn { background: #3A3016; color: #F3E3B8; } }

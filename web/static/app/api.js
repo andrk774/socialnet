@@ -97,6 +97,14 @@ export async function register(fields) {
     const r = await api("POST", "/auth/register", fields);
     setToken(r.access_token);
 }
+export const qrLoginStart = () => api("POST", "/auth/qr/start");
+export async function qrLoginPoll(id, poll_token) {
+    const r = await api("POST", "/auth/qr/poll", { id, poll_token });
+    if (!r.access_token)
+        return false;
+    setToken(r.access_token);
+    return true;
+}
 export async function logout() {
     try {
         await api("POST", "/auth/logout");

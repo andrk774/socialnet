@@ -26,6 +26,7 @@ import { RecordPage } from "./record.js";
 import { SearchPage } from "./search.js";
 import { Showcase } from "./landing.js";
 import { setupNative } from "./native.js";
+import { QRApprovePage } from "./qrlogin.js";
 
 function routes(path: string, onRead: () => void, myId: number): ComponentChildren {
   let p;
@@ -46,6 +47,7 @@ function routes(path: string, onRead: () => void, myId: number): ComponentChildr
   if ((p = match("/routes/:id/print", path))) return <PrintPage routeId={p.id} />;
   if (match("/offline", path)) return <OfflinePage />;
   if (match("/record", path)) return <RecordPage />;
+  if (match("/qr-login", path)) return <QRApprovePage />;
   if (match("/articles", path)) return <ArticlesPage />;
   if (match("/rides", path)) return <RidesPage />;
   if (match("/feeds", path)) return <AntennasPage />;
