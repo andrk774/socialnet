@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"mime"
 	"net"
+	"net/mail"
 	"net/smtp"
 	"strings"
 	"sync"
@@ -37,12 +38,16 @@ func (s *SMTP) Send(ctx context.Context, m Message) error {
 	if strings.ContainsAny(m.To, "\r\n") || strings.ContainsAny(m.Subject, "\r\n") {
 		return fmt.Errorf("invalid header value")
 	}
+	envelope, header, err := splitFrom(s.From)
+	if err != nil {
+		return err
+	}
 	host, _, _ := net.SplitHostPort(s.Addr)
 	var auth smtp.Auth
 	if s.User != "" {
 		auth = smtp.PlainAuth("", s.User, s.Password, host)
 	}
-	msg := "From: " + s.From + "\r\n" +
+	msg := "From: " + header + "\r\n" +
 		"To: " + m.To + "\r\n" +
 		"Subject: " + mime.QEncoding.Encode("utf-8", m.Subject) + "\r\n" +
 		"Date: " + time.Now().Format(time.RFC1123Z) + "\r\n" +
@@ -52,13 +57,28 @@ func (s *SMTP) Send(ctx context.Context, m Message) error {
 		strings.ReplaceAll(m.Body, "\n", "\r\n")
 
 	done := make(chan error, 1)
-	go func() { done <- smtp.SendMail(s.Addr, auth, s.From, []string{m.To}, []byte(msg)) }()
+	go func() { done <- smtp.SendMail(s.Addr, auth, envelope, []string{m.To}, []byte(msg)) }()
 	select {
 	case err := <-done:
 		return err
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+// splitFrom разбирает MAIL_FROM («Socialnet <no-reply@example.com>» или
+// просто адрес): в SMTP-команду MAIL FROM идёт только адрес — с именем
+// сервер отвечает «501 invalid FROM parameter», — а в заголовок From —
+// имя и адрес, имя закодировано по RFC 2047.
+func splitFrom(from string) (envelope, header string, err error) {
+	if strings.ContainsAny(from, "\r\n") {
+		return "", "", fmt.Errorf("invalid MAIL_FROM")
+	}
+	addr, err := mail.ParseAddress(from)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid MAIL_FROM %q: %w", from, err)
+	}
+	return addr.Address, addr.String(), nil
 }
 
 // Log пишет письма в лог вместо отправки — для разработки без SMTP.
