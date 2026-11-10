@@ -124,33 +124,42 @@ func (s *Server) handlePlusSettings(w http.ResponseWriter, r *http.Request) {
 	s.handlePlus(w, r)
 }
 
-// RunPlusRenewals продлевает подписки с автопродлением. Ключ идемпотентности
-// привязан к дате окончания: за один период — одно списание, сколько бы
-// экземпляров API ни запускали продление.
+// RunPlusRenewals продлевает подписки с автопродлением. За один период —
+// одно списание, сколько бы экземпляров API ни запускали продление: срок
+// перепроверяется под блокировкой (store.RenewPlus). Сбой у одного
+// пользователя не останавливает продление остальных.
 func (s *Server) RunPlusRenewals(ctx context.Context) error {
 	ids, err := s.store.DueRenewals(ctx, 200)
 	if err != nil {
 		return err
 	}
+	var errs []error
 	for _, u := range ids {
-		p, err := s.store.PlusStatus(ctx, u)
-		if err != nil || p.ExpiresAt == nil {
-			return err
-		}
-		key := fmt.Sprintf("plus-renew-%s", p.ExpiresAt.UTC().Format("20060102T1504"))
-		_, _, err = s.store.BuyPlus(ctx, u, s.cfg.PlusPrice, plusDays, key)
-		switch {
-		case errors.Is(err, store.ErrInsufficientFunds), errors.Is(err, store.ErrWalletDebt):
-			if err := s.store.SetPlusAutoRenew(ctx, u, false); err != nil {
-				return err
+		if err := s.renewPlus(ctx, u); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
 			}
-			s.notify(ctx, store.NewNotification{UserID: u, Type: "plus_renew_failed"})
-		case err != nil:
-			return err
-		default:
-			s.notify(ctx, store.NewNotification{UserID: u, Type: "plus_renewed"})
+			errs = append(errs, fmt.Errorf("user %d: %w", u, err))
 		}
 	}
+	return errors.Join(errs...)
+}
+
+func (s *Server) renewPlus(ctx context.Context, u int64) error {
+	_, err := s.store.RenewPlus(ctx, u, s.cfg.PlusPrice, plusDays)
+	switch {
+	case errors.Is(err, store.ErrNotDue):
+		return nil // продлил другой экземпляр или автопродление выключили
+	case errors.Is(err, store.ErrInsufficientFunds), errors.Is(err, store.ErrWalletDebt):
+		if err := s.store.SetPlusAutoRenew(ctx, u, false); err != nil {
+			return err
+		}
+		s.notify(ctx, store.NewNotification{UserID: u, Type: "plus_renew_failed"})
+		return nil
+	case err != nil:
+		return err
+	}
+	s.notify(ctx, store.NewNotification{UserID: u, Type: "plus_renewed"})
 	return nil
 }
 

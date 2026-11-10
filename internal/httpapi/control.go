@@ -138,7 +138,7 @@ func (s *Server) handleReturned(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "only hikes have a control deadline")
 		return
 	}
-	alerted, err := s.store.MarkReturned(r.Context(), e.ID)
+	alerted, err := s.store.MarkReturned(r.Context(), e.ID, allClearMails)
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusConflict, "already_returned", "already marked as returned")
 		return
@@ -148,13 +148,7 @@ func (s *Server) handleReturned(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if alerted != nil {
-		for _, c := range alerted.Contacts {
-			s.sendMail(c.Email, "Отбой: группа «"+alerted.Title+"» вернулась",
-				"Здравствуйте, "+c.Name+"!\n\n"+
-					"Группа похода «"+alerted.Title+"», о которой мы писали вам, отметила, что вернулась ("+uralFmt(time.Now())+").\n"+
-					"Если вы обращались в МЧС, сообщите им, что помощь не нужна.\n\n"+
-					"Ваш адрес удалён с socialnet.\n")
-		}
+		s.kickMail()
 	}
 	s.notifyGoing(r.Context(), e.ID, me, "hike_returned")
 	s.log.Info("hike returned", "event_id", e.ID, "after_alert", alerted != nil)
@@ -171,24 +165,28 @@ func (s *Server) notifyGoing(ctx context.Context, event, actor int64, typ string
 	s.notifyEvent(ctx, ids, typ, actor, event)
 }
 
-// RunControl — напоминания, тревоги и очистка контактов (вызывается планировщиком).
+// RunControl — тревоги, напоминания и очистка контактов (вызывается
+// планировщиком). Тревоги — первыми: сбой на напоминаниях не должен
+// задерживать письма тем, кто ждёт группу.
 func (s *Server) RunControl(ctx context.Context) error {
+	alerts, err := s.store.DueAlerts(ctx, s.alertMails)
+	if err != nil {
+		return err
+	}
+	if len(alerts) > 0 {
+		s.kickMail()
+	}
+	for _, e := range alerts {
+		s.notifyEvent(ctx, e.Participants, "hike_alert_sent", 0, e.ID)
+		s.log.Warn("hike control deadline missed, alerts queued", "event_id", e.ID, "contacts", len(e.Contacts))
+		s.m.business.Inc("hike_alert")
+	}
 	reminders, err := s.store.DueReminders(ctx)
 	if err != nil {
 		return err
 	}
 	for _, e := range reminders {
 		s.notifyEvent(ctx, e.Participants, "hike_control_soon", 0, e.ID)
-	}
-	alerts, err := s.store.DueAlerts(ctx)
-	if err != nil {
-		return err
-	}
-	for _, e := range alerts {
-		s.sendAlerts(e)
-		s.notifyEvent(ctx, e.Participants, "hike_alert_sent", 0, e.ID)
-		s.log.Warn("hike control deadline missed, alerts sent", "event_id", e.ID, "contacts", len(e.Contacts))
-		s.m.business.Inc("hike_alert")
 	}
 	if n, err := s.store.CleanupHikeContacts(ctx); err != nil {
 		return err
@@ -198,7 +196,22 @@ func (s *Server) RunControl(ctx context.Context) error {
 	return nil
 }
 
-func (s *Server) sendAlerts(e *store.ControlEvent) {
+// allClearMails — «отбой» тем, кому ушла тревога.
+func allClearMails(e *store.ControlEvent) []store.OutboxMail {
+	var out []store.OutboxMail
+	for _, c := range e.Contacts {
+		out = append(out, store.OutboxMail{To: c.Email, Subject: "Отбой: группа «" + e.Title + "» вернулась",
+			Body: "Здравствуйте, " + c.Name + "!\n\n" +
+				"Группа похода «" + e.Title + "», о которой мы писали вам, отметила, что вернулась (" + uralFmt(time.Now()) + ").\n" +
+				"Если вы обращались в МЧС, сообщите им, что помощь не нужна.\n\n" +
+				"Ваш адрес удалён с socialnet.\n"})
+	}
+	return out
+}
+
+// alertMails — тревожные письма доверенным контактам.
+func (s *Server) alertMails(e *store.ControlEvent) []store.OutboxMail {
+	var out []store.OutboxMail
 	where := e.RouteTitle
 	if e.Place != "" {
 		if where != "" {
@@ -231,6 +244,7 @@ func (s *Server) sendAlerts(e *store.ControlEvent) {
 			"  — страница похода: " + s.cfg.AppURL + "/events/" + fmt.Sprint(e.ID) + "\n\n" +
 			"Когда группа отметит возвращение, мы напишем вам ещё раз.\n\n" +
 			"Если вы не знаете этого человека, просто проигнорируйте письмо: ваш адрес будет удалён в течение 7 дней.\n"
-		s.sendMail(c.Email, "Контрольный срок: группа «"+e.Title+"» не отметилась", body)
+		out = append(out, store.OutboxMail{To: c.Email, Subject: "Контрольный срок: группа «" + e.Title + "» не отметилась", Body: body})
 	}
+	return out
 }

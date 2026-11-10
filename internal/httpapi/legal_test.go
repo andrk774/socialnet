@@ -105,6 +105,19 @@ func TestDeleteAccount(t *testing.T) {
 	clubID := int64(club["id"].(float64))
 	bob.req("POST", p("/communities/%d/join", clubID), nil, 204)
 	empty := anna.req("POST", p("/communities"), map[string]any{"slug": "anna_empty", "name": "Пусто"}, 201)
+
+	// следы Анны на записи Боба: лайк, голос, комментарий с ответом Боба, ответ в ветке Боба
+	bpost := bob.req("POST", p("/posts"), map[string]any{"text": "Идём в субботу", "poll": map[string]any{
+		"question": "Во сколько?", "options": []string{"В 7", "В 9"}}}, 201)
+	bpid := idOf(bpost)
+	opt := int64(bpost["poll"].(map[string]any)["options"].([]any)[0].(map[string]any)["id"].(float64))
+	anna.req("POST", p("/posts/%d/reactions", bpid), map[string]any{"reaction": "like"}, 200)
+	anna.req("POST", p("/posts/%d/poll/votes", bpid), map[string]any{"option_ids": []int64{opt}}, 200)
+	annaRoot := anna.req("POST", p("/posts/%d/comments", bpid), map[string]any{"text": "Я с вами"}, 201)
+	bob.req("POST", p("/posts/%d/comments", bpid), map[string]any{"text": "Отлично", "reply_to_id": idOf(annaRoot)}, 201)
+	bobRoot := bob.req("POST", p("/posts/%d/comments", bpid), map[string]any{"text": "Берите воду"}, 201)
+	anna.req("POST", p("/posts/%d/comments", bpid), map[string]any{"text": "Возьму", "reply_to_id": idOf(bobRoot)}, 201)
+
 	anna.req("DELETE", p("/users/me"), map[string]any{"password": "wrong-password"}, 403)
 
 	anna.req("DELETE", p("/users/me"), map[string]any{"password": "password-anna"}, 204)
@@ -115,8 +128,10 @@ func TestDeleteAccount(t *testing.T) {
 	}
 	// профиль и записи пропали, файл трека стёрт
 	bob.req("GET", p("/users/%d", anna.ID), nil, 404)
-	if n := len(items(bob.req("GET", p("/feed"), nil, 200))); n != 0 {
-		t.Fatalf("deleted user's posts in feed: %d", n)
+	for _, it := range items(bob.req("GET", p("/feed"), nil, 200)) {
+		if author := it.(map[string]any)["author"].(map[string]any); int64(author["id"].(float64)) == anna.ID {
+			t.Fatalf("deleted user's post in feed: %v", it)
+		}
 	}
 	if _, err := os.Stat(gpxPath); !os.IsNotExist(err) {
 		t.Errorf("route file not deleted: %v", err)
@@ -138,6 +153,23 @@ func TestDeleteAccount(t *testing.T) {
 		t.Fatalf("club not handed over: %v", got)
 	}
 	bob.req("GET", p("/communities/%d", int64(empty["id"].(float64))), nil, 404)
+	// счётчики на записи Боба не врут: остался только корень Боба без ответов
+	var likes, comments, voters, votes, replies int
+	if err := srv.store.Pool().QueryRow(t.Context(), `
+		SELECT p.likes_count, p.comments_count, pl.voters_count,
+		       (SELECT sum(votes_count) FROM poll_options WHERE poll_id = pl.id),
+		       (SELECT replies_count FROM comments WHERE id = $2)
+		FROM posts p JOIN polls pl ON pl.post_id = p.id WHERE p.id = $1`, bpid, idOf(bobRoot)).
+		Scan(&likes, &comments, &voters, &votes, &replies); err != nil {
+		t.Fatal(err)
+	}
+	if likes != 0 || comments != 1 || voters != 0 || votes != 0 || replies != 0 {
+		t.Fatalf("counters after deletion: likes=%d comments=%d voters=%d votes=%d replies=%d",
+			likes, comments, voters, votes, replies)
+	}
+	if n := len(items(bob.req("GET", p("/posts/%d/comments", bpid), nil, 200))); n != 1 {
+		t.Fatalf("comments listed: %d", n)
+	}
 	// почту можно занять снова
 	c := newClient(t, ts.URL)
 	if code, out := c.do("POST", "/api/v1/auth/register", "", map[string]any{"email": "anna@example.com", "username": "anna",

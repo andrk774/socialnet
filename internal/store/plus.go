@@ -49,11 +49,7 @@ func (s *Store) BuyPlus(ctx context.Context, user, price int64, days int, idem s
 		if err != nil || rec.Replayed {
 			return err
 		}
-		_, err = tx.Exec(ctx, `
-			INSERT INTO subscriptions (user_id, expires_at) VALUES ($1, now() + make_interval(days => $2))
-			ON CONFLICT (user_id) DO UPDATE SET
-				expires_at = GREATEST(subscriptions.expires_at, now()) + make_interval(days => $2), updated_at = now()`, user, days)
-		return err
+		return extendPlus(ctx, tx, user, days)
 	})
 	if _, dup := isUnique(err); dup && idem != "" {
 		rec, err = s.replay(ctx, Transfer{Kind: "subscription", Amount: price, Initiator: user, IdemKey: idem})
@@ -63,6 +59,55 @@ func (s *Store) BuyPlus(ctx context.Context, user, price int64, days int, idem s
 	}
 	p, err := s.PlusStatus(ctx, user)
 	return rec, p, err
+}
+
+func extendPlus(ctx context.Context, tx pgx.Tx, user int64, days int) error {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO subscriptions (user_id, expires_at) VALUES ($1, now() + make_interval(days => $2))
+		ON CONFLICT (user_id) DO UPDATE SET
+			expires_at = GREATEST(subscriptions.expires_at, now()) + make_interval(days => $2), updated_at = now()`, user, days)
+	return err
+}
+
+// ErrNotDue: продлевать не нужно — автопродление выключено или подписку уже
+// продлил другой экземпляр API.
+var ErrNotDue = errors.New("renewal not due")
+
+// RenewPlus — автопродление. Пора ли продлевать, решается под блокировкой
+// строки подписки в той же транзакции, что и списание: второй экземпляр API,
+// дождавшись блокировки, увидит уже продлённую подписку и вернёт ErrNotDue.
+// (Раньше срок читался до списания, и второй экземпляр, прочитав новый срок,
+// получал новый ключ идемпотентности и списывал цену ещё раз.)
+func (s *Store) RenewPlus(ctx context.Context, user, price int64, days int) (*TxRecord, error) {
+	var rec *TxRecord
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
+		var exp time.Time
+		var due bool
+		err := tx.QueryRow(ctx, `
+			SELECT expires_at, auto_renew AND expires_at < now() + interval '1 hour' AND expires_at > now() - interval '3 days'
+			FROM subscriptions WHERE user_id = $1 FOR UPDATE`, user).Scan(&exp, &due)
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && !due) {
+			return ErrNotDue
+		}
+		if err != nil {
+			return err
+		}
+		// ключ привязан к сроку, который продлеваем: за период — одно списание
+		key := "plus-renew-" + exp.UTC().Format("20060102T1504")
+		rec, err = transferTx(ctx, tx, Transfer{Kind: "subscription", From: UserAccount(user), To: SystemAccount,
+			Amount: price, Memo: "Подписка «Плюс» на " + strconv.Itoa(days) + " дней (автопродление)", Initiator: user, IdemKey: key})
+		if err != nil {
+			return err
+		}
+		if rec.Replayed { // этот период уже оплачен
+			return ErrNotDue
+		}
+		return extendPlus(ctx, tx, user, days)
+	})
+	if _, dup := isUnique(err); dup {
+		return nil, ErrNotDue
+	}
+	return rec, err
 }
 
 func (s *Store) SetPlusAutoRenew(ctx context.Context, user int64, on bool) error {

@@ -101,6 +101,40 @@ func (s *Store) DeleteAccount(ctx context.Context, id int64) (DeletedFiles, erro
 		if err := collect(`DELETE FROM videos WHERE owner_id = $1 RETURNING id::text`, &f.Videos); err != nil {
 			return err
 		}
+		// Счётчики приложение ведёт само (без триггеров), поэтому перед
+		// удалением строк вычитаем из них то, что исчезнет: лайки, голоса и
+		// комментарии на чужих записях. Вместе с корневыми комментариями
+		// каскадом уходят и ответы на них — их тоже вычитаем. GREATEST —
+		// чтобы уже разошедшийся счётчик не сорвал удаление проверкой >= 0.
+		for _, q := range []string{
+			`UPDATE posts p SET likes_count = GREATEST(p.likes_count - x.n, 0)
+			 FROM (SELECT post_id, count(*) AS n FROM post_likes WHERE user_id = $1 GROUP BY post_id) x
+			 WHERE p.id = x.post_id`,
+			`WITH gone AS (
+				SELECT c.post_id, c.parent_id FROM comments c
+				WHERE c.deleted_at IS NULL
+				  AND (c.author_id = $1 OR c.parent_id IN (SELECT id FROM comments WHERE author_id = $1))
+			 ), roots AS (
+				UPDATE comments r SET replies_count = GREATEST(r.replies_count - x.n, 0)
+				FROM (SELECT parent_id, count(*) AS n FROM gone WHERE parent_id IS NOT NULL GROUP BY parent_id) x
+				WHERE r.id = x.parent_id AND r.author_id <> $1
+			 )
+			 UPDATE posts p SET comments_count = GREATEST(p.comments_count - x.n, 0)
+			 FROM (SELECT post_id, count(*) AS n FROM gone GROUP BY post_id) x
+			 WHERE p.id = x.post_id`,
+			`WITH v AS (SELECT poll_id, option_id FROM poll_votes WHERE user_id = $1),
+			 opts AS (
+				UPDATE poll_options o SET votes_count = GREATEST(o.votes_count - x.n, 0)
+				FROM (SELECT option_id, count(*) AS n FROM v GROUP BY option_id) x
+				WHERE o.id = x.option_id
+			 )
+			 UPDATE polls pl SET voters_count = GREATEST(pl.voters_count - 1, 0)
+			 WHERE pl.id IN (SELECT DISTINCT poll_id FROM v)`,
+		} {
+			if _, err := tx.Exec(ctx, q, id); err != nil {
+				return fmt.Errorf("fix counters: %w", err)
+			}
+		}
 		for _, q := range []string{
 			`DELETE FROM posts WHERE author_id = $1`,
 			`DELETE FROM comments WHERE author_id = $1`,

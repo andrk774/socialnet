@@ -157,9 +157,13 @@ func (s *Store) loadControlEvent(ctx context.Context, q pgx.Tx, id int64) (*Cont
 	return e, rows.Err()
 }
 
-// MarkReturned: группа вернулась. Если тревога уже ушла — возвращает
-// поход с контактами, чтобы написать «всё в порядке». Контакты удаляются.
-func (s *Store) MarkReturned(ctx context.Context, id int64) (alerted *ControlEvent, err error) {
+// ComposeMails — письма по походу; вызывается внутри транзакции, письма
+// попадают в очередь (mail_outbox) вместе с отметкой о тревоге или отбое.
+type ComposeMails func(*ControlEvent) []OutboxMail
+
+// MarkReturned: группа вернулась. Если тревога уже ушла — ставит в очередь
+// письма «всё в порядке» (compose) и возвращает поход. Контакты удаляются.
+func (s *Store) MarkReturned(ctx context.Context, id int64, compose ComposeMails) (alerted *ControlEvent, err error) {
 	err = s.inTx(ctx, func(tx pgx.Tx) error {
 		var wasAlerted bool
 		err := tx.QueryRow(ctx, `
@@ -175,6 +179,9 @@ func (s *Store) MarkReturned(ctx context.Context, id int64) (alerted *ControlEve
 			if alerted, err = s.loadControlEvent(ctx, tx, id); err != nil {
 				return err
 			}
+			if err := enqueueMails(ctx, tx, compose(alerted)); err != nil {
+				return err
+			}
 		}
 		_, err = tx.Exec(ctx, `DELETE FROM hike_contacts WHERE event_id = $1`, id)
 		return err
@@ -184,7 +191,9 @@ func (s *Store) MarkReturned(ctx context.Context, id int64) (alerted *ControlEve
 
 // claimControl отмечает и возвращает походы, подошедшие под условие.
 // UPDATE … RETURNING атомарен: при нескольких экземплярах API письмо уйдёт один раз.
-func (s *Store) claimControl(ctx context.Context, set, where string) ([]*ControlEvent, error) {
+// Письма compose (если задан) ставятся в очередь в той же транзакции:
+// отметка без писем или письма без отметки невозможны.
+func (s *Store) claimControl(ctx context.Context, set, where string, compose ComposeMails) ([]*ControlEvent, error) {
 	var out []*ControlEvent
 	err := s.inTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `UPDATE events SET `+set+` = now()
@@ -202,6 +211,11 @@ func (s *Store) claimControl(ctx context.Context, set, where string) ([]*Control
 			if err != nil {
 				return err
 			}
+			if compose != nil {
+				if err := enqueueMails(ctx, tx, compose(e)); err != nil {
+					return err
+				}
+			}
 			out = append(out, e)
 		}
 		return nil
@@ -212,12 +226,13 @@ func (s *Store) claimControl(ctx context.Context, set, where string) ([]*Control
 // DueReminders: за час до срока — напомнить участникам отметиться.
 func (s *Store) DueReminders(ctx context.Context) ([]*ControlEvent, error) {
 	return s.claimControl(ctx, "reminder_sent_at",
-		`reminder_sent_at IS NULL AND control_at > now() AND control_at <= now() + interval '1 hour'`)
+		`reminder_sent_at IS NULL AND control_at > now() AND control_at <= now() + interval '1 hour'`, nil)
 }
 
-// DueAlerts: срок прошёл, группа не отметилась.
-func (s *Store) DueAlerts(ctx context.Context) ([]*ControlEvent, error) {
-	return s.claimControl(ctx, "alert_sent_at", `control_at <= now()`)
+// DueAlerts: срок прошёл, группа не отметилась — письма контактам (compose)
+// ставятся в очередь вместе с отметкой alert_sent_at.
+func (s *Store) DueAlerts(ctx context.Context, compose ComposeMails) ([]*ControlEvent, error) {
+	return s.claimControl(ctx, "alert_sent_at", `control_at <= now()`, compose)
 }
 
 // CleanupHikeContacts: контакты не хранятся дольше нужного.
