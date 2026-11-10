@@ -25,6 +25,51 @@ variables → Actions → Variables):
 Готовый APK — в разделе Artifacts прогона (`socialnet-debug-apk`). Скачайте
 на телефон и установите (разрешите установку из этого источника).
 
+## Запуск на своём телефоне с локальным сайтом
+
+Для разработки приложение можно собрать на компьютере и открыть в нём
+сайт, запущенный тут же в Docker, — без домена и HTTPS. Изменения сайта
+видны в приложении сразу, пересобирать APK не нужно.
+
+Понадобятся: Node.js, Android Studio (из неё берутся Java и Android SDK)
+и запущенный стек (`docker compose up -d` в корне проекта, сайт на
+`http://localhost:8080`).
+
+1. На телефоне: «Сведения о телефоне» → «Сведения о ПО» → семь раз нажать
+   «Номер сборки»; затем «Параметры разработчика» → «Отладка по USB».
+   Подключить кабелем и разрешить отладку с этого компьютера.
+2. Собрать APK. Лучше вне папки, которую синхронизирует облако (OneDrive,
+   Яндекс Диск): сборка создаёт сотни мегабайт временных файлов. Например,
+   скопировать `package.json`, `scripts/` и `www/` в `C:\socialnet-android`
+   и там (PowerShell):
+
+   ```powershell
+   npm install
+   $env:APP_URL = "http://localhost:8080"
+   node scripts/prepare.mjs
+   $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+   $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+   cd android; .\gradlew.bat assembleDebug
+   ```
+
+3. Поставить и связать с компьютером (`adb` — в
+   `%LOCALAPPDATA%\Android\Sdk\platform-tools`):
+
+   ```powershell
+   adb install -r app\build\outputs\apk\debug\app-debug.apk
+   adb reverse tcp:8080 tcp:8080
+   ```
+
+   `adb reverse` направляет `localhost:8080` телефона на компьютер по
+   кабелю; после переподключения кабеля команду нужно повторить.
+
+В эмуляторе Android вместо `adb reverse` укажите
+`APP_URL=http://10.0.2.2:8080` — так эмулятор видит компьютер.
+
+Без HTTPS `prepare.mjs` принимает только `localhost`, `127.0.0.1` и
+`10.0.2.2`: собрать по ошибке боевое приложение без шифрования нельзя.
+Письма сайта (подтверждение почты и т. п.) — в Mailpit: `http://localhost:8025`.
+
 ## Подпись для RuStore
 
 Отладочный APK годится для себя и друзей. Для магазина нужен подписанный

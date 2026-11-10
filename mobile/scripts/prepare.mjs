@@ -6,7 +6,7 @@
 // обновления сайта приходят без новой версии APK. Своё в приложении —
 // фоновая запись трека (плагин background-geolocation): GPS пишет и при
 // выключенном экране, с уведомлением «Идёт запись трека».
-import { execFileSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,8 +14,12 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const env = process.env;
 const appURL = (env.APP_URL || "").replace(/\/+$/, "");
-if (!/^https:\/\/[^/]+$/.test(appURL)) {
-  console.error("APP_URL: адрес сайта вида https://example.ru (без пути)");
+// Разработка: сайт на этом компьютере по HTTP — на телефоне через
+// `adb reverse tcp:8080 tcp:8080` (http://localhost:8080), в эмуляторе —
+// http://10.0.2.2:8080. Любой другой адрес — только HTTPS.
+const devURL = /^http:\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2)(:\d+)?$/.test(appURL);
+if (!devURL && !/^https:\/\/[^/]+$/.test(appURL)) {
+  console.error("APP_URL: адрес сайта вида https://example.ru (без пути); для разработки — http://localhost:8080");
   process.exit(2);
 }
 const host = new URL(appURL).host;
@@ -28,12 +32,18 @@ const config = {
   appId,
   appName,
   webDir: "www",
-  server: { url: appURL, androidScheme: "https", allowNavigation: [host], errorPath: "index.html" },
+  server: { url: appURL, androidScheme: "https", allowNavigation: [host], errorPath: "index.html", ...(devURL ? { cleartext: true } : {}) },
   android: { allowMixedContent: false },
 };
 writeFileSync(join(root, "capacitor.config.json"), JSON.stringify(config, null, 2) + "\n");
 
-const run = (...args) => execFileSync("npx", ["--no-install", ...args], { cwd: root, stdio: "inherit" });
+// В Windows npx — это npx.cmd, а .cmd Node запускает только через оболочку:
+// там команда идёт одной строкой (аргументы постоянные, подстановок из
+// окружения нет).
+const run = (...args) =>
+  process.platform === "win32"
+    ? execSync(["npx", "--no-install", ...args].join(" "), { cwd: root, stdio: "inherit" })
+    : execFileSync("npx", ["--no-install", ...args], { cwd: root, stdio: "inherit" });
 if (!existsSync(join(root, "android"))) run("cap", "add", "android");
 
 const edit = (rel, fn) => {
@@ -101,4 +111,4 @@ android {
 });
 
 run("cap", "sync", "android");
-console.log(`android/ готов: ${appName} (${appId}) ${versionName}, сайт ${appURL}`);
+console.log(`android/ готов: ${appName} (${appId}) ${versionName}, сайт ${appURL}${devURL ? " (разработка: HTTP без шифрования)" : ""}`);
