@@ -20,8 +20,12 @@ async function newUser(name, viewport = { width: 1280, height: 860 }) {
   // включая нарушения CSP («Refused to …»), считается ошибкой
   page.on("console", (m) => { if (m.type() === "error" && !m.text().startsWith("Failed to load resource")) problems.push(`${name}: console: ${m.text()}`); });
   page.on("pageerror", (e) => problems.push(`${name}: pageerror: ${e.message}`));
-  // тайлы, которые карта уже не показывает, Leaflet отменяет сам — это не ошибка
-  page.on("requestfailed", (r) => { if (!r.url().includes("/api/v1/ws") && !(r.url().includes("/tiles/") && r.failure()?.errorText === "net::ERR_ABORTED")) problems.push(`${name}: failed ${r.method()} ${r.url()} ${r.failure()?.errorText}`); });
+  // Отменённое браузером — не ошибка: тайлы, которые карта уже не показывает,
+  // Leaflet отменяет сам; обновление токена при загрузке обрывается переходом
+  // на другую страницу, и сервер на этот случай принимает старый токен
+  // ещё минуту (store.RefreshReuseGrace), так что сеанс не теряется.
+  const benignAbort = (r) => r.failure()?.errorText === "net::ERR_ABORTED" && (r.url().includes("/tiles/") || r.url().endsWith("/api/v1/auth/refresh"));
+  page.on("requestfailed", (r) => { if (!r.url().includes("/api/v1/ws") && !benignAbort(r)) problems.push(`${name}: failed ${r.method()} ${r.url()} ${r.failure()?.errorText}`); });
   await page.goto(base + "/");
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
   await page.getByLabel("Имя", { exact: true }).fill(name === "anna" ? "Анна" : "Борис");

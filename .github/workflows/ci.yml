@@ -72,8 +72,11 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+      # Playwright — точная версия: с ней приходит конкретный Chromium, и новый
+      # браузер не меняет поведение теста сам по себе (1.65 принёс Chromium 158,
+      # который сообщает об отменённых переходом запросах как об ошибке).
       - run: |
-          npm install -g typescript@6.0.3 playwright@1
+          npm install -g typescript@6.0.3 playwright@1.65.0
           echo "NODE_PATH=$(npm root -g)" >> "$GITHUB_ENV"
       - name: Собранный фронтенд соответствует исходникам
         run: cd web && tsc -p . && git diff --exit-code static/app

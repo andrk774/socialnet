@@ -117,7 +117,7 @@ func (c *testClient) do(method, path, token string, body any) (int, map[string]a
 }
 
 func TestAuthFlow(t *testing.T) {
-	ts := setup(t, 1000)
+	ts, srv, _ := setupFull(t, 1000)
 	c := newClient(t, ts.URL)
 
 	reg := map[string]any{
@@ -202,7 +202,23 @@ func TestAuthFlow(t *testing.T) {
 		t.Fatal("refresh token not rotated")
 	}
 
-	// Reuse detection: старый токен предъявлен снова — все сессии отзываются
+	// Ответ на refresh не дошёл (переход на другую страницу, обрыв связи) или
+	// две вкладки обновились разом: старый токен сразу после замены — не кража
+	lost := newClient(t, ts.URL)
+	lost.http.Jar.SetCookies(u.URL, []*http.Cookie{{Name: refreshCookie, Value: oldCookie, Path: "/api/v1/auth"}})
+	if code, body := lost.do("POST", "/api/v1/auth/refresh", "", nil); code != http.StatusOK {
+		t.Fatalf("refresh retried right after rotation: %d %v", code, body)
+	}
+	if code, _ := c.do("POST", "/api/v1/auth/refresh", "", nil); code != http.StatusOK {
+		t.Fatalf("other tab logged out by a retried refresh: %d", code)
+	}
+
+	// Reuse detection: старый токен предъявлен снова после окна ожидания —
+	// все сессии отзываются
+	if _, err := srv.store.Pool().Exec(t.Context(),
+		`UPDATE refresh_tokens SET replaced_at = replaced_at - interval '2 minutes' WHERE replaced_at IS NOT NULL`); err != nil {
+		t.Fatal(err)
+	}
 	attacker := newClient(t, ts.URL)
 	attacker.http.Jar.SetCookies(u.URL, []*http.Cookie{{Name: refreshCookie, Value: oldCookie, Path: "/api/v1/auth"}})
 	if code, _ := attacker.do("POST", "/api/v1/auth/refresh", "", nil); code != http.StatusUnauthorized {
@@ -222,6 +238,33 @@ func TestAuthFlow(t *testing.T) {
 	resp.Body.Close()
 	if code, _ := c.do("POST", "/api/v1/auth/refresh", "", nil); code != http.StatusUnauthorized {
 		t.Fatalf("refresh after logout: %d", code)
+	}
+	if lostCookie := lost.http.Jar.Cookies(u.URL); len(lostCookie) == 0 {
+		t.Fatal("no cookie after retried refresh")
+	}
+
+	// Выход гасит весь сеанс, включая токен, выданный другой вкладке в окне
+	// ожидания, — и старый токен после выхода сеанс не воскрешает
+	c.do("POST", "/api/v1/auth/login", "", map[string]any{"email": "ivan@example.com", "password": "s3cret-pass"})
+	before := c.http.Jar.Cookies(u.URL)[0].Value
+	c.do("POST", "/api/v1/auth/refresh", "", nil)
+	tab2 := newClient(t, ts.URL)
+	tab2.http.Jar.SetCookies(u.URL, []*http.Cookie{{Name: refreshCookie, Value: before, Path: "/api/v1/auth"}})
+	if code, _ := tab2.do("POST", "/api/v1/auth/refresh", "", nil); code != http.StatusOK {
+		t.Fatalf("second tab refresh: %d", code)
+	}
+	req, _ = http.NewRequest("POST", ts.URL+"/api/v1/auth/logout", nil)
+	if resp, err = c.http.Do(req); err != nil || resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("logout: %v %v", resp, err)
+	}
+	resp.Body.Close()
+	if code, _ := tab2.do("POST", "/api/v1/auth/refresh", "", nil); code != http.StatusUnauthorized {
+		t.Fatalf("other tab survived logout: %d", code)
+	}
+	stale := newClient(t, ts.URL)
+	stale.http.Jar.SetCookies(u.URL, []*http.Cookie{{Name: refreshCookie, Value: before, Path: "/api/v1/auth"}})
+	if code, _ := stale.do("POST", "/api/v1/auth/refresh", "", nil); code != http.StatusUnauthorized {
+		t.Fatalf("logged-out session revived by an old token: %d", code)
 	}
 }
 

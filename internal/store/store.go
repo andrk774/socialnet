@@ -211,9 +211,18 @@ type SessionMeta struct {
 	IP        *netip.Addr
 }
 
+// RefreshReuseGrace — сколько после замены старый refresh-токен ещё
+// принимается. Ответ на /auth/refresh мог не дойти до браузера (переход на
+// другую страницу, обрыв мобильной связи), или две вкладки обновили токен
+// одновременно: тогда браузер снова пришлёт старый токен, и это не кража.
+const RefreshReuseGrace = 60 * time.Second
+
 // RotateRefreshToken гасит старый токен и выдаёт новый в одной транзакции.
 // Если пришёл уже отозванный токен, значит его украли и кто-то им уже
 // воспользовался: отзываем все сессии пользователя (reuse detection).
+// Исключение — повтор в течение RefreshReuseGrace после замены, пока сеанс
+// жив: выдаём ещё один токен того же сеанса. Выданный ранее не гасим — он
+// мог дойти до другой вкладки; весь сеанс гасится выходом (RevokeRefreshToken).
 func (s *Store) RotateRefreshToken(ctx context.Context, oldHash, newHash []byte, ttl time.Duration, meta SessionMeta) (userID int64, sid string, err error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -228,12 +237,17 @@ func (s *Store) RotateRefreshToken(ctx context.Context, oldHash, newHash []byte,
 		replaced  *time.Time
 		started   time.Time
 		bannedAt  *time.Time
+		inGrace   bool // заменён только что, и в сеансе есть живой токен
 	)
 	err = tx.QueryRow(ctx, `
-		SELECT t.id, t.user_id, t.expires_at, t.revoked_at, t.replaced_at, t.session_started_at, t.session_id::text, u.banned_at
+		SELECT t.id, t.user_id, t.expires_at, t.revoked_at, t.replaced_at, t.session_started_at, t.session_id::text, u.banned_at,
+		       COALESCE(t.replaced_at > now() - $2::interval AND EXISTS (
+		           SELECT 1 FROM refresh_tokens live
+		           WHERE live.session_id = t.session_id AND live.revoked_at IS NULL AND live.expires_at > now()), false)
 		FROM refresh_tokens t JOIN users u ON u.id = t.user_id
 		WHERE t.token_hash = $1
-		FOR UPDATE OF t`, oldHash).Scan(&tokenID, &userID, &expiresAt, &revokedAt, &replaced, &started, &sid, &bannedAt)
+		FOR UPDATE OF t`, oldHash, RefreshReuseGrace.String()).
+		Scan(&tokenID, &userID, &expiresAt, &revokedAt, &replaced, &started, &sid, &bannedAt, &inGrace)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return 0, "", ErrTokenInvalid
 	}
@@ -244,7 +258,7 @@ func (s *Store) RotateRefreshToken(ctx context.Context, oldHash, newHash []byte,
 	if revokedAt != nil && replaced == nil {
 		return 0, "", ErrTokenInvalid // вышли или завершили сеанс — это не кража
 	}
-	if revokedAt != nil {
+	if revokedAt != nil && !inGrace {
 		if _, err := tx.Exec(ctx, `
 			UPDATE refresh_tokens SET revoked_at = now()
 			WHERE user_id = $1 AND revoked_at IS NULL`, userID); err != nil {
@@ -259,8 +273,12 @@ func (s *Store) RotateRefreshToken(ctx context.Context, oldHash, newHash []byte,
 		return 0, "", ErrTokenInvalid
 	}
 
-	if _, err := tx.Exec(ctx, `UPDATE refresh_tokens SET revoked_at = now(), replaced_at = now() WHERE id = $1`, tokenID); err != nil {
-		return 0, "", err
+	// В окне ожидания старый токен уже погашен; replaced_at не сдвигаем,
+	// иначе повторами окно можно было бы продлевать бесконечно.
+	if revokedAt == nil {
+		if _, err := tx.Exec(ctx, `UPDATE refresh_tokens SET revoked_at = now(), replaced_at = now() WHERE id = $1`, tokenID); err != nil {
+			return 0, "", err
+		}
 	}
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO refresh_tokens (user_id, token_hash, user_agent, ip, expires_at, session_started_at, session_id)
@@ -271,9 +289,13 @@ func (s *Store) RotateRefreshToken(ctx context.Context, oldHash, newHash []byte,
 	return userID, sid, tx.Commit(ctx)
 }
 
+// RevokeRefreshToken — выход: гасит весь сеанс этого токена, включая токены,
+// выданные в окне ожидания (RefreshReuseGrace) другим вкладкам.
 func (s *Store) RevokeRefreshToken(ctx context.Context, hash []byte) error {
-	_, err := s.pool.Exec(ctx,
-		`UPDATE refresh_tokens SET revoked_at = now() WHERE token_hash = $1 AND revoked_at IS NULL`, hash)
+	_, err := s.pool.Exec(ctx, `
+		UPDATE refresh_tokens SET revoked_at = now()
+		WHERE revoked_at IS NULL AND (token_hash = $1
+		   OR session_id = (SELECT session_id FROM refresh_tokens WHERE token_hash = $1))`, hash)
 	return err
 }
 

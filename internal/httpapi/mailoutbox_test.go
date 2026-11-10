@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
@@ -81,7 +82,10 @@ func TestMailOutboxRetries(t *testing.T) {
 		t.Fatal("sent twice")
 	}
 
-	// письмо старше суток при сбое бросается
+	// письмо старше суток при сбое бросается. Отказ пишется в лог как
+	// ошибка (так и задумано), а обвязка тестов валит тест на любой ошибке
+	// в логе — поэтому здесь лог не проверяем.
+	srv.log = slog.New(slog.DiscardHandler)
 	flaky.mu.Lock()
 	flaky.fail = 1
 	flaky.mu.Unlock()

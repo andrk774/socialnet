@@ -119,8 +119,10 @@ func TestPlusSubscription(t *testing.T) {
 	if b := balance(t, anna); b != 903 { // 102 + 1000 − 199
 		t.Fatalf("renewal charged wrong: %v", b)
 	}
-	// несколько экземпляров API одновременно: одно списание за период
-	if _, err := srv.store.Pool().Exec(t.Context(), `UPDATE subscriptions SET expires_at = now() + interval '10 minutes' WHERE user_id = $1`, anna.ID); err != nil {
+	// несколько экземпляров API одновременно: одно списание за период.
+	// Срок — в другой минуте, чем у прошлого продления: ключ идемпотентности
+	// привязан к сроку с точностью до минуты, иначе период уже «оплачен».
+	if _, err := srv.store.Pool().Exec(t.Context(), `UPDATE subscriptions SET expires_at = now() + interval '30 minutes' WHERE user_id = $1`, anna.ID); err != nil {
 		t.Fatal(err)
 	}
 	errs := make(chan error, 4)
