@@ -2,7 +2,7 @@ package httpapi
 
 import (
 	"crypto/hmac"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 -- TURN REST credentials require HMAC-SHA1 for coturn interoperability.
 	"encoding/base64"
 	"errors"
 	"net/http"

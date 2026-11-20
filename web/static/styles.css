@@ -1181,3 +1181,6 @@ dialog.call-overlay{width:100vw;height:100dvh;max-width:none;max-height:none;bor
 .admin-balance legend {font-weight:600; padding:0 8px;}.admin-balance>.primary {margin-top:16px;}
 .admin-subscription { margin:20px 0; padding:18px; background:var(--tint); border-radius:12px; }
 .admin-subscription>div {display:flex; align-items:center; justify-content:space-between; gap:12px;}.admin-subscription h3 {margin:0;}.admin-subscription dl {display:grid;gap:12px;margin:16px 0 0;}.admin-subscription dl>div {display:flex;justify-content:space-between;gap:12px;}.admin-subscription dd {margin:0;text-align:right;}.admin-subscription dt {color:var(--ink-2);}
+
+/* Security actions must fit narrow settings panels. */
+.settings button { max-width:100%; white-space:normal; overflow-wrap:anywhere; }

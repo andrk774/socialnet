@@ -93,7 +93,7 @@ func (s *Server) handlePutAI(w http.ResponseWriter, r *http.Request) {
 	c.APIKey = ""
 	c.ClearKey = false
 	c.KeySet = false
-	raw, _ := json.Marshal(c)
+	raw, _ := json.Marshal(map[string]any{"enabled": c.Enabled, "allow_users": c.AllowUsers, "base_url": c.BaseURL, "text_model": c.TextModel, "image_model": c.ImageModel})
 	_, e = s.store.Pool().Exec(r.Context(), `INSERT INTO ai_settings VALUES(true,$1,$2) ON CONFLICT(id) DO UPDATE SET settings=EXCLUDED.settings,key_enc=EXCLUDED.key_enc`, raw, enc)
 	if e != nil {
 		s.internalError(w, r, e)
@@ -124,7 +124,7 @@ func aiRequest(ctx context.Context, c aiSettings, path string, body any, out any
 	if e != nil {
 		return fmt.Errorf("provider unavailable")
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != 200 {
 		return fmt.Errorf("provider HTTP %d", res.StatusCode)
 	}

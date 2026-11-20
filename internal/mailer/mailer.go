@@ -72,7 +72,7 @@ func (s *SMTP) Send(ctx context.Context, m Message) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	deadline, _ := ctx.Deadline()
 	_ = conn.SetDeadline(deadline)
 	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
@@ -81,7 +81,7 @@ func (s *SMTP) Send(ctx context.Context, m Message) error {
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 	if s.TLSMode == "starttls" || s.TLSMode == "" {
 		if ok, _ := client.Extension("STARTTLS"); ok {
 			if err = client.StartTLS(tlsConfig); err != nil {

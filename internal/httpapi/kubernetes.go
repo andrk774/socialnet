@@ -160,7 +160,7 @@ func kubeClient(endpoint, caFile, tokenFile string) (*http.Client, string, error
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" {
 		return nil, "", fmt.Errorf("invalid endpoint")
 	}
-	ca, err := os.ReadFile(caFile)
+	ca, err := os.ReadFile(caFile) // #nosec G304 -- Path comes only from trusted server configuration.
 	if err != nil {
 		return nil, "", err
 	}
@@ -168,7 +168,7 @@ func kubeClient(endpoint, caFile, tokenFile string) (*http.Client, string, error
 	if !roots.AppendCertsFromPEM(ca) {
 		return nil, "", fmt.Errorf("invalid CA")
 	}
-	token, err := os.ReadFile(tokenFile)
+	token, err := os.ReadFile(tokenFile) // #nosec G304 -- Path comes only from trusted server configuration.
 	if err != nil || len(strings.TrimSpace(string(token))) == 0 {
 		return nil, "", fmt.Errorf("invalid token")
 	}
@@ -177,23 +177,23 @@ func kubeClient(endpoint, caFile, tokenFile string) (*http.Client, string, error
 func kubeRead(ctx context.Context, client *http.Client, endpoint, token string, v any) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
-		return fmt.Errorf("Kubernetes: неверный адрес")
+		return fmt.Errorf("kubernetes: неверный адрес")
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	res, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("Kubernetes: соединение недоступно или истекло время ожидания")
+		return fmt.Errorf("kubernetes: соединение недоступно или истекло время ожидания")
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != 200 {
-		return fmt.Errorf("Kubernetes API: HTTP %d", res.StatusCode)
+		return fmt.Errorf("kubernetes API: HTTP %d", res.StatusCode)
 	}
 	data, err := io.ReadAll(io.LimitReader(res.Body, 4*1024*1024+1))
 	if err != nil || len(data) > 4*1024*1024 {
-		return fmt.Errorf("Kubernetes: ответ слишком большой или не прочитан")
+		return fmt.Errorf("kubernetes: ответ слишком большой или не прочитан")
 	}
 	if json.Unmarshal(data, v) != nil {
-		return fmt.Errorf("Kubernetes: неверный формат ответа")
+		return fmt.Errorf("kubernetes: неверный формат ответа")
 	}
 	return nil
 }

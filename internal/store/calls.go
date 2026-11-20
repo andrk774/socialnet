@@ -26,7 +26,7 @@ func (s *Store) CreateCall(ctx context.Context, caller, callee int64, video bool
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	// Lock both user rows in a stable order: a user cannot take part in two live calls.
 	rows, err := tx.Query(ctx, `SELECT id FROM users WHERE id IN ($1,$2) ORDER BY id FOR UPDATE`, caller, callee)
 	if err != nil {

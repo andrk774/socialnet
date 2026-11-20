@@ -87,7 +87,7 @@ func (s *Store) OrganizePhotos(ctx context.Context, owner int64, ids []string, a
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if album != nil && *album != 0 {
 		var ok bool
 		err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM photo_albums WHERE id=$1 AND owner_id=$2)`, *album, owner).Scan(&ok)
