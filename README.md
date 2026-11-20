@@ -7,6 +7,8 @@
 
 ## Быстрый старт
 
+Для первого запуска следуйте [подробной инструкции](#подробная-инструкция-по-запуску).
+
 ```bash
 cp .env.example .env
 # впишите секреты (каждый: openssl rand -hex 32):
@@ -26,6 +28,190 @@ docker compose --profile monitoring up -d  # + Prometheus и Grafana: http://127
   вывод вставьте в `.env` и перезапустите.
 - Назначить себя администратором:
   `docker compose exec api /api make-admin you@example.com`
+
+## Подробная инструкция по запуску
+
+### 1. Подготовьте компьютер и скачайте проект
+
+Нужны Git и Docker с Compose v2. На Windows запустите Docker Desktop в режиме
+Linux containers. Для запуска готового сайта устанавливать Go и Node.js не нужно:
+сборка приложения выполняется внутри Docker, собранный веб-интерфейс есть в репозитории.
+
+```sh
+git clone https://github.com/andrk774/socialnet.git
+cd socialnet
+docker version
+docker compose version
+```
+
+Если проект уже скачан, используйте его папку. Если socialnet уже работает в
+Kubernetes, переходите к соответствующему разделу ниже: одновременный запуск
+Compose создаст отдельную базу и может занять тот же порт 8080.
+
+### 2. Создайте локальную конфигурацию
+
+На Windows (PowerShell):
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+
+На Linux/macOS:
+
+```sh
+cp .env.example .env
+# Откройте .env в редакторе
+```
+
+Копируйте шаблон только при первом запуске. Существующий `.env` содержит ключи
+ваших данных — не заменяйте его при обновлении.
+
+Установите **разные случайные значения** для `POSTGRES_PASSWORD`, `JWT_SECRET`,
+`TOTP_ENC_KEY`, `REDIS_PASSWORD`, `BACKUP_ENC_KEY`. Для каждого подходит отдельная
+строка из 64 шестнадцатеричных символов. Получить одну строку в PowerShell:
+
+```powershell
+$bytes = New-Object byte[] 32
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+$rng.Dispose()
+([BitConverter]::ToString($bytes)).Replace('-', '').ToLowerInvariant()
+```
+
+На Linux/macOS: `openssl rand -hex 32`. Повторите генерацию для каждого значения.
+Для локального запуска также установите:
+
+```dotenv
+APP_URL=http://localhost:8080
+COOKIE_SECURE=false
+SMTP_HOST=mailpit
+SMTP_PORT=1025
+```
+
+Файл `.env` не публикуется в Git. Сохраните его закрытую резервную копию:
+ключи нужны для расшифровки 2FA, настроек интеграций и резервных копий.
+
+### 3. Соберите и запустите
+
+Из корня проекта:
+
+```sh
+docker compose config -q
+docker compose up -d --build --wait --wait-timeout 300
+docker compose ps
+```
+
+Первый запуск загружает образы и собирает Go-приложение; скорость зависит от сети
+и компьютера. Поднимаются PostgreSQL, Redis, API, обработчик медиа, резервное
+копирование и Mailpit. Миграции БД применяются автоматически.
+
+| Адрес | Назначение |
+|---|---|
+| http://localhost:8080 | Сайт |
+| http://localhost:8080/health | Проверка API; ожидается `{"status":"ok"}` |
+| http://localhost:8080/docs/ | Документация API |
+| http://localhost:8025 | Письма локальных пользователей в Mailpit |
+
+Проверка из PowerShell: `Invoke-RestMethod http://localhost:8080/health`.
+Используйте один и тот же адрес сайта при работе, не переключайтесь между
+`localhost` и `127.0.0.1`: браузер хранит их сеансы отдельно.
+
+### 4. Создайте администратора
+
+Откройте сайт, зарегистрируйте аккаунт и подтвердите email через письмо в Mailpit.
+Затем выполните команду со своей почтой:
+
+```sh
+docker compose exec api /api make-admin you@example.com
+```
+
+Выйдите из аккаунта и войдите снова. Откройте http://localhost:8080/admin.
+В админке можно настроить SMTP, TURN и внешний API ИИ. Для реальной отправки
+писем нужны данные почтового провайдера; локальный Mailpit только показывает письма.
+Для звонков между разными сетями может потребоваться TURN. Сохранение HTTPS-настроек
+в админке само по себе не устанавливает сертификат и не запускает HTTPS-прокси.
+
+### 5. Остановка, повторный запуск и обновление Compose
+
+```sh
+docker compose stop       # остановить, сохранив контейнеры и данные
+docker compose start      # запустить уже созданные контейнеры
+docker compose logs --tail 100 api worker
+```
+
+Перед обновлением сделайте резервную копию БД, медиа и конфигурации. Затем:
+
+```sh
+git pull --ff-only
+docker compose up -d --build --wait --wait-timeout 300
+```
+
+Если Git сообщает о локальных изменениях, сначала сохраните или согласуйте их.
+Не используйте `docker compose down -v` для обычной остановки: этот флаг удаляет
+тома с данными. Смена `POSTGRES_PASSWORD` в `.env` не меняет пароль в уже созданной БД.
+
+### 6. Локальный Kubernetes в Docker Desktop
+
+Для **уже развёрнутого** проекта включите Docker Desktop и дождитесь статуса
+Active у Kubernetes. Проверьте кластер и приложение:
+
+```powershell
+kubectl --context docker-desktop get nodes
+kubectl --context docker-desktop -n socialnet get pods,pvc
+kubectl --context docker-desktop -n socialnet rollout status deployment/socialnet
+kubectl --context docker-desktop -n socialnet port-forward service/socialnet 8080:80
+```
+
+Последнюю команду оставьте работающей в терминале; сайт откроется на
+http://localhost:8080. Если переадресация уже запущена, второй процесс не нужен.
+Остановка `port-forward` закрывает доступ с компьютера, но не останавливает поды.
+
+```powershell
+kubectl --context docker-desktop -n socialnet logs deployment/socialnet -c api --tail=100
+kubectl --context docker-desktop -n socialnet logs deployment/socialnet -c worker --tail=100
+kubectl --context docker-desktop -n socialnet exec deployment/socialnet -c api -- /api make-admin you@example.com
+kubectl --context docker-desktop -n socialnet port-forward deployment/mailpit 8025:8025
+```
+
+Для **пустого кластера** одной команды `apply` недостаточно: сначала подготовьте
+образ, хранилище и Secret с подключениями. См. [развёртывание Kubernetes](deploy/kubernetes/README.md)
+и [локальную конфигурацию Docker Desktop](deploy/kubernetes-local/README.md).
+Локальная конфигурация содержит PostgreSQL, Redis и Mailpit; базовая ожидает внешние
+сервисы. Образ из Docker не обязательно доступен узлу kind: загрузите его в реестр,
+доступный кластеру, либо импортируйте в хранилище образов узла. Используйте уникальный
+тег при каждом обновлении и укажите его в `deploy/kubernetes-local/Kustomization`.
+
+После подготовки образа и Secret:
+
+```powershell
+kubectl --context docker-desktop apply -k deploy/kubernetes-local
+kubectl --context docker-desktop -n socialnet rollout status deployment/socialnet
+```
+
+Не сбрасывайте кластер для обычного обновления: Reset/Delete cluster может удалить
+его локальные тома. Перенос из Compose требует копирования БД, медиа и сохранения ключей.
+
+### 7. Если сайт не запускается
+
+| Проблема | Что проверить |
+|---|---|
+| Не удаётся подключиться к Docker | Docker Desktop запущен, Linux engine готов; выполните `docker version` |
+| Порт 8080 занят | Не работает ли другая копия Compose или `kubectl port-forward` |
+| API не готов | `docker compose ps` и `docker compose logs --tail 100 api db redis` |
+| Фото/видео долго обрабатывается | Логи `worker`, свободное место; вкладка «Система» в админке |
+| Письмо не пришло | При локальном запуске ищите его в Mailpit, а не в личном почтовом ящике |
+| Изменения интерфейса не видны | Образ пересобран, контейнер обновлён; перезагрузите страницу с Ctrl+F5 |
+| Kubernetes: `ImagePullBackOff` | Тег образа, доступ к реестру или наличие образа внутри узла |
+| Kubernetes: `CreateContainerConfigError` | Наличие `socialnet-secrets` и нужных ключей; `kubectl -n socialnet describe pod ИМЯ_ПОДА` |
+| Kubernetes: `Pending` | Состояние PVC и StorageClass; `kubectl -n socialnet get pvc` |
+
+### 8. Публичный сервер и HTTPS
+
+Для доступа из интернета используйте домен, HTTPS и `COOKIE_SECURE=true`.
+Пошаговая установка на сервер описана в разделе [«На сервер»](#на-сервер).
+Для Kubernetes нужны Ingress/Gateway и TLS-сертификат; публичный адрес в настройках
+должен совпадать с адресом, который открывают пользователи.
 
 ## Что умеет
 
