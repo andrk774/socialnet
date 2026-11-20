@@ -1,3 +1,6 @@
+import { ProfileMedia } from "./profilemedia.js";
+import { ProfileDetails, ProfileActions } from "./profiledetails.js";
+import { ProfileCover } from "./profilecover.js";
 import { h } from "../vendor/preact/index.js";
 import { useState } from "../vendor/preact/hooks.js";
 import { UserCard, api, fullName, get, post } from "./api.js";
@@ -38,15 +41,15 @@ export function ProfilePage({ username }: { username: string }) {
 
   return (
     <div class="profile">
-      <header class="profile-head">
+      <ProfileCover id={u.id} self={rel === "self"}/><header class="profile-head profile-head-covered">
         {rel === "self" ? <AvatarUpload user={u} onSaved={prof.reload} /> : <Avatar user={u} size={144} />}
         <div>
           <h1>{fullName(u)}{u.plus && <span class="plus-badge" title="Подписка «Плюс»">Плюс</span>}</h1>
           <p class="muted">@{u.username}{u.presence?.online ? " · в сети" : ""}</p>
           {u.status_text && <p class="status">{u.status_text}</p>}
-          {u.city && <p class="muted">{u.city}</p>}
+          {u.city && <p class="muted">{u.city}</p>}<ProfileDetails user={u}/>
         </div>
-        {rel === "self" && <a class="button ghost" href="/statistics">Статистика</a>}
+        {rel === "self" && <ProfileActions user={u} reload={prof.reload}/>}
         {rel !== "self" && (
           <div class="profile-actions">
             <button class={rel === "none" || rel === "request_received" ? "primary" : "ghost"} onClick={friend}>{friendLabel[rel]}</button>
@@ -58,6 +61,7 @@ export function ProfilePage({ username }: { username: string }) {
       </header>
       <ErrorLine error={error} />
       {u.about && <p class="about">{u.about}</p>}
+      {rel === "self" && <ProfileMedia id={u.id}/>}
       <OrganizerReviews userId={u.id} />
       {u.closed ? <p class="empty">Профиль закрыт. Записи видят только друзья.</p> : (
         <PostList path={`/users/${u.id}/posts`} empty={rel === "self" ? "Здесь появятся ваши записи." : "Записей пока нет."}

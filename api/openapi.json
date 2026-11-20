@@ -14056,6 +14056,92 @@
     }
    }
   },
+  "/api/v1/photos/{id}/comments": {
+   "get": {
+    "tags": [
+     "media"
+    ],
+    "summary": "List photo comments; owner or visible containing post required",
+    "operationId": "get_api_v1_photos_id_comments",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "media"
+    ],
+    "summary": "Add photo comment (1-2000 characters)",
+    "operationId": "post_api_v1_photos_id_comments",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "text"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/playlists": {
    "post": {
     "tags": [
@@ -18969,6 +19055,40 @@
     }
    }
   },
+  "/api/v1/users/me/cover": {
+   "put": {
+    "tags": [
+     "users"
+    ],
+    "summary": "Update own cover",
+    "operationId": "put_api_v1_users_me_cover",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    },
+    "responses": {
+     "204": {
+      "description": "Успешно"
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/users/me/email/verification": {
    "post": {
     "tags": [
@@ -19469,6 +19589,48 @@
          "required": [
           "id"
          ]
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/users/{id}/cover": {
+   "get": {
+    "tags": [
+     "users"
+    ],
+    "summary": "Profile cover",
+    "operationId": "get_api_v1_users_id_cover",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "format": "int64"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
         }
        }
       }
@@ -20462,6 +20624,47 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/Video"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Ошибка",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/videos/{vid}/view": {
+   "post": {
+    "tags": [
+     "videos"
+    ],
+    "summary": "Count unique viewer",
+    "operationId": "post_api_v1_videos_vid_view",
+    "parameters": [
+     {
+      "name": "vid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Успешно",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object"
         }
        }
       }

@@ -15,7 +15,7 @@ kubectl --context docker-desktop -n socialnet logs deployment/socialnet -c api
 kubectl --context docker-desktop -n socialnet rollout restart deployment/socialnet
 ```
 
-Образ `socialnet:header-20261120` импортирован в containerd локального
+Образ `socialnet:photo-comments-20261120` импортирован в containerd локального
 узла. Перед обновлением нужно собрать и импортировать новый образ,
 изменить tag в Kustomization и применить `kubectl apply -k deploy/kubernetes-local`.
 Secret `socialnet-secrets` создаётся отдельно: его нет в репозитории.

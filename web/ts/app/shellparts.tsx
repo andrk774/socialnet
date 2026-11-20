@@ -4,6 +4,12 @@ import { Self, fullName, logout } from "./api.js";
 import { Avatar } from "./ui.js";
 
 const paths: Record<string, string> = {
+  close: "M6 6l12 12M18 6L6 18",
+  chevron: "M7 10l5 5 5-5",
+  statistics: "M3 20h18M5 15l6-6 4 3 6-8M15 4h6v6",
+  shield: "M12 2l9 4v6c0 5-9 10-9 10S3 17 3 12V6zM8 12l3 3 5-6",
+  edit: "M14 5l5 5M4 16L17 3l4 4L8 20H4z",
+  trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7",
   phone: "M6 3H3v3c0 8 7 15 15 15h3v-5l-5-2-2 2c-3-1-5-3-6-6l2-2-2-5z",
   photo: "M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM3 17l6-6 4 4 3-3 5 5M15 7h.01",
   profile: "M20 21v-2a7 7 0 0 0-14 0v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8",
@@ -37,6 +43,7 @@ export function navIcon(href: string) {
 
 type Theme = "system" | "light" | "dark";
 export function AccountMenu({ user }: { user: Self }) {
+ const qrHelp=useRef<HTMLDialogElement>(null);
   const ref = useRef<HTMLDetailsElement>(null);
   const [theme, setTheme] = useState<Theme>(() => {
     try { const saved = localStorage.getItem("sn-theme"); return saved === "light" || saved === "dark" ? saved : "system"; } catch { return "system"; }
@@ -57,9 +64,12 @@ export function AccountMenu({ user }: { user: Self }) {
     <summary aria-label="Меню аккаунта"><Avatar user={user} size={32} /><svg class="account-chevron" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></summary>
     <div class="account-panel" onClick={(event) => { if ((event.target as HTMLElement).closest("a") && ref.current) ref.current.open = false; }}>
       <a class="account-identity" href={`/u/${user.username}`}><Avatar user={user} size={64} /><strong>{fullName(user)}</strong><span class="muted">@{user.username}</span></a>
+      <dialog ref={qrHelp} class="music-dialog" aria-label="Вход по QR-коду"><h2>Вход по QR-коду</h2><p>На новом устройстве откройте socialnet и выберите «Вход по QR-коду с телефона». На телефоне, где вы уже вошли, отсканируйте код камерой и подтвердите вход.</p><p class="muted">Проверяйте адрес сайта и устройство перед подтверждением. Код действует две минуты.</p><button onClick={()=>qrHelp.current?.close()}>Закрыть</button></dialog>
       <a class="account-manage" href="/settings">Управление аккаунтом</a>
       <nav aria-label="Аккаунт">
         <a href="/wallet"><Icon name="wallet" />Кошелёк</a>
+        <button onClick={()=>qrHelp.current?.showModal()}><Icon name="profile" />Вход по QR-коду</button>
+        <a href="/help"><Icon name="settings" />Помощь</a>
         <a href="/bookmarks"><Icon name="bookmark" />Мои закладки</a>
         <a href="/settings"><Icon name="settings" />Настройки</a>
         <button onClick={() => setTheme(theme === "system" ? "light" : theme === "light" ? "dark" : "system")}><Icon name="theme" />Тема: {{ system: "Системная", light: "Светлая", dark: "Тёмная" }[theme]}</button>

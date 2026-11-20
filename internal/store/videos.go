@@ -10,6 +10,7 @@ import (
 )
 
 type Video struct {
+	Views       int64      `json:"views"`
 	ID          string     `json:"id"`
 	OwnerID     int64      `json:"owner_id"`
 	Title       string     `json:"title"`
@@ -26,7 +27,7 @@ type Video struct {
 	ReadyAt     *time.Time `json:"ready_at,omitempty"`
 }
 
-const videoCols = `id::text, owner_id, title, description, status, duration_sec, width, height, renditions, created_at, ready_at, mp4`
+const videoCols = `id::text, owner_id, title, description, status, duration_sec, width, height, renditions, created_at, ready_at, mp4, (SELECT count(*) FROM video_views WHERE video_id=videos.id)`
 
 func scanVideos(rows pgx.Rows) ([]Video, error) {
 	defer rows.Close()
@@ -35,7 +36,7 @@ func scanVideos(rows pgx.Rows) ([]Video, error) {
 		var v Video
 		var mp4 *string
 		if err := rows.Scan(&v.ID, &v.OwnerID, &v.Title, &v.Description, &v.Status, &v.DurationSec,
-			&v.Width, &v.Height, &v.Qualities, &v.CreatedAt, &v.ReadyAt, &mp4); err != nil {
+			&v.Width, &v.Height, &v.Qualities, &v.CreatedAt, &v.ReadyAt, &mp4, &v.Views); err != nil {
 			return nil, err
 		}
 		if v.Status == "ready" {

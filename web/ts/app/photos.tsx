@@ -27,7 +27,7 @@ export function PhotosPage() {
     return all.sort((a,b) => b.created_at.localeCompare(a.created_at));
   }, []);
   const albums = useLoad(() => get<{items: Album[]}>("/photo-albums"), []);
-  const [tab,setTab] = useState<"photos"|"albums"|"archive">("photos");
+  const [tab,setTab] = useState<"photos"|"albums"|"archive">(new URLSearchParams(location.search).get("tab")==="albums"?"albums":"photos");
   const [album,setAlbum] = useState<number | null>(null);
   const [selecting,setSelecting] = useState(false);
   const [selected,setSelected] = useState<string[]>([]);

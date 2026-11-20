@@ -1,6 +1,6 @@
 import { h, Fragment } from "../vendor/preact/index.js";
 import { useEffect, useRef, useState } from "../vendor/preact/hooks.js";
-import { Page, Photo, Self, UserCard, get, put, upload } from "./api.js";
+import { Page, Photo, Self, UserCard, get, put, post, upload } from "./api.js";
 import { setMe } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, Time, duration, useLoad } from "./ui.js";
 import { Video } from "./posts.js";
@@ -97,12 +97,13 @@ export function MediaUpload({ kind, onUploaded }: { kind: "music" | "video"; onU
   </form>;
 }
 
-interface UploadedVideo { id: string; title: string; status: string; poster_url?: string; hls_url?: string; mp4_url?: string; duration_sec?: number; created_at: string }
+interface UploadedVideo { views: number; id: string; title: string; status: string; poster_url?: string; hls_url?: string; mp4_url?: string; duration_sec?: number; created_at: string }
 export function VideosPage({ userId }: { userId: number }) {
   const list = useLoad(() => get<Page<UploadedVideo>>(`/users/${userId}/videos?limit=50`), [userId]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [selected, setSelected] = useState<UploadedVideo | null>(null);
+  const [viewError,setViewError] = useState<unknown>(null);
   const viewer = useRef<HTMLDialogElement>(null);
   const uploader = useRef<HTMLDialogElement>(null);
   useEffect(() => { if (selected) viewer.current?.showModal(); }, [selected]);
@@ -118,15 +119,15 @@ export function VideosPage({ userId }: { userId: number }) {
     <nav class="video-filters" aria-label="Фильтры видео">{[["all", "Все"], ["ready", "Готовые"], ["processing", "Обрабатываются"], ["failed", "С ошибкой"]].map(([id, label]) => <button class={filter === id ? "chip active" : "chip"} aria-pressed={filter === id} onClick={() => setFilter(id)}>{label}</button>)}</nav>
     <ErrorLine error={list.error} />
     {!list.data ? <Loading /> : !videos.length ? <Empty>{list.data.items.length ? "Нет видео по выбранным условиям." : "Загрузите своё первое видео."}</Empty> : <div class="video-grid">{videos.map((v) => <article class="video-card" key={v.id}>
-      <button class="video-thumbnail" disabled={v.status !== "ready"} aria-label={`Смотреть: ${v.title}`} onClick={() => setSelected(v)}>
+      <button class="video-thumbnail" disabled={v.status !== "ready"} aria-label={`Смотреть: ${v.title}`} onClick={() => {setViewError(null);setSelected(v)}}>
         {v.poster_url ? <img src={v.poster_url} alt="" loading="lazy" /> : <span class="video-placeholder" aria-hidden="true">▷</span>}
         {v.status === "ready" && <><span class="video-play" aria-hidden="true">▶</span>{v.duration_sec !== undefined && <span class="video-duration">{duration(v.duration_sec)}</span>}</>}
         {v.status !== "ready" && <span class="video-state">{v.status === "failed" ? "Ошибка обработки" : "Обрабатывается…"}</span>}
       </button>
-      <h2>{v.title}</h2><p class="muted"><Time iso={v.created_at} /></p>
+      <h2>{v.title}</h2><p class="muted">{v.views ?? 0} просмотров</p><p class="muted"><Time iso={v.created_at} /></p>
       {v.status === "failed" && <p class="error">Попробуйте загрузить другой файл.</p>}
     </article>)}</div>}
     <dialog ref={uploader} class="music-dialog" aria-label="Загрузка видео"><button class="music-dialog-close" aria-label="Закрыть загрузку видео" onClick={() => uploader.current?.close()}>×</button><MediaUpload kind="video" onUploaded={() => { list.reload(); setFilter("all"); setQuery(""); }} /></dialog>
-    <dialog ref={viewer} class="video-viewer" aria-label="Просмотр видео" onClose={() => setSelected(null)} onClick={(e) => { if (e.target === e.currentTarget) viewer.current?.close(); }}><button class="music-dialog-close" aria-label="Закрыть видео" onClick={() => viewer.current?.close()}>×</button>{selected && <Video key={selected.id} src={selected.hls_url ?? ""} mp4={selected.mp4_url} poster={selected.poster_url ?? ""} title={selected.title} />}</dialog>
+    <dialog ref={viewer} class="video-viewer" aria-label="Просмотр видео" onClose={() => setSelected(null)} onClick={(e) => { if (e.target === e.currentTarget) viewer.current?.close(); }}><button class="music-dialog-close" aria-label="Закрыть видео" onClick={() => viewer.current?.close()}>×</button>{selected && <><Video onPlay={() => { void post<{views:number}>(`/videos/${selected.id}/view`).then(x => { setSelected(old => old?.id === selected.id ? {...old,views:x.views} : old); list.reload(); }).catch(setViewError); }} key={selected.id} src={selected.hls_url ?? ""} mp4={selected.mp4_url} poster={selected.poster_url ?? ""} title={selected.title} /><ErrorLine error={viewError}/><p class="muted">{selected.views ?? 0} просмотров</p></>}</dialog>
   </section>;
 }

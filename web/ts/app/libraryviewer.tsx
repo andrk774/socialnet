@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "../vendor/preact/hooks.js";
 import { Photo, Self, del, fullName, patch, put } from "./api.js";
 import { Avatar, ErrorLine, Time } from "./ui.js";
 import { setMe, useMe } from "./session.js";
+import { PhotoComments } from "./photocomments.js";
 
 export interface DetailedPhoto extends Photo {created_at:string;description:string}
 export function LibraryViewer({photo,index,total,album,onStep,onClose,onChanged}:{photo:DetailedPhoto;index:number;total:number;album:string;onStep:(n:number)=>void;onClose:()=>void;onChanged:()=>void}) {
@@ -20,6 +21,7 @@ export function LibraryViewer({photo,index,total,album,onStep,onClose,onChanged}
     </div>
     <aside class="photo-view-details">{me&&<header><Avatar user={me} size={48}/><div><a href={`/u/${me.username}`}>{fullName(me)}</a><Time iso={photo.created_at}/></div></header>}
       <div class="photo-view-description">{editing?<form class="stack" onSubmit={e=>{e.preventDefault();void act(async()=>{await patch(`/photos/${photo.id}`,{description:text});setEditing(false);onChanged();});}}><label>Описание фотографии<textarea value={text} maxLength={2000} onInput={e=>setText(e.currentTarget.value)} /></label><div class="library-actions"><button class="primary" disabled={busy}>Сохранить</button><button class="ghost" type="button" disabled={busy} onClick={()=>{setText(photo.description??"");setEditing(false);}}>Отмена</button></div></form>:<><p>{photo.description}</p><button class="link" onClick={()=>setEditing(true)}>Редактировать описание</button></>}<ErrorLine error={error}/><p role="status">{notice}</p></div>
+      <PhotoComments key={photo.id} id={photo.id}/>
     </aside>
   </dialog>;
 }

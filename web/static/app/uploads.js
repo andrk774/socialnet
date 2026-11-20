@@ -1,6 +1,6 @@
 import { h, Fragment } from "../vendor/preact/index.js";
 import { useEffect, useRef, useState } from "../vendor/preact/hooks.js";
-import { get, put, upload } from "./api.js";
+import { get, put, post, upload } from "./api.js";
 import { setMe } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, Time, duration, useLoad } from "./ui.js";
 import { Video } from "./posts.js";
@@ -184,6 +184,7 @@ export function VideosPage({ userId }) {
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState("all");
     const [selected, setSelected] = useState(null);
+    const [viewError, setViewError] = useState(null);
     const viewer = useRef(null);
     const uploader = useRef(null);
     useEffect(() => { if (selected)
@@ -207,13 +208,16 @@ export function VideosPage({ userId }) {
         h("nav", { class: "video-filters", "aria-label": "\u0424\u0438\u043B\u044C\u0442\u0440\u044B \u0432\u0438\u0434\u0435\u043E" }, [["all", "Все"], ["ready", "Готовые"], ["processing", "Обрабатываются"], ["failed", "С ошибкой"]].map(([id, label]) => h("button", { class: filter === id ? "chip active" : "chip", "aria-pressed": filter === id, onClick: () => setFilter(id) }, label))),
         h(ErrorLine, { error: list.error }),
         !list.data ? h(Loading, null) : !videos.length ? h(Empty, null, list.data.items.length ? "Нет видео по выбранным условиям." : "Загрузите своё первое видео.") : h("div", { class: "video-grid" }, videos.map((v) => h("article", { class: "video-card", key: v.id },
-            h("button", { class: "video-thumbnail", disabled: v.status !== "ready", "aria-label": `Смотреть: ${v.title}`, onClick: () => setSelected(v) },
+            h("button", { class: "video-thumbnail", disabled: v.status !== "ready", "aria-label": `Смотреть: ${v.title}`, onClick: () => { setViewError(null); setSelected(v); } },
                 v.poster_url ? h("img", { src: v.poster_url, alt: "", loading: "lazy" }) : h("span", { class: "video-placeholder", "aria-hidden": "true" }, "\u25B7"),
                 v.status === "ready" && h(Fragment, null,
                     h("span", { class: "video-play", "aria-hidden": "true" }, "\u25B6"),
                     v.duration_sec !== undefined && h("span", { class: "video-duration" }, duration(v.duration_sec))),
                 v.status !== "ready" && h("span", { class: "video-state" }, v.status === "failed" ? "Ошибка обработки" : "Обрабатывается…")),
             h("h2", null, v.title),
+            h("p", { class: "muted" },
+                v.views ?? 0,
+                " \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u043E\u0432"),
             h("p", { class: "muted" },
                 h(Time, { iso: v.created_at })),
             v.status === "failed" && h("p", { class: "error" }, "\u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0434\u0440\u0443\u0433\u043E\u0439 \u0444\u0430\u0439\u043B.")))),
@@ -223,5 +227,10 @@ export function VideosPage({ userId }) {
         h("dialog", { ref: viewer, class: "video-viewer", "aria-label": "\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0432\u0438\u0434\u0435\u043E", onClose: () => setSelected(null), onClick: (e) => { if (e.target === e.currentTarget)
                 viewer.current?.close(); } },
             h("button", { class: "music-dialog-close", "aria-label": "\u0417\u0430\u043A\u0440\u044B\u0442\u044C \u0432\u0438\u0434\u0435\u043E", onClick: () => viewer.current?.close() }, "\u00D7"),
-            selected && h(Video, { key: selected.id, src: selected.hls_url ?? "", mp4: selected.mp4_url, poster: selected.poster_url ?? "", title: selected.title })));
+            selected && h(Fragment, null,
+                h(Video, { onPlay: () => { void post(`/videos/${selected.id}/view`).then(x => { setSelected(old => old?.id === selected.id ? { ...old, views: x.views } : old); list.reload(); }).catch(setViewError); }, key: selected.id, src: selected.hls_url ?? "", mp4: selected.mp4_url, poster: selected.poster_url ?? "", title: selected.title }),
+                h(ErrorLine, { error: viewError }),
+                h("p", { class: "muted" },
+                    selected.views ?? 0,
+                    " \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u043E\u0432"))));
 }

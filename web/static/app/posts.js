@@ -516,12 +516,12 @@ function PhotoViewer({ p, initialIndex, close, react, bookmark, onCount, error }
                     h(ErrorLine, { error: error })),
                 h(Comments, { post: p, onCount: onCount }))));
 }
-export function Video({ src, mp4, poster, title }) {
+export function Video({ src, mp4, poster, title, onPlay }) {
     // Браузер берёт первый источник, который умеет играть: HLS (Safari, iOS,
     // Android — с подстройкой качества под сеть) или MP4 (остальные).
     const hls = document.createElement("video").canPlayType("application/vnd.apple.mpegurl") !== "";
     return (h("figure", { class: "video" },
-        hls || mp4 ? (h("video", { controls: true, preload: "none", poster: poster, playsInline: true },
+        hls || mp4 ? (h("video", { onPlay: onPlay, controls: true, preload: "none", poster: poster, playsInline: true },
             hls && h("source", { src: src, type: "application/vnd.apple.mpegurl" }),
             mp4 && h("source", { src: mp4, type: "video/mp4" }))) : (h("div", { class: "video-fallback", style: { backgroundImage: `url("${poster}")` } },
             h("p", null, "\u0412\u0438\u0434\u0435\u043E \u0435\u0449\u0451 \u0433\u043E\u0442\u043E\u0432\u0438\u0442\u0441\u044F \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0430. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0435\u0433\u043E \u043D\u0430 \u0442\u0435\u043B\u0435\u0444\u043E\u043D\u0435 \u0438\u043B\u0438 \u0432 Safari."))),

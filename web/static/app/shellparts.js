@@ -3,6 +3,12 @@ import { useEffect, useRef, useState } from "../vendor/preact/hooks.js";
 import { fullName, logout } from "./api.js";
 import { Avatar } from "./ui.js";
 const paths = {
+    close: "M6 6l12 12M18 6L6 18",
+    chevron: "M7 10l5 5 5-5",
+    statistics: "M3 20h18M5 15l6-6 4 3 6-8M15 4h6v6",
+    shield: "M12 2l9 4v6c0 5-9 10-9 10S3 17 3 12V6zM8 12l3 3 5-6",
+    edit: "M14 5l5 5M4 16L17 3l4 4L8 20H4z",
+    trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7",
     phone: "M6 3H3v3c0 8 7 15 15 15h3v-5l-5-2-2 2c-3-1-5-3-6-6l2-2-2-5z",
     photo: "M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM3 17l6-6 4 4 3-3 5 5M15 7h.01",
     profile: "M20 21v-2a7 7 0 0 0-14 0v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8",
@@ -38,6 +44,7 @@ export function navIcon(href) {
     return { "/": "feed", "/im": "message", "/notifications": "bell", "/communities": "people", "/music": "music", "/bookmarks": "bookmark", "/documents": "file", "/settings": "settings", "/wallet": "wallet", "/search": "search", "/articles": "file", "/plus": "plus" }[href] ?? "map";
 }
 export function AccountMenu({ user }) {
+    const qrHelp = useRef(null);
     const ref = useRef(null);
     const [theme, setTheme] = useState(() => {
         try {
@@ -87,11 +94,22 @@ export function AccountMenu({ user }) {
                 h("span", { class: "muted" },
                     "@",
                     user.username)),
+            h("dialog", { ref: qrHelp, class: "music-dialog", "aria-label": "\u0412\u0445\u043E\u0434 \u043F\u043E QR-\u043A\u043E\u0434\u0443" },
+                h("h2", null, "\u0412\u0445\u043E\u0434 \u043F\u043E QR-\u043A\u043E\u0434\u0443"),
+                h("p", null, "\u041D\u0430 \u043D\u043E\u0432\u043E\u043C \u0443\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432\u0435 \u043E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 socialnet \u0438 \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u00AB\u0412\u0445\u043E\u0434 \u043F\u043E QR-\u043A\u043E\u0434\u0443 \u0441 \u0442\u0435\u043B\u0435\u0444\u043E\u043D\u0430\u00BB. \u041D\u0430 \u0442\u0435\u043B\u0435\u0444\u043E\u043D\u0435, \u0433\u0434\u0435 \u0432\u044B \u0443\u0436\u0435 \u0432\u043E\u0448\u043B\u0438, \u043E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u0443\u0439\u0442\u0435 \u043A\u043E\u0434 \u043A\u0430\u043C\u0435\u0440\u043E\u0439 \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0432\u0445\u043E\u0434."),
+                h("p", { class: "muted" }, "\u041F\u0440\u043E\u0432\u0435\u0440\u044F\u0439\u0442\u0435 \u0430\u0434\u0440\u0435\u0441 \u0441\u0430\u0439\u0442\u0430 \u0438 \u0443\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432\u043E \u043F\u0435\u0440\u0435\u0434 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435\u043C. \u041A\u043E\u0434 \u0434\u0435\u0439\u0441\u0442\u0432\u0443\u0435\u0442 \u0434\u0432\u0435 \u043C\u0438\u043D\u0443\u0442\u044B."),
+                h("button", { onClick: () => qrHelp.current?.close() }, "\u0417\u0430\u043A\u0440\u044B\u0442\u044C")),
             h("a", { class: "account-manage", href: "/settings" }, "\u0423\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u043E\u043C"),
             h("nav", { "aria-label": "\u0410\u043A\u043A\u0430\u0443\u043D\u0442" },
                 h("a", { href: "/wallet" },
                     h(Icon, { name: "wallet" }),
                     "\u041A\u043E\u0448\u0435\u043B\u0451\u043A"),
+                h("button", { onClick: () => qrHelp.current?.showModal() },
+                    h(Icon, { name: "profile" }),
+                    "\u0412\u0445\u043E\u0434 \u043F\u043E QR-\u043A\u043E\u0434\u0443"),
+                h("a", { href: "/help" },
+                    h(Icon, { name: "settings" }),
+                    "\u041F\u043E\u043C\u043E\u0449\u044C"),
                 h("a", { href: "/bookmarks" },
                     h(Icon, { name: "bookmark" }),
                     "\u041C\u043E\u0438 \u0437\u0430\u043A\u043B\u0430\u0434\u043A\u0438"),

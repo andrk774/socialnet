@@ -1,3 +1,6 @@
+import { ProfileMedia } from "./profilemedia.js";
+import { ProfileDetails, ProfileActions } from "./profiledetails.js";
+import { ProfileCover } from "./profilecover.js";
 import { h } from "../vendor/preact/index.js";
 import { useState } from "../vendor/preact/hooks.js";
 import { api, fullName, get, post } from "./api.js";
@@ -34,7 +37,8 @@ export function ProfilePage({ username }) {
         }
     }
     return (h("div", { class: "profile" },
-        h("header", { class: "profile-head" },
+        h(ProfileCover, { id: u.id, self: rel === "self" }),
+        h("header", { class: "profile-head profile-head-covered" },
             rel === "self" ? h(AvatarUpload, { user: u, onSaved: prof.reload }) : h(Avatar, { user: u, size: 144 }),
             h("div", null,
                 h("h1", null,
@@ -45,8 +49,9 @@ export function ProfilePage({ username }) {
                     u.username,
                     u.presence?.online ? " · в сети" : ""),
                 u.status_text && h("p", { class: "status" }, u.status_text),
-                u.city && h("p", { class: "muted" }, u.city)),
-            rel === "self" && h("a", { class: "button ghost", href: "/statistics" }, "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430"),
+                u.city && h("p", { class: "muted" }, u.city),
+                h(ProfileDetails, { user: u })),
+            rel === "self" && h(ProfileActions, { user: u, reload: prof.reload }),
             rel !== "self" && (h("div", { class: "profile-actions" },
                 h("button", { class: rel === "none" || rel === "request_received" ? "primary" : "ghost", onClick: friend }, friendLabel[rel]),
                 u.relationship.can_write && h("button", { class: "ghost", onClick: () => navigate(`/im/u/${u.id}`) }, "\u041D\u0430\u043F\u0438\u0441\u0430\u0442\u044C"),
@@ -54,6 +59,7 @@ export function ProfilePage({ username }) {
                 h(ReportButton, { target: { type: "user", id: u.id }, cls: "ghost" })))),
         h(ErrorLine, { error: error }),
         u.about && h("p", { class: "about" }, u.about),
+        rel === "self" && h(ProfileMedia, { id: u.id }),
         h(OrganizerReviews, { userId: u.id }),
         u.closed ? h("p", { class: "empty" }, "\u041F\u0440\u043E\u0444\u0438\u043B\u044C \u0437\u0430\u043A\u0440\u044B\u0442. \u0417\u0430\u043F\u0438\u0441\u0438 \u0432\u0438\u0434\u044F\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u0434\u0440\u0443\u0437\u044C\u044F.") : (h(PostList, { path: `/users/${u.id}/posts`, empty: rel === "self" ? "Здесь появятся ваши записи." : "Записей пока нет.", header: (add) => (rel === "self" ? h(Composer, { onPosted: add }) : null) }))));
 }

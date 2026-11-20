@@ -371,6 +371,8 @@ func (s *Server) Router() http.Handler {
 				r.Get("/photos", s.handleLibraryPhotos)
 				r.Patch("/photos", s.handleOrganizePhotos)
 				r.Patch("/photos/{id}", s.handleDescribePhoto)
+				r.Get("/photos/{id}/comments", s.handlePhotoComments)
+				r.Post("/photos/{id}/comments", s.handlePhotoComments)
 				r.Get("/photo-albums", s.handlePhotoAlbums)
 				r.Post("/photo-albums", s.handleCreatePhotoAlbum)
 
@@ -424,6 +426,9 @@ func (s *Server) Router() http.Handler {
 				r.Delete("/playlists/{id}/tracks/{tid}", s.handleRemovePlaylistTrack)
 
 				// видео
+				r.Post("/videos/{vid}/view", s.handleVideoView)
+				r.Get("/users/{id}/cover", s.handleGetCover)
+				r.Put("/users/me/cover", s.handlePutCover)
 				r.Get("/videos/{vid}", s.handleGetVideo)
 				r.Patch("/videos/{vid}", s.handleUpdateVideo)
 				r.Delete("/videos/{vid}", s.handleDeleteVideo)

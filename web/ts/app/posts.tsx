@@ -478,14 +478,14 @@ function PhotoViewer({ p, initialIndex, close, react, bookmark, onCount, error }
   </dialog>;
 }
 
-export function Video({ src, mp4, poster, title }: { src: string; mp4?: string; poster: string; title?: string }) {
+export function Video({ src, mp4, poster, title, onPlay }: { src: string; mp4?: string; poster: string; title?: string; onPlay?: () => void }) {
   // Браузер берёт первый источник, который умеет играть: HLS (Safari, iOS,
   // Android — с подстройкой качества под сеть) или MP4 (остальные).
   const hls = document.createElement("video").canPlayType("application/vnd.apple.mpegurl") !== "";
   return (
     <figure class="video">
       {hls || mp4 ? (
-        <video controls preload="none" poster={poster} playsInline>
+        <video onPlay={onPlay} controls preload="none" poster={poster} playsInline>
           {hls && <source src={src} type="application/vnd.apple.mpegurl" />}
           {mp4 && <source src={mp4} type="video/mp4" />}
         </video>

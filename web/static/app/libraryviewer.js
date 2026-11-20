@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "../vendor/preact/hooks.js";
 import { del, fullName, patch, put } from "./api.js";
 import { Avatar, ErrorLine, Time } from "./ui.js";
 import { setMe, useMe } from "./session.js";
+import { PhotoComments } from "./photocomments.js";
 export function LibraryViewer({ photo, index, total, album, onStep, onClose, onChanged }) {
     const me = useMe();
     const dialog = useRef(null);
@@ -78,5 +79,6 @@ export function LibraryViewer({ photo, index, total, album, onStep, onClose, onC
                     h("p", null, photo.description),
                     h("button", { class: "link", onClick: () => setEditing(true) }, "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u0435")),
                 h(ErrorLine, { error: error }),
-                h("p", { role: "status" }, notice))));
+                h("p", { role: "status" }, notice)),
+            h(PhotoComments, { key: photo.id, id: photo.id })));
 }
