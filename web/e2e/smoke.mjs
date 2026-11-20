@@ -12,6 +12,7 @@ process.on("unhandledRejection", async (e) => {
 });
 const browser = await chromium.launch({args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']});
 const problems = [];
+const offlineContexts = new WeakSet();
 
 async function newUser(name, viewport = { width: 1280, height: 860 }) {
   const ctx = await browser.newContext({ viewport, locale: "ru-RU", colorScheme: "light" });
@@ -24,8 +25,22 @@ async function newUser(name, viewport = { width: 1280, height: 860 }) {
   // Leaflet отменяет сам; обновление токена при загрузке обрывается переходом
   // на другую страницу, и сервер на этот случай принимает старый токен
   // ещё минуту (store.RefreshReuseGrace), так что сеанс не теряется.
-  const benignAbort = (r) => r.failure()?.errorText === "net::ERR_ABORTED" && (r.url().includes("/tiles/") || r.url().endsWith("/api/v1/auth/refresh") || (r.method()==="GET" && r.url().endsWith("/api/v1/calls")));
-  page.on("requestfailed", (r) => { if (!r.url().includes("/api/v1/ws") && !benignAbort(r)) problems.push(`${name}: failed ${r.method()} ${r.url()} ${r.failure()?.errorText}`); });
+  let navigation = 0;
+  const requestNavigation = new WeakMap();
+  page.on("request", (r) => {
+    if (r.isNavigationRequest() && r.frame() === page.mainFrame()) navigation++;
+    requestNavigation.set(r, navigation);
+  });
+  const benignAbort = (r) => r.failure()?.errorText === "net::ERR_ABORTED" && (
+    r.url().includes("/tiles/") || r.url().endsWith("/api/v1/auth/refresh") ||
+    (r.method() === "GET" && (r.url().endsWith("/api/v1/calls") || requestNavigation.get(r) < navigation))
+  );
+  page.on("requestfailed", (r) => {
+    // Only the explicit offline scenario may cause a disconnected network.
+    const expectedOffline = offlineContexts.has(ctx) && r.failure()?.errorText === "net::ERR_INTERNET_DISCONNECTED";
+    if (!r.url().includes("/api/v1/ws") && !benignAbort(r) && !expectedOffline)
+      problems.push(`${name}: failed ${r.method()} ${r.url()} ${r.failure()?.errorText}`);
+  });
   await page.goto(base + "/");
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
   await page.getByLabel("Имя", { exact: true }).fill(name === "anna" ? "Анна" : "Борис");
@@ -433,6 +448,7 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
     const off = await anna.ctx.newPage();
     await off.goto(base + "/offline");
     await off.getByText("Двуглавая сопка").first().waitFor();
+    offlineContexts.add(anna.ctx);
     await anna.ctx.setOffline(true);
     await off.reload();
     await off.getByText("Нет связи").waitFor();
@@ -440,6 +456,7 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
     await off.locator("img.leaflet-tile-loaded").first().waitFor();
     await off.screenshot({ path: `${shots}/17-offline.png`, fullPage: true });
     await anna.ctx.setOffline(false);
+    offlineContexts.delete(anna.ctx);
     await off.close();
   }
   await card.getByRole("button", { name: "Во весь экран" }).click();
