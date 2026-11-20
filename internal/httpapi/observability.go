@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -23,17 +24,22 @@ import (
 // ---------- метрики ----------
 
 type serverMetrics struct {
-	reg      *metrics.Registry
-	requests *metrics.CounterVec
-	latency  *metrics.HistogramVec
-	events   *metrics.CounterVec // события безопасности: login, login_failed, ...
-	business *metrics.CounterVec // сообщения, посты, покупки, доставки callback
-	alerts   *metrics.CounterVec
+	started    time.Time
+	total      atomic.Uint64
+	errors5xx  atomic.Uint64
+	durationNS atomic.Uint64
+	reg        *metrics.Registry
+	requests   *metrics.CounterVec
+	latency    *metrics.HistogramVec
+	events     *metrics.CounterVec // события безопасности: login, login_failed, ...
+	business   *metrics.CounterVec // сообщения, посты, покупки, доставки callback
+	alerts     *metrics.CounterVec
 }
 
 func (s *Server) initMetrics() {
 	reg := metrics.NewRegistry()
 	m := &serverMetrics{
+		started:  time.Now(),
 		reg:      reg,
 		requests: reg.Counter("socialnet_http_requests_total", "HTTP-запросы по маршруту и коду ответа.", "method", "route", "status"),
 		latency: reg.Histogram("socialnet_http_request_duration_seconds", "Время обработки запроса.",
@@ -79,6 +85,11 @@ func (s *Server) instrument(next http.Handler) http.Handler {
 			status = http.StatusOK
 		}
 		s.m.requests.Inc(r.Method, route, strconv.Itoa(status))
+		s.m.total.Add(1)
+		if status >= 500 {
+			s.m.errors5xx.Add(1)
+		}
+		s.m.durationNS.Add(uint64(time.Since(start)))
 		s.m.latency.Observe(time.Since(start).Seconds(), r.Method, route)
 	})
 }
@@ -124,6 +135,10 @@ func (s *Server) audit(next http.Handler) http.Handler {
 		var details json.RawMessage
 		if json.Valid(body) {
 			details = body
+		}
+		// Never persist password values, including rejected requests.
+		if strings.HasSuffix(r.URL.Path, "/password") || strings.HasSuffix(r.URL.Path, "/turn") || strings.HasSuffix(r.URL.Path, "/smtp") || strings.HasSuffix(r.URL.Path, "/ai") {
+			details = json.RawMessage(`{"password":"[REDACTED]"}`)
 		}
 		// Запись идёт после ответа, но в том же запросе: не теряется, если процесс жив.
 		ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)

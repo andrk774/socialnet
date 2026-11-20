@@ -1,10 +1,22 @@
+import { NotificationMenu } from "./notificationmenu.js";
+import { StatisticsPage } from "./statistics.js";
+import { CommentArchivePage } from "./commentarchive.js";
+import { CallsPage, CallManager } from "./calls.js";
+import { DevelopersPage } from "./developers.js";
+import { SettingsHub } from "./settingshub.js";
+import { hiddenSections } from "./navprefs.js";
+import { HelpPage, InfoPage, LegalIndex, SidebarFooter } from "./helpcenter.js";
+import { MusicPage } from "./music.js";
+import { MiniPlayer, MiniPlayerState } from "./miniplayer.js";
+import { PhotosPage } from "./photos.js";
 import { h, Fragment, render, ComponentChildren } from "../vendor/preact/index.js";
 import { useEffect, useState } from "../vendor/preact/hooks.js";
 import { get, logout, onAuthChange, post, refresh, signedIn } from "./api.js";
 import { AuthPage } from "./auth.js";
 import { ChatPage, ConversationsPage, DirectPage } from "./messages.js";
-import { CommunitiesPage, CommunityPage, FeedPage, MusicPage, NotificationsPage, OAuthPage, PostPage, SettingsPage, TagPage, WalletPage } from "./pages.js";
+import { CommunitiesPage, CommunityPage, FeedPage, NotificationsPage, OAuthPage, PostPage, TagPage, WalletPage } from "./pages.js";
 import { ProfilePage } from "./profile.js";
+import { VideosPage } from "./uploads.js";
 import { EventPage, HikeForm, HikesPage } from "./hikes.js";
 import { CompanionsPage } from "./companions.js";
 import { ConsentGate } from "./legal.js";
@@ -21,15 +33,19 @@ import { BookmarksPage, DocumentsPage, ScheduledPage } from "./library.js";
 import { on, startRealtime, stopRealtime } from "./realtime.js";
 import { match, navigate, query, usePath } from "./router.js";
 import { loadMe, setMe, useMe } from "./session.js";
-import { Avatar, ErrorLine, Loading } from "./ui.js";
+import { ErrorLine, Loading } from "./ui.js";
 import { RecordPage } from "./record.js";
 import { SearchPage } from "./search.js";
 import { Showcase } from "./landing.js";
 import { setupNative } from "./native.js";
 import { QRApprovePage } from "./qrlogin.js";
+import { AccountMenu, FeedAside, Icon, navIcon } from "./shellparts.js";
 
 function routes(path: string, onRead: () => void, myId: number): ComponentChildren {
   let p;
+  if (match("/help",path)) return <HelpPage/>;
+  if (match("/legal-info",path)) return <LegalIndex/>;
+  for (const kind of ["about","authors","business","safety"]) if(match(`/${kind}`,path)) return <InfoPage kind={kind}/>;
   if (path === "/" || path.startsWith("/?")) return <FeedPage />;
   if ((p = match("/u/:name", path))) return <ProfilePage username={p.name} />;
   if ((p = match("/p/:id", path))) return <PostPage id={+p.id} />;
@@ -39,6 +55,7 @@ function routes(path: string, onRead: () => void, myId: number): ComponentChildr
   if ((p = match("/im/:id", path))) return <ChatPage id={+p.id} />;
   if (match("/notifications", path)) return <NotificationsPage onRead={onRead} />;
   if (match("/communities", path)) return <CommunitiesPage />;
+  if (match("/photos", path)) return <PhotosPage />;
   if (match("/hikes/new", path)) return <HikeForm />;
   if (match("/hikes", path)) return <HikesPage />;
   if (match("/companions", path)) return <CompanionsPage />;
@@ -57,9 +74,14 @@ function routes(path: string, onRead: () => void, myId: number): ComponentChildr
   if ((p = match("/articles/:id/edit", path))) return <ArticleEditor id={+p.id} />;
   if ((p = match("/articles/:id", path))) return <ArticlePage id={+p.id} />;
   if ((p = match("/c/:slug", path))) return <CommunityPage slug={p.slug} />;
-  if (match("/music", path)) return <MusicPage userId={myId} />;
+  if (match("/music", path)) return null;
+  if (match("/videos", path)) return <VideosPage userId={myId} />;
   if (match("/wallet", path)) return <WalletPage />;
-  if (match("/settings", path)) return <SettingsPage />;
+  if (match("/statistics", path)) return <StatisticsPage />;
+  if (match("/calls", path)) return <CallsPage />;
+  if (match("/developers", path)) return <DevelopersPage />;
+  if (match("/help/comments", path)) return <CommentArchivePage />;
+  if (match("/settings", path)) return <SettingsHub />;
   if (match("/search", path)) return <SearchPage />;
   if (match("/bookmarks", path)) return <BookmarksPage />;
   if (match("/documents", path)) return <DocumentsPage />;
@@ -73,10 +95,10 @@ function routes(path: string, onRead: () => void, myId: number): ComponentChildr
 // телефоне — нижняя панель из главных разделов и экран «Ещё».
 type NavItem = [string, string];
 const navGroups: [string, NavItem[]][] = [
+  ["Общение", [["/", "Лента"], ["/feeds", "Мои ленты"], ["/im", "Сообщения"], ["/calls", "Звонки"], ["/notifications", "Уведомления"], ["/communities", "Сообщества"]]],
   ["Походы", [["/hikes", "Походы"], ["/record", "Записать трек"], ["/companions", "Попутчики"], ["/rides", "Подвоз"], ["/articles", "Статьи"], ["/fundraisers", "Сборы"], ["/offline", "Офлайн"]]],
-  ["Общение", [["/", "Лента"], ["/feeds", "Мои ленты"], ["/im", "Сообщения"], ["/notifications", "Уведомления"], ["/communities", "Сообщества"]]],
-  ["Моё", [["/music", "Музыка"], ["/bookmarks", "Закладки"], ["/documents", "Документы"], ["/scheduled", "Отложенные"],
-    ["/wallet", "Кошелёк"], ["/plus", "Плюс"], ["/settings", "Безопасность"]]],
+  ["Моё", [["/photos", "Фото"], ["/music", "Музыка"], ["/videos", "Видео"], ["/bookmarks", "Закладки"], ["/documents", "Документы"], ["/scheduled", "Отложенные"],
+    ["/wallet", "Кошелёк"], ["/plus", "Плюс"], ["/settings", "Настройки"]]],
 ];
 // короткие подписи для узкой панели; полные — в aria-label
 const tabs: [string, string, string][] = [["/", "Лента", "Лента"], ["/hikes", "Походы", "Походы"], ["/im", "Чаты", "Сообщения"], ["/notifications", "Новое", "Уведомления"]];
@@ -87,6 +109,12 @@ function Shell() {
   const [unread, setUnread] = useState(0);
   const [q, setQ] = useState("");
   const [more, setMore] = useState(false);
+  const musicActive=path.split("?")[0]==="/music";
+  const [musicLoaded,setMusicLoaded]=useState(musicActive);
+  const [player,setPlayer]=useState<MiniPlayerState|null>(null);
+  useEffect(()=>{if(musicActive)setMusicLoaded(true);},[musicActive]);
+  const [hidden,setHidden] = useState<string[]>([]);
+  useEffect(()=>{const update=()=>setHidden(user?hiddenSections(user.id):[]);update();window.addEventListener("sn-navigation",update);return()=>window.removeEventListener("sn-navigation",update);},[user?.id]);
   useEffect(() => setMore(false), [path]);
 
   const countUnread = () => get<{ unread: number }>("/notifications?limit=1").then((r) => setUnread(r.unread), () => {});
@@ -98,25 +126,30 @@ function Shell() {
   if (!user) return <Loading />;
   if (user.consent_required && !path.startsWith("/settings")) return <ConsentGate />;
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
-  const groups: [string, NavItem[]][] = user.role === "user" ? navGroups
+  const allGroups: [string, NavItem[]][] = user.role === "user" ? navGroups
     : [...navGroups.slice(0, 2), [navGroups[2][0], [...navGroups[2][1], ["/admin", user.role === "admin" ? "Админка" : "Модерация"]]]];
+  const groups: [string,NavItem[]][] = allGroups.map(([title,items])=>[title,items.filter(([url])=>!hidden.includes(url))]);
   const link = (href: string, label: string, cls?: string, full?: string) => (
     <a key={href} href={href} class={cls} aria-label={full && full !== label ? (href === "/notifications" && unread > 0 ? `${full}, новых: ${unread}` : full) : undefined} aria-current={active(href) ? "page" : undefined}>
-      {label}{href === "/notifications" && unread > 0 && <span class="badge" aria-label={`новых: ${unread}`}>{unread}</span>}
+      <Icon name={navIcon(href)} /><span>{label}</span>{href === "/notifications" && unread > 0 && <span class="badge" aria-label={`новых: ${unread}`}>{unread}</span>}
     </a>
   );
   return (
     <div class="shell">
+      <CallManager />
       <header class="topbar"><div class="topbar-in">
-        <a href="/" class="wordmark" aria-label="socialnet — лента">socialnet</a>
+        <a href="/" class="wordmark" aria-label="socialnet — лента"><span class="brand-mark" aria-hidden="true">s</span>socialnet</a>
         <form class="search" role="search" onSubmit={(e) => { e.preventDefault(); navigate(`/search?q=${encodeURIComponent(q)}`); }}>
           <label class="sr-only" for="q">Поиск</label>
-          <input id="q" type="search" placeholder="Поиск: походы, маршруты, люди" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
+          <Icon name="search" /><input id="q" type="search" placeholder="Поиск: походы, маршруты, люди" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
         </form>
-        <a href={`/u/${user.username}`} class="me" aria-label="Мой профиль"><Avatar user={user} size={32} /></a>
+        <div class="topbar-actions"><NotificationMenu unread={unread} onRead={countUnread}/><a href="/music" class="header-action" aria-label="Открыть музыку"><Icon name="music" /></a></div>
+        <MiniPlayer player={player}/>
+        <AccountMenu user={user} />
       </div></header>
-      <div class="layout">
+      <div class={path === "/" || path.startsWith("/?") ? "layout layout-feed" : "layout"}>
       <nav class="sidenav" aria-label="Разделы">
+        <a href={`/u/${user.username}`} aria-label="Мой профиль" aria-current={active(`/u/${user.username}`) ? "page" : undefined}><Icon name="profile" /><span>Профиль</span></a>
         {groups.map(([title, items]) => (
           <section key={title} class="nav-group">
             <h2 class="nav-title">{title}</h2>
@@ -124,6 +157,7 @@ function Shell() {
           </section>
         ))}
         <ul><li><button class="link" onClick={() => logout()}>Выйти</button></li></ul>
+        <SidebarFooter/>
       </nav>
       <nav class="tabbar" aria-label="Главные разделы">
         {tabs.map(([href, label, full]) => link(href, label, "tab", full))}
@@ -135,12 +169,15 @@ function Shell() {
             <section key={title}><h2 class="nav-title">{title}</h2><div class="more-grid">{items.map(([href, label]) => link(href, label, "more-item"))}</div></section>
           ))}
           <button class="ghost" onClick={() => logout()}>Выйти</button>
+          <SidebarFooter/>
         </div>
       )}
       <main class="content" id="main">
         {!user.email_verified && <VerifyBanner email={user.email} />}
+        {(musicLoaded||musicActive)&&<div hidden={!musicActive}><MusicPage key={user.id} userId={user.id} active={musicActive} onPlayerChange={setPlayer}/></div>}
         {routes(path, () => setUnread(0), user.id)}
       </main>
+      {(path === "/" || path.startsWith("/?")) && <FeedAside />}
       </div>
     </div>
   );

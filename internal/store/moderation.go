@@ -296,12 +296,31 @@ func (s *Store) Unban(ctx context.Context, userID int64) error {
 }
 
 func (s *Store) SetRole(ctx context.Context, userID int64, role string) error {
-	tag, err := s.pool.Exec(ctx, `UPDATE users SET role = $2 WHERE id = $1`, userID, role)
-	if err == nil && tag.RowsAffected() == 0 {
-		return ErrNotFound
-	}
-	return err
+	return s.inTx(ctx, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(83019244)`); err != nil {
+			return err
+		}
+		var current string
+		if err := tx.QueryRow(ctx, `SELECT role FROM users WHERE id=$1 FOR UPDATE`, userID).Scan(&current); errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		} else if err != nil {
+			return err
+		}
+		if current == "admin" && role != "admin" {
+			var others int
+			if err := tx.QueryRow(ctx, `SELECT count(*) FROM users WHERE role='admin' AND banned_at IS NULL AND id<>$1`, userID).Scan(&others); err != nil {
+				return err
+			}
+			if others == 0 {
+				return ErrLastAdmin
+			}
+		}
+		_, err := tx.Exec(ctx, `UPDATE users SET role=$2 WHERE id=$1`, userID, role)
+		return err
+	})
 }
+
+var ErrLastAdmin = errors.New("cannot demote the last administrator")
 
 type ModAction struct {
 	ID          int64     `json:"id"`

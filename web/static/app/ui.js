@@ -100,4 +100,7 @@ export function Empty({ children }) {
 export function Loading() {
     return h("p", { class: "loading", "aria-live": "polite" }, "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430\u2026");
 }
-export const duration = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+export const duration = (s) => {
+    const seconds = Number.isFinite(s) ? Math.max(0, Math.floor(s)) : 0;
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+};

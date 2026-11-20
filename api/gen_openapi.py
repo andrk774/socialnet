@@ -63,7 +63,7 @@ schemas = {
     "RouteMark": obj(id=int_, route_id=uuid, author=S("UserCard"), kind=enum("spring", "camp", "ford", "danger", "view", "other"),
                      lat=num, lon=num, title=str_, note=str_, photo_url=nullable(str_), thumb_url=nullable(str_),
                      verified_on={"type": "string", "format": "date"}, checks=int_, my_check=bool_, created_at=dt),
-    "Poll": obj(id=int_, question=str_, multiple=bool_, anonymous=bool_, closes_at=nullable(dt), closed=bool_,
+    "Poll": obj(id=int_, question=str_, multiple=bool_, anonymous=bool_, closes_at={"type": ["string", "null"], "format": "date-time"}, closed=bool_,
                 voters_count=int_, results_hidden=bool_, my_votes=arr(int_),
                 options=arr(obj(id=int_, text=str_, votes=nullable(int_)))),
     "Post": obj(id=int_, author=S("UserCard"), **{"community?": obj(id=int_, slug=str_, name=str_)}, text=str_,
@@ -75,7 +75,7 @@ schemas = {
                 reactions={"type": "object", "additionalProperties": int_},
                 created_at=dt, **{"edited_at?": dt}),
     "Comment": obj(id=int_, post_id=int_, **{"parent_id?": int_, "reply_to?": S("UserCard")}, replies_count=int_,
-                   author=S("UserCard"), text=str_, created_at=dt),
+                   author=S("UserCard"), text=str_, created_at=dt, photos=arr(S("Photo")), tracks=arr(S("PostTrack")), videos=arr(S("PostVideo")), documents=arr(S("PostDocument")), sticker=str_, likes_count=int_, my_reaction=str_),
     "Attachment": obj(kind=enum("photo", "track", "voice", "document"), id=uuid, url=str_,
                       **{"thumb_url?": str_, "title?": str_, "artist?": str_, "duration_sec?": int_, "ext?": str_, "size?": int_}),
     "ChatMember": obj(id=int_, username=str_, first_name=str_, last_name=str_, avatar_url=nullable(str_),
@@ -89,7 +89,7 @@ schemas = {
                  meeting_point=str_, approval=bool_,
                  going_count=int_, maybe_count=int_, pending_count=int_, waitlist_count=int_,
                  my_status=nullable(enum("going", "maybe", "pending", "waitlist")), **{"my_waitlist_position?": int_},
-                 control_at=nullable(dt), returned_at=nullable(dt), alert_sent=bool_, created_at=dt, **{"chat_id?": int_, "can_review?": bool_, "my_review?": S("Review"), "notices?": arr(S("AreaNotice"))}),
+                 control_at={"type": ["string", "null"], "format": "date-time"}, returned_at={"type": ["string", "null"], "format": "date-time"}, alert_sent=bool_, created_at=dt, **{"chat_id?": int_, "can_review?": bool_, "my_review?": S("Review"), "notices?": arr(S("AreaNotice"))}),
     "CompanionAd": obj(id=int_, author=S("UserCard"), region=str_, title=str_, body=str_,
                        date_from={"type": "string", "format": "date"}, date_to={"type": "string", "format": "date"},
                        difficulty=nullable(enum_int(1, 2, 3, 4, 5)), seats=int_, route_id=nullable(str_), closed=bool_, created_at=dt),
@@ -98,7 +98,7 @@ schemas = {
                  **{"spans?": arr(S("Span")), "items?": arr(arr(S("Span"))), "media_id?": uuid, "caption?": str_}),
     "Article": obj(id=int_, author=S("UserCard"), title=str_, cover_url=nullable(str_), cover_thumb_url=nullable(str_),
                    cover_media_id=nullable(uuid), route_id=nullable(uuid), status=enum("draft", "published"), excerpt=str_,
-                   created_at=dt, updated_at=dt, published_at=nullable(dt), **{"body?": str_, "blocks?": arr(S("Block"))}),
+                   created_at=dt, updated_at=dt, published_at={"type": ["string", "null"], "format": "date-time"}, **{"body?": str_, "blocks?": arr(S("Block"))}),
     "Ride": obj(id=int_, driver=S("UserCard"), event_id=nullable(int_), **{"from": str_}, to=str_, departs_at=dt, seats=int_,
                 taken=int_, pending=int_, note=str_, my_status=nullable(enum("pending", "accepted")), created_at=dt),
     "Application": obj(user=S("UserCard"), note=str_, created_at=dt),
@@ -135,8 +135,8 @@ schemas = {
     "Playlist": obj(id=int_, owner_id=int_, title=str_, track_count=int_, **{"tracks?": arr(S("Track"))}, created_at=dt),
     "App": obj(id=int_, owner_id=int_, name=str_, client_id=str_, confidential=bool_, redirect_uris=arr(str_),
                **{"client_secret?": str_}, created_at=dt),
-    "AuthorizedApp": obj(app_id=int_, name=str_, scopes=arr(str_), granted_at=dt, last_used_at=nullable(dt)),
-    "BotToken": obj(id=int_, name=str_, scopes=arr(str_), created_at=dt, last_used_at=nullable(dt)),
+    "AuthorizedApp": obj(app_id=int_, name=str_, scopes=arr(str_), granted_at=dt, last_used_at={"type": ["string", "null"], "format": "date-time"}),
+    "BotToken": obj(id=int_, name=str_, scopes=arr(str_), created_at=dt, last_used_at={"type": ["string", "null"], "format": "date-time"}),
     "CallbackServer": obj(community_id=int_, url=str_, events=arr(str_), status=enum("unconfirmed", "active", "failing"),
                           last_error=str_, updated_at=dt),
     "Video": obj(id=uuid, owner_id=int_, title=str_, description=str_, status=enum("processing", "ready", "failed"),
@@ -260,7 +260,7 @@ r("DELETE", A + "/bookmarks/{kind}/{target}", "bookmarks", "Убрать из з
 # --- документы ---
 r("POST", A + "/documents", "documents", "Загрузить документ (PDF, DOC(X), XLS(X), PPT(X), ODF, EPUB, DjVu, RTF, TXT, ZIP, 7Z, RAR… до 50 МБ)",
   resp=S("Document"), code=201, content=upload_form(**{"title?": str_}))
-r("GET", A + "/documents", "documents", "Мои документы", resp=lst(S("Document")))
+r("GET", A + "/documents", "documents", "Мои файлы: q — поиск, kind — all/text/gif/archive", resp=obj(items=arr(S("Document")),next_cursor=nullable(int_),total=int_))
 r("PATCH", A + "/documents/{did}", "documents", "Переименовать", obj(title=str_), S("Document"))
 r("DELETE", A + "/documents/{did}", "documents", "Удалить (пропадёт из постов и сообщений)", code=204)
 r("GET", A + "/documents/{did}/download", "documents", "Скачать (владелец, зрители поста, участники беседы)", resp="binary")
@@ -268,8 +268,11 @@ r("DELETE", A + "/posts/{id}", "posts", "Удалить пост", code=204)
 r("POST", A + "/posts/{id}/like", "posts", "Лайк", resp=obj(likes_count=int_, liked_by_me=bool_))
 r("DELETE", A + "/posts/{id}/like", "posts", "Убрать лайк", resp=obj(likes_count=int_, liked_by_me=bool_))
 r("GET", A + "/posts/{id}/comments", "posts", "Комментарии", resp=lst(S("Comment")))
-r("POST", A + "/posts/{id}/comments", "posts", "Комментировать", obj(text=str_), obj(id=int_, post_id=int_, text=str_), 201)
+r("POST", A + "/posts/{id}/comments", "posts", "Comment with text and/or attachments (10 maximum) or a built-in sticker", obj(**{"text?":str_,"reply_to_id?":int_,"photo_ids?":arr(uuid),"track_ids?":arr(uuid),"video_ids?":arr(uuid),"document_ids?":arr(uuid),"sticker?":enum("hello","thanks","hug","wow","yes","sad")}), obj(id=int_, post_id=int_, text=str_), 201)
 r("DELETE", A + "/comments/{id}", "posts", "Удалить комментарий", code=204)
+r("GET", A + "/comments/{id}/reactions", "posts", "Comment reactions, after user ID cursor", resp=lst(obj(user=S("UserCard"),reaction=str_)))
+r("POST", A + "/comments/{id}/reactions", "posts", "Set comment reaction", obj(reaction=enum("like","love","haha","wow","sad","angry")), code=204)
+r("DELETE", A + "/comments/{id}/reactions", "posts", "Remove comment reaction", code=204)
 r("GET", A + "/users/{id}/posts", "posts", "Стена", resp=lst(S("Post")))
 r("GET", A + "/feed", "posts", "Лента", resp=lst(S("Post")))
 r("GET", A + "/hashtags/{tag}/posts", "posts", "Посты по хэштегу", resp=lst(S("Post")))
@@ -282,6 +285,13 @@ r("GET", A + "/push/vapid-public-key", "notifications", "Ключ VAPID для W
 r("POST", A + "/push/subscriptions", "notifications", "Подписать браузер на push", obj(endpoint=str_, keys=obj(p256dh=str_, auth=str_)), code=204)
 r("DELETE", A + "/push/subscriptions", "notifications", "Отписать браузер", obj(endpoint=str_), code=204)
 # --- сообщения ---
+call_schema=obj(id=int_,caller_id=int_,callee_id=int_,video=bool_,status=str_,created_at=dt,peer=S("UserCard"),**{"offer?":str_,"answer?":str_,"answered_at?":dt,"ended_at?":dt})
+r("GET", A + "/calls/config", "messages", "WebRTC ICE configuration with temporary TURN credentials", resp=obj(ice_servers=arr(obj(urls=str_,**{"username?":str_,"credential?":str_})),relay_configured=bool_))
+r("GET", A + "/calls", "messages", "Own call history, optional before ID cursor", resp=obj(items=arr(call_schema),next_cursor=nullable(int_)))
+r("GET", A + "/calls/{id}", "messages", "Call signaling for participants only", resp=call_schema)
+r("POST", A + "/users/{id}/calls", "messages", "Start a personal call", obj(video=bool_,offer=str_),obj(id=int_),201)
+r("POST", A + "/calls/{id}/action", "messages", "Answer, decline, end or heartbeat a call", obj(action=str_,**{"answer?":str_}),code=204)
+r("DELETE", A + "/calls/history", "messages", "Clear own completed call history",code=204)
 r("POST", A + "/users/{id}/messages", "messages", "Отправить сообщение", obj(**{"body?": str_, "ciphertext?": b64, "nonce?": b64}), S("Message"), 201)
 r("GET", A + "/conversations", "messages", "Диалоги", resp=lst(S("Conversation")))
 r("GET", A + "/conversations/{id}/messages", "messages", "История диалога", resp=lst(S("Message")))
@@ -294,6 +304,14 @@ r("GET", A + "/ws", "messages", "WebSocket: ?ticket=… События: message,
 # --- фото ---
 r("POST", A + "/media", "media", "Загрузить фото (JPEG/PNG/GIF до 10 МБ)", resp=obj(id=uuid, url=str_, thumb_url=str_, width=int_, height=int_, mime=str_), code=201, content=upload_form())
 r("DELETE", A + "/media/{id}", "media", "Удалить фото", code=204)
+r("GET", A + "/photos", "media", "My photo library (UUID after cursor, 200 per page)", resp=obj(items=arr(obj(id=uuid,url=str_,thumb_url=str_,album_id=nullable(int_),archived=bool_,created_at=dt,description=str_)),next_cursor=nullable(uuid)))
+r("PATCH", A + "/photos", "media", "Organize 1-200 owned photos; album_id 0 clears album", obj(ids=arr(uuid), **{"album_id?":int_, "archived?":bool_}), code=204)
+r("PATCH", A + "/photos/{id}", "media", "Edit owned photo description (up to 2000 characters)", obj(description=str_), code=204)
+r("GET", A + "/users/me/comments", "users", "Own retained comments; optional after ID cursor, pages of 200", resp=obj(items=arr(obj(id=int_,post_id=int_,text=str_,created_at=str_)),next_cursor=nullable(int_)))
+r("GET", A + "/users/me/statistics", "users", "Personal statistics, UTC start/end dates, maximum 367 days", resp=obj(items=arr(obj(id=int_,kind=str_,text=str_,created_at=str_,archived=bool_,likes=int_,comments=int_,viewers=int_)),truncated=bool_))
+r("GET", A + "/photo-albums", "media", "My photo albums", resp=obj(items=arr(obj(id=int_,title=str_,count=int_,cover_url=nullable(str_)))))
+r("POST", A + "/photo-albums", "media", "Create photo album", obj(title=str_), obj(id=int_,title=str_),201)
+r("GET", A + "/communities/popular", "communities", "Public communities ranked by membership", resp=obj(items=arr(S("Community"))))
 r("GET", "/media/{id}/{size}", "media", "Файл фото: size = full | thumb", auth=False, resp="binary")
 # --- безопасность / модерация ---
 r("POST", A + "/reports", "moderation", "Пожаловаться", obj(target_type=enum("post", "comment", "user", "community", "track", "video", "document", "route", "companion", "route_point", "article", "review"), **{"target_id?": int_, "target_uuid?": uuid}, reason=str_), obj(id=int_, status=str_), 201)
@@ -343,6 +361,25 @@ r("GET", A + "/users/{id}/gifts", "wallet", "Подарки в профиле", 
 r("POST", A + "/communities/{id}/donate", "wallet", "Поддержать сообщество", obj(**money), S("TxResult"), 201)
 r("GET", A + "/communities/{id}/wallet", "wallet", "Кошелёк сообщества (админ)", resp=obj(balance=int_, transactions=lst(S("Tx"))))
 r("POST", A + "/communities/{id}/wallet/payout", "wallet", "Вывод участнику (владелец)", obj(to_user_id=int_, **money), S("TxResult"), 201)
+r("POST", A + "/admin/users/{id}/balance", "wallet", "Adjust user balance (admin)", obj(amount=int_, direction=enum("add", "remove"), memo=str_, idempotency_key=str_), S("TxResult"), 201)
+r("GET", A + "/conversations/{id}/pin", "messages", "Pinned message", resp={"type":"object"})
+r("PUT", A + "/conversations/{id}/pin", "messages", "Pin message or unpin with zero", obj(message_id=int_), None, 204)
+r("GET", A + "/stickers", "messages", "Own custom stickers", resp={"type":"object"})
+r("POST", A + "/stickers", "messages", "Create sticker from own uploaded image", obj(id=str_,title=str_), None, 204)
+r("POST", A + "/stickers/remove", "messages", "Remove own sticker", obj(id=str_), None, 204)
+r("GET", A + "/admin/site", "admin", "Site URL and HTTPS deployment settings", resp={"type":"object"})
+r("PUT", A + "/admin/site", "admin", "Save site URL and HTTPS deployment settings", {"type":"object"}, None, 204)
+r("GET", A + "/admin/ai", "admin", "AI provider settings without API key", resp={"type":"object"})
+r("PUT", A + "/admin/ai", "admin", "Save encrypted AI provider settings", {"type":"object"}, None, 204)
+r("GET", A + "/ai/status", "messages", "AI feature availability", resp={"type":"object"})
+r("POST", A + "/ai/generate", "messages", "Generate text or sticker on explicit request", obj(kind=str_,prompt=str_), {"type":"object"})
+r("GET", A + "/admin/smtp", "admin", "SMTP settings without password", None, obj(host=str_, port=int_, username=str_, sender=str_, tls_mode=str_, password_set=bool_, source=str_))
+r("PUT", A + "/admin/smtp", "admin", "Save encrypted SMTP settings", obj(host=str_, port=int_, username=str_, sender=str_, tls_mode=str_, password=str_, clear_password=bool_), None, 204)
+r("GET", A + "/admin/turn", "admin", "TURN settings without secret", None, obj(enabled=bool_, stun_url=str_, turn_url=str_, secret_set=bool_, source=str_))
+r("PUT", A + "/admin/turn", "admin", "Save TURN settings", obj(enabled=bool_, stun_url=str_, turn_url=str_, secret=str_), None, 204)
+r("GET", A + "/admin/kubernetes", "admin", "Kubernetes namespace status (read only)", None, obj(enabled=bool_, namespace=str_, at=dt, errors=arr(str_), truncated=bool_, pods=arr(obj(name=str_, phase=str_, node=str_, ready=int_, containers=int_, restarts=int_, reasons=arr(str_))), deployments=arr(obj(name=str_, desired=int_, ready=int_, updated=int_)), events=arr(obj(type=str_, reason=str_, object=str_, count=int_, at=str_))))
+r("PUT", A + "/admin/users/{id}/profile", "admin", "Edit user profile", obj(first_name=str_, last_name=str_, email=str_, birthday={"type":["string","null"]}, created_at=dt), None, 204)
+r("PUT", A + "/admin/users/{id}/password", "admin", "Set new password and revoke sessions", obj(password=str_), None, 204)
 r("POST", A + "/admin/wallet/mint", "wallet", "Начислить монеты (админ)", obj(user_id=int_, **money), S("TxResult"), 201)
 # --- музыка ---
 r("POST", A + "/tracks", "music", "Загрузить трек (до 50 МБ)", resp=S("Track"), code=201, content=upload_form(**{"title?": str_, "artist?": str_}))
@@ -369,6 +406,7 @@ r("GET", "/video/{vid}/{file}", "video", "HLS: master.m3u8, 360p.m3u8, сегм�
 
 # --- ветки комментариев и реакции ---
 r("GET", A + "/comments/{id}/replies", "posts", "Ответы в ветке комментария", resp=lst(S("Comment")))
+r("GET", A + "/posts/{id}/reactions", "posts", "List users who reacted", resp=lst(obj(user=S("UserCard"), reaction=str_)))
 r("POST", A + "/posts/{id}/reactions", "posts", "Поставить или сменить реакцию",
   obj(reaction=enum("like", "love", "haha", "wow", "sad", "angry")), obj(likes_count=int_, my_reaction=str_))
 r("DELETE", A + "/posts/{id}/reactions", "posts", "Убрать реакцию", resp=obj(likes_count=int_, liked_by_me=bool_))
@@ -389,7 +427,7 @@ r("POST", A + "/communities/{id}/requests/{userID}/approve", "communities", "П�
 r("POST", A + "/communities/{id}/requests/{userID}/reject", "communities", "Отклонить заявку", code=204)
 emoji_s = obj(id=int_, community_id=int_, shortcode=str_, url=str_, reaction=str_, created_at=dt)
 fund = obj(id=int_, community=obj(id=int_, slug=str_, name=str_), title=str_, description=str_, goal=int_, raised=int_,
-           donors=int_, deadline=dt, open=bool_, closed_at=nullable(dt), created_at=dt)
+           donors=int_, deadline=dt, open=bool_, closed_at={"type": ["string", "null"], "format": "date-time"}, created_at=dt)
 r("GET", A + "/communities/{id}/fundraisers", "communities", "Сборы сообщества", resp=obj(items=arr(fund)))
 r("POST", A + "/communities/{id}/fundraisers", "communities", "Объявить сбор (админ): цель в монетах, срок до 180 дней",
   obj(title=str_, goal=int_, deadline=dt, **{"description?": str_}), fund, 201)
@@ -412,9 +450,9 @@ r("GET", A + "/stories/{id}/viewers", "stories", "Кто смотрел (авт�
 r("DELETE", A + "/stories/{id}", "stories", "Удалить историю", code=204)
 # --- мероприятия ---
 ev = obj(**{"kind?": enum("event", "hike"), "title?": str_, "description?": str_, "place?": str_, "starts_at?": dt,
-            "ends_at?": nullable(dt), "community_id?": int_, "difficulty?": nullable(enum_int(1, 2, 3, 4, 5)),
+            "ends_at?": {"type": ["string", "null"], "format": "date-time"}, "community_id?": int_, "difficulty?": nullable(enum_int(1, 2, 3, 4, 5)),
             "capacity?": nullable(int_), "gear?": str_, "route_id?": nullable(str_), "meeting_point?": str_, "approval?": bool_,
-            "control_at?": nullable(dt)})
+            "control_at?": {"type": ["string", "null"], "format": "date-time"}})
 r("POST", A + "/events", "events", "Создать мероприятие", ev, S("Event"), 201)
 r("GET", A + "/events", "events", "Мои предстоящие мероприятия", resp=obj(items=arr(S("Event"))))
 r("GET", A + "/events/{id}", "events", "Мероприятие", resp=S("Event"))
@@ -454,7 +492,7 @@ r("POST", A + "/antennas", "wall", "Новая лента: 1–10 слов (ру
 r("PUT", A + "/antennas/{id}", "wall", "Изменить ленту", antenna_body, antenna)
 r("DELETE", A + "/antennas/{id}", "wall", "Удалить ленту", code=204)
 r("GET", A + "/antennas/{id}/posts", "wall", "Записи ленты (только видимые); первая страница отмечает их просмотренными", resp=lst(S("Post")))
-plus_s = obj(active=bool_, expires_at=nullable(dt), auto_renew=bool_, price=int_, days=int_, limits=obj())
+plus_s = obj(active=bool_, expires_at={"type": ["string", "null"], "format": "date-time"}, auto_renew=bool_, price=int_, days=int_, limits=obj())
 r("GET", A + "/plus", "wallet", "Подписка «Плюс»: состояние, цена в монетах, лимиты (обычный и с «Плюсом»)", resp=plus_s)
 r("POST", A + "/plus/buy", "wallet", "Купить или продлить на 30 дней за монеты (ключ идемпотентности обязателен)",
   obj(idempotency_key=str_), {"allOf": [plus_s, obj(replayed=bool_, balance=int_)]}, 201)
@@ -501,6 +539,7 @@ alert = obj(id=int_, rule=str_, subject=str_, severity=enum("low", "medium", "hi
 admin_user = obj(id=int_, username=str_, email=str_, first_name=str_, last_name=str_, avatar_url=nullable(str_),
                  role=enum("user", "moderator", "admin"), email_verified=bool_, is_bot=bool_, created_at=dt,
                  **{"banned_at?": dt, "ban_reason?": str_, "last_seen_at?": dt})
+r("GET", A + "/admin/system", "admin", "System monitoring (admin only)", resp={"type":"object"})
 r("GET", A + "/admin/stats", "moderation", "Сводка: пользователи, активность, жалобы, тревоги, платежи",
   resp=obj(users=int_, users_new_24h=int_, users_new_7d=int_, active_24h=int_, banned=int_, posts_24h=int_,
            comments_24h=int_, messages_24h=int_, open_reports=int_, open_alerts=int_, new_vulnerability_reports=int_,
@@ -509,7 +548,7 @@ r("GET", A + "/admin/users", "moderation", "Поиск пользователе�
 r("GET", A + "/admin/users/{id}", "moderation", "Карточка пользователя (без пароля и секретов — их нет в открытом виде)",
   resp={"allOf": [admin_user, obj(two_factor_enabled=bool_, active_sessions=int_, posts=int_, comments=int_, friends=int_,
                                   open_reports_against=int_, reports_filed=int_, balance=int_, debt=int_,
-                                  **{"last_login_at?": dt}, recent_security_events=arr(S("SecurityEvent")))]})
+                                  **{"last_login_at?": dt}, birthday={"type":["string","null"]}, subscription=obj(active=bool_, expires_at={"type": ["string", "null"], "format": "date-time"}, auto_renew=bool_), recent_security_events=arr(S("SecurityEvent")))]})
 r("POST", A + "/admin/users/{id}/password-reset", "moderation", "Отправить пользователю письмо со ссылкой на сброс пароля",
   obj(**{"revoke_sessions?": bool_}), obj(sent_to=str_, sessions_revoked=bool_), 202)
 r("POST", A + "/admin/users/{id}/revoke-sessions", "moderation", "Завершить все сеансы и токены приложений пользователя", code=204)

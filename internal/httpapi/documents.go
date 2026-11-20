@@ -24,6 +24,7 @@ const maxDocBytes = 50 << 20
 // начинаться файл. Расширение без совпадающей сигнатуры — отказ: так под
 // видом .pdf не загрузить исполняемый файл или HTML-страницу.
 var docFamilies = map[string]string{
+	"gif":  "gif",
 	"pdf":  "pdf",
 	"docx": "zip", "xlsx": "zip", "pptx": "zip", "odt": "zip", "ods": "zip", "odp": "zip", "epub": "zip", "zip": "zip",
 	"doc": "ole", "xls": "ole", "ppt": "ole",
@@ -32,6 +33,7 @@ var docFamilies = map[string]string{
 }
 
 var docMagic = map[string][][]byte{
+	"gif":  {[]byte("GIF87a"), []byte("GIF89a")},
 	"pdf":  {[]byte("%PDF-")},
 	"zip":  {[]byte("PK\x03\x04"), []byte("PK\x05\x06")},
 	"ole":  {{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1}},
@@ -144,12 +146,34 @@ func (s *Server) handleUploadDocument(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleMyDocuments(w http.ResponseWriter, r *http.Request) {
 	p := pageParams(r)
-	items, err := s.store.MyDocuments(r.Context(), userIDFrom(r.Context()), p.Before, p.Limit)
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if utf8.RuneCountInString(q) > 120 {
+		writeError(w, 400, "bad_request", "query too long")
+		return
+	}
+	exts := []string{}
+	switch r.URL.Query().Get("kind") {
+	case "", "all":
+	case "text":
+		exts = []string{"pdf", "doc", "docx", "txt", "md", "csv", "rtf", "odt", "epub", "djvu", "xls", "xlsx", "ods", "ppt", "pptx", "odp"}
+	case "gif":
+		exts = []string{"gif"}
+	case "archive":
+		exts = []string{"zip", "7z", "rar", "gz"}
+	default:
+		writeError(w, 400, "bad_request", "invalid file category")
+		return
+	}
+	items, total, err := s.store.MyDocuments(r.Context(), userIDFrom(r.Context()), p.Before, p.Limit, q, exts)
 	if err != nil {
 		s.internalError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, list(items, p.Limit, store.Document.Cursor))
+	page := list(items, p.Limit, store.Document.Cursor)
+	writeJSON(w, http.StatusOK, struct {
+		listResponse[store.Document]
+		Total int `json:"total"`
+	}{page, total})
 }
 
 func docID(w http.ResponseWriter, r *http.Request) (string, bool) {

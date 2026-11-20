@@ -10,7 +10,7 @@ process.on("unhandledRejection", async (e) => {
   for (const ctx of browser.contexts()) for (const [i, p] of ctx.pages().entries()) await p.screenshot({ path: `${shots}/failure-${i}.png`, fullPage: true }).catch(() => {});
   console.error(e); process.exit(1);
 });
-const browser = await chromium.launch();
+const browser = await chromium.launch({args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']});
 const problems = [];
 
 async function newUser(name, viewport = { width: 1280, height: 860 }) {
@@ -24,7 +24,7 @@ async function newUser(name, viewport = { width: 1280, height: 860 }) {
   // Leaflet отменяет сам; обновление токена при загрузке обрывается переходом
   // на другую страницу, и сервер на этот случай принимает старый токен
   // ещё минуту (store.RefreshReuseGrace), так что сеанс не теряется.
-  const benignAbort = (r) => r.failure()?.errorText === "net::ERR_ABORTED" && (r.url().includes("/tiles/") || r.url().endsWith("/api/v1/auth/refresh"));
+  const benignAbort = (r) => r.failure()?.errorText === "net::ERR_ABORTED" && (r.url().includes("/tiles/") || r.url().endsWith("/api/v1/auth/refresh") || (r.method()==="GET" && r.url().endsWith("/api/v1/calls")));
   page.on("requestfailed", (r) => { if (!r.url().includes("/api/v1/ws") && !benignAbort(r)) problems.push(`${name}: failed ${r.method()} ${r.url()} ${r.failure()?.errorText}`); });
   await page.goto(base + "/");
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
@@ -45,6 +45,158 @@ async function newUser(name, viewport = { width: 1280, height: 860 }) {
 }
 
 const anna = await newUser("anna");
+
+// Upload through the visible forms and verify persistence against the real API.
+{
+  const p = anna.page;
+  const picture = await p.locator(".brand-mark").screenshot();
+  await p.goto(base + "/u/anna");
+  await p.locator('.avatar-upload input[type="file"]').setInputFiles({ name: "avatar.png", mimeType: "image/png", buffer: picture });
+  await p.getByRole("button", { name: "Сохранить аватар", exact: true }).click();
+  await p.locator('.profile-head img.avatar[src*="/media/"]').waitFor();
+  await p.locator('.account-menu > summary img.avatar[src*="/media/"]').waitFor();
+  await p.reload();
+  await p.locator('.profile-head img.avatar[src*="/media/"]').waitFor();
+  await p.getByLabel("Меню фотографии профиля").click();
+  await p.getByRole("button", { name: "Открыть фото", exact: true }).click();
+  await p.locator('.avatar-photo-dialog[open] img[src$="/full"]').waitFor();
+  await p.keyboard.press("Escape");
+  await p.getByLabel("Меню фотографии профиля").click();
+  p.once("dialog", (d) => d.accept());
+  await p.getByRole("button", { name: "Удалить фото", exact: true }).click();
+  await p.locator('.profile-head .avatar-letter').waitFor();
+  await p.reload();
+  await p.locator('.profile-head .avatar-letter').waitFor();
+  if (clip) {
+    const samples = 44100 * 2;
+    const wav = Buffer.alloc(44 + samples * 2);
+    wav.write("RIFF", 0); wav.writeUInt32LE(wav.length - 8, 4); wav.write("WAVEfmt ", 8);
+    wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
+    wav.writeUInt32LE(44100, 24); wav.writeUInt32LE(88200, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
+    wav.write("data", 36); wav.writeUInt32LE(samples * 2, 40);
+    for (let i = 0; i < samples; i++) wav.writeInt16LE(Math.round(5000 * Math.sin(i * 440 * 2 * Math.PI / 44100)), 44 + i * 2);
+    await p.goto(base + "/music");
+    await p.getByRole("button", { name: "Загрузить аудиозапись", exact: true }).click();
+    await p.getByLabel("Файл", { exact: true }).setInputFiles({ name: "test.wav", mimeType: "audio/wav", buffer: wav });
+    await p.getByLabel("Название", { exact: true }).fill("Проверка музыки");
+    await p.getByLabel("Исполнитель", { exact: true }).fill("Анна");
+    await p.getByRole("button", { name: "Загрузить", exact: true }).click();
+    await p.getByText("Трек добавлен в вашу музыку.", { exact: true }).waitFor();
+    await p.locator('.music-dialog[open]').getByLabel("Закрыть окно").click();
+    await p.locator('.tracks').getByText("Проверка музыки", { exact: true }).waitFor();
+    await p.locator('.track-btn').first().click();
+    await p.locator('.player audio').waitFor({ state: 'attached' });
+    await p.waitForFunction(() => { const a = document.querySelector('.player audio'); return a && !a.paused && a.currentTime > 0; });
+    await p.locator('.music-tracks .track-btn').first().click();
+    await p.waitForFunction(() => document.querySelector('.player audio').paused);
+    await p.getByRole('button', { name: 'Воспроизвести', exact: true }).click();
+    await p.waitForFunction(() => !document.querySelector('.player audio').paused);
+    await p.getByRole('button',{name:'Повтор трека',exact:true}).click();
+    await p.locator('.header-player-title').filter({hasText:'Проверка музыки'}).waitFor();
+    await p.evaluate(()=>{window.__musicElement=document.querySelector('.player audio');});
+    await p.locator('.sidenav a[href="/documents"]').click();
+    await p.getByRole('heading',{name:/Файлы/}).waitFor();
+    await p.waitForFunction(()=>{const a=document.querySelector('.player audio');return a===window.__musicElement&&!a.paused;});
+    await p.getByRole('button',{name:'Мини-плеер: пауза',exact:true}).click();
+    await p.waitForFunction(()=>window.__musicElement.paused);
+    await p.getByRole('button',{name:'Мини-плеер: воспроизвести',exact:true}).click();
+    await p.waitForFunction(()=>!window.__musicElement.paused);
+    await p.setViewportSize({width:390,height:844});
+    assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mini player overflow');
+    await p.screenshot({path:`${shots}/mini-player-mobile.png`});
+    await p.setViewportSize({width:1280,height:860});
+    await p.locator('.header-player-title').click();
+    await p.getByRole('heading',{name:'Музыка',exact:true}).waitFor({state:'attached'});
+    await p.screenshot({path:`${shots}/mini-player-desktop.png`});
+    await p.getByRole("button", { name: "Создать плейлист", exact: true }).click();
+    await p.getByLabel("Название плейлиста", { exact: true }).fill("Мой тестовый плейлист");
+    await p.getByRole("button", { name: "Создать", exact: true }).click();
+    await p.getByRole("heading", { name: "Мой тестовый плейлист", exact: true }).waitFor();
+    await p.getByRole("button", { name: "Моя музыка", exact: true }).click();
+  await p.getByRole("button", { name: "Добавить в плейлист: Проверка музыки", exact: true }).first().click();
+    await p.getByRole("button", { name: "Мой тестовый плейлист", exact: true }).click();
+    await p.getByRole("button", { name: "Плейлисты", exact: true }).click();
+    await p.locator('.playlist-card').filter({ hasText: "Мой тестовый плейлист" }).click();
+    await p.locator('.tracks').getByText("Проверка музыки", { exact: true }).waitFor();
+    await p.getByLabel("Поиск музыки", { exact: true }).fill("Проверка");
+    await p.getByRole("heading", { name: "Результаты поиска" }).waitFor();
+    await p.locator('.tracks').getByText("Проверка музыки", { exact: true }).waitFor();
+    await p.getByRole("button", { name: "Главная", exact: true }).click();
+    await p.getByRole("button", { name: "☷ Настроить", exact: true }).click();
+    await p.getByLabel("Мой тестовый плейлист", { exact: true }).check();
+    await p.getByRole("button", { name: "По списку", exact: true }).click();
+    await p.getByRole("button", { name: "Применить", exact: true }).click();
+    await p.getByRole("button", { name: "Слушать мой микс", exact: true }).click();
+    await p.locator('.music-now').getByText("Проверка музыки", { exact: true }).waitFor();
+    await p.setViewportSize({ width: 390, height: 844 });
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "music mobile overflow");
+    await p.setViewportSize({ width: 1280, height: 860 });
+    await p.goto(base + "/videos");
+    await p.getByRole("button", { name: "Загрузить видео", exact: true }).click();
+    await p.getByLabel("Файл", { exact: true }).setInputFiles(clip);
+    await p.getByLabel("Название", { exact: true }).fill("Проверка загрузки видео");
+    await p.getByRole("button", { name: "Загрузить", exact: true }).click();
+    await p.getByText("Видео загружено. После обработки здесь появится плеер.", { exact: true }).waitFor();
+    await p.getByLabel("Закрыть загрузку видео", { exact: true }).click();
+    await p.getByRole("button", { name: "Смотреть: Проверка загрузки видео", exact: true }).click({ timeout: 90000 });
+    await p.locator('figure.video video').waitFor({ timeout: 90000 });
+    await p.keyboard.press("Escape");
+    await p.locator('.video-viewer video').waitFor({ state: 'detached' });
+    await p.reload();
+    await p.getByLabel("Поиск видео", { exact: true }).fill("несуществующее видео");
+    await p.getByText("Нет видео по выбранным условиям.", { exact: true }).waitFor();
+    await p.getByLabel("Поиск видео", { exact: true }).fill("Проверка");
+    await p.getByRole("button", { name: "Готовые", exact: true }).click();
+    await p.getByRole("button", { name: "Смотреть: Проверка загрузки видео", exact: true }).click();
+    await p.locator('figure.video video').waitFor();
+  }
+  await p.goto(base + "/");
+  await p.getByPlaceholder("Что у вас нового?").waitFor();
+}
+
+// Каркас ленты: меню аккаунта, сохранение темы и реальные фотоистории.
+{
+  const p = anna.page;
+  await p.getByLabel("Меню аккаунта", { exact: true }).click();
+  await p.getByRole("link", { name: "Управление аккаунтом" }).waitFor();
+  await p.getByRole("button", { name: "Тема: Системная", exact: true }).click();
+  await p.getByRole("button", { name: "Тема: Светлая", exact: true }).click();
+  await p.waitForFunction(() => document.documentElement.dataset.theme === "dark");
+  assert.equal(await p.evaluate(() => document.documentElement.dataset.theme), "dark");
+  await p.reload();
+  await p.getByPlaceholder("Что у вас нового?").waitFor();
+  await p.waitForFunction(() => document.documentElement.dataset.theme === "dark");
+  assert.equal(await p.evaluate(() => document.documentElement.dataset.theme), "dark");
+  await p.getByLabel("Меню аккаунта", { exact: true }).click();
+  await p.getByRole("button", { name: "Тема: Тёмная", exact: true }).click();
+  await p.keyboard.press("Escape");
+  assert.equal(await p.locator(".account-menu").evaluate((e) => e.open), false);
+  const picture = await p.locator(".brand-mark").screenshot();
+  await p.getByRole("button", { name: "Моя история", exact: true }).click();
+  await p.getByLabel("Фото для истории").setInputFiles({ name: "story.png", mimeType: "image/png", buffer: picture });
+  await p.getByLabel("Подпись", { exact: true }).fill("Новый интерфейс socialnet");
+  await p.getByRole("button", { name: "Опубликовать историю" }).click();
+  await p.getByRole("button", { name: "Истории: Анна" }).click();
+  await p.getByRole("dialog").getByText("Новый интерфейс socialnet", { exact: true }).waitFor();
+  await p.getByRole('button',{name:'Приостановить историю',exact:true}).click();
+  const progress=await p.locator('.story-progress progress').inputValue().catch(()=>p.locator('.story-progress progress').evaluate(e=>e.value));
+  await p.waitForTimeout(250);
+  assert.equal(await p.locator('.story-progress progress').evaluate(e=>e.value),Number(progress));
+  await p.getByRole('dialog').screenshot({path:`${shots}/story-theater.png`});
+  await p.keyboard.press("Escape");
+  assert.equal(await p.getByRole("dialog").count(), 0);
+  await p.getByLabel("Меню аккаунта", { exact: true }).click();
+  await p.screenshot({ path: `${shots}/01a-account-menu.png` });
+  await p.locator("h1").first().evaluate((e) => e.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })));
+  assert.equal(await p.locator(".account-menu").evaluate((e) => e.open), false);
+  await p.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, "mobile horizontal overflow");
+  await p.getByRole("button", { name: "Ещё", exact: true }).click();
+  await p.getByRole("dialog", { name: "Все разделы" }).waitFor();
+  await p.getByRole("button", { name: "Ещё", exact: true }).click();
+  await p.screenshot({ path: `${shots}/01d-mobile-feed.png` });
+  await p.setViewportSize({ width: 1280, height: 860 });
+}
 
 // вход по QR-коду: новое устройство показывает код, телефон Анны подтверждает
 {
@@ -116,6 +268,18 @@ const first = anna.page.locator("article.post").nth(1); // первая запи
 await first.getByRole("button", { name: "Выбрать реакцию" }).click();
 await first.getByRole("menuitem", { name: "Люблю" }).click();
 await first.getByRole("button", { name: /Ваша реакция: Люблю/ }).waitFor();
+await first.locator('.reaction-count').hover();
+await first.locator('.reaction-preview .avatar').first().waitFor();
+await first.locator('.reaction-count').click();
+await anna.page.getByRole('dialog',{name:'Реакции на публикацию'}).getByRole('link',{name:'Анна',exact:true}).waitFor();
+await anna.page.getByRole('button',{name:'Закрыть список',exact:true}).click();
+await first.getByRole('button',{name:'Поделиться',exact:true}).click();
+const share=anna.page.getByRole('dialog',{name:'Поделиться записью'});
+assert.match(await share.getByLabel('Ссылка на запись').inputValue(),/\/p\/\d+$/);
+await anna.ctx.grantPermissions(['clipboard-read','clipboard-write'],{origin:base});
+await share.getByRole('button',{name:'Копировать ссылку',exact:true}).click();
+await share.getByRole('status').filter({hasText:'Ссылка скопирована'}).waitFor();
+await share.getByRole('button',{name:'Закрыть',exact:true}).click();
 await first.getByRole("button", { name: /Комментарии/ }).click();
 await first.getByPlaceholder("Написать комментарий").fill("Красота!");
 await first.getByRole("button", { name: "Отправить", exact: true }).click();
@@ -124,6 +288,24 @@ await first.getByRole("button", { name: "Ответить" }).click();
 await first.getByPlaceholder("Написать комментарий").fill("Анна, спасибо");
 await first.getByRole("button", { name: "Отправить", exact: true }).click();
 await first.getByText("Анна, спасибо").waitFor();
+const rootComment=first.locator('.comment').filter({has:anna.page.getByText('Красота!',{exact:true})}).first();
+await rootComment.getByRole('button',{name:'Нравится комментарий',exact:true}).first().click();
+await rootComment.locator('.reaction-count').first().filter({hasText:'1'}).waitFor();
+await rootComment.locator('.reaction-count').first().click();
+const commentReactions=anna.page.getByRole('dialog',{name:'Реакции на комментарий',exact:true});
+await commentReactions.getByRole('link',{name:'Анна',exact:true}).waitFor();
+await commentReactions.getByRole('button',{name:'Закрыть список'}).click();
+await first.getByRole('button',{name:'Стикеры',exact:true}).click();
+const commentPicker=anna.page.getByRole('dialog',{name:'Вложения к комментарию',exact:true});
+await commentPicker.locator('.comment-sticker-grid button').first().click();
+await first.getByRole('button',{name:'Файл',exact:true}).click();
+await commentPicker.getByLabel('Файл для комментария').setInputFiles({name:'comment-file.txt',mimeType:'text/plain',buffer:Buffer.from('comment attachment')});
+await commentPicker.getByText('Выбрано 1 из 10',{exact:true}).waitFor();
+await commentPicker.getByRole('button',{name:'Готово',exact:true}).click();
+await first.getByRole('button',{name:'Отправить',exact:true}).click();
+await first.locator('.comment-media .sticker-hello').waitFor();
+await first.locator('.comment-media').getByRole('button',{name:/comment-file/}).waitFor();
+await anna.page.screenshot({path:`${shots}/comment-content.png`,fullPage:true});
 await anna.page.screenshot({ path: `${shots}/02-feed-post.png`, fullPage: true });
 
 // второй пользователь; Анна пишет ему, он видит сообщение без перезагрузки
@@ -140,6 +322,12 @@ await bob.page.getByRole("link", { name: /Анна/ }).click();
 await bob.page.getByLabel("Сообщение").fill("Иду!");
 await bob.page.getByRole("button", { name: "Отправить", exact: true }).click();
 await anna.page.locator(".msg").filter({ hasText: "Иду!" }).waitFor({ timeout: 5000 });
+await anna.page.getByLabel("Сообщение", { exact: true }).fill("Первая строка");
+await anna.page.getByLabel("Сообщение", { exact: true }).press("Shift+Enter");
+await anna.page.getByLabel("Сообщение", { exact: true }).pressSequentially("Вторая строка");
+assert.equal(await anna.page.getByLabel("Сообщение", { exact: true }).inputValue(), "Первая строка\nВторая строка");
+await anna.page.getByLabel("Сообщение", { exact: true }).press("Enter");
+await bob.page.locator(".msg").filter({ hasText: "Вторая строка" }).waitFor();
 await anna.page.screenshot({ path: `${shots}/03-chat.png` });
 
 // опрос: Анна спрашивает, Борис голосует и видит проценты
@@ -283,7 +471,7 @@ assert.equal(await bob.page.getByText("Маршрут на субботу").coun
 
 // поход: Анна собирает группу по заявкам, Борис просится, Анна принимает
 {
-  await anna.page.getByRole("link", { name: "Походы" }).click();
+  await anna.page.getByRole("link", { name: "Походы", exact: true }).click();
   await anna.page.getByText("Ближайших походов нет").waitFor();
   await anna.page.getByRole("link", { name: "Организовать поход" }).click();
   await anna.page.getByLabel("Название").fill("Двуглавая сопка с ночёвкой");
@@ -493,11 +681,11 @@ await anna.page.getByRole("button", { name: /Подключить за \d+ мо�
 {
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
   await anna.page.getByRole("link", { name: "Сообщества" }).click();
-  await anna.page.getByText("Создать сообщество").click();
+  await anna.page.getByRole("button", {name:"Создать сообщество",exact:true}).click();
   await anna.page.getByLabel("Название").fill("Клуб Таганая");
   await anna.page.getByLabel("Адрес").fill("taganay_club");
-  await anna.page.getByRole("button", { name: "Создать" }).click();
-  await anna.page.getByRole("link", { name: "Клуб Таганая" }).click();
+  await anna.page.getByRole("dialog", { name: "Создать сообщество" }).getByRole("button", { name: "Создать", exact: true }).click();
+  await anna.page.locator('.community-main .community-description').filter({hasText:"Клуб Таганая"}).click();
   await anna.page.getByText(/^Эмодзи сообщества/).click();
   await anna.page.locator(".emoji-manager").getByLabel("Код").fill("gora");
   await anna.page.locator(".emoji-manager").getByLabel("Картинка").setInputFiles({ name: "gora.png", mimeType: "image/png", buffer: png });
@@ -591,7 +779,7 @@ await anna.page.getByRole("alert").filter({ hasText: "подтвердите п�
 await anna.page.getByRole("button", { name: "Отправить письмо ещё раз" }).click();
 await anna.page.getByText("Письмо отправлено").waitFor();
 await anna.page.screenshot({ path: `${shots}/04-wallet.png`, fullPage: true });
-await anna.page.goto(base + "/settings");
+await anna.page.goto(base + "/settings?tab=security");
 await anna.page.getByText("это устройство").waitFor();
 await anna.page.goto(base + "/u/anna");
 await anna.page.getByRole("heading", { name: "Анна" }).waitFor();
@@ -719,6 +907,225 @@ const dp = await dark.newPage();
 await dp.goto(base + "/");
 await dp.screenshot({ path: `${shots}/07-login-dark.png` });
 
+// Layout audit of every top-level section at desktop and mobile widths.
+{
+ const p=anna.page;
+ await p.goto(base+'/documents');
+ await p.getByLabel('Загрузить файл',{exact:true}).setInputFiles([{name:'Reference.txt',mimeType:'text/plain',buffer:Buffer.from('Document search test')},{name:'Pixel.gif',mimeType:'image/gif',buffer:Buffer.from('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==','base64')}]);
+ await p.getByRole('button',{name:'Reference.txt',exact:true}).waitFor();
+ await p.getByRole('button',{name:'GIF-изображения',exact:true}).click();
+ await p.getByRole('button',{name:'Pixel.gif',exact:true}).waitFor();
+ assert.equal(await p.getByRole('button',{name:'Reference.txt',exact:true}).count(),0);
+ await p.getByRole('button',{name:'Все файлы',exact:true}).click();
+ await p.getByLabel('Поиск файлов').fill('Reference');
+ await p.getByRole('button',{name:'Reference.txt',exact:true}).waitFor();
+ await p.getByRole('button',{name:'Pixel.gif',exact:true}).waitFor({state:'detached'});
+ const downloaded=p.waitForEvent('download');
+ await p.getByRole('button',{name:'Reference.txt',exact:true}).click();
+ assert.equal((await downloaded).suggestedFilename(),'Reference.txt');
+ await p.goto(base+'/developers?tab=api');
+ await p.getByLabel('Поиск API').fill('/calls/config');
+ await p.locator('.api-method').first().waitFor();
+ assert.equal(await p.locator('.api-method').count(),1);
+ await p.goto(base+'/developers?tab=docs');
+ await p.getByRole('button',{name:'Авторизация OAuth',exact:true}).click();
+ await p.getByRole('heading',{name:'Авторизация OAuth',exact:true}).waitFor();
+ await p.goto(base+'/developers?tab=apps');
+ await p.getByRole('button',{name:'Создать приложение',exact:true}).click();
+ const form=p.getByRole('dialog',{name:'Создать приложение',exact:true});
+ await form.getByLabel('Название приложения').fill('Browser test application');
+ await form.getByLabel('Redirect URI, по одному на строку').fill('https://example.org/callback');
+ await form.getByRole('button',{name:'Создать',exact:true}).click();
+ await p.getByRole('heading',{name:'Browser test application',exact:true}).waitFor();
+ await p.reload();
+ await p.getByRole('heading',{name:'Browser test application',exact:true}).waitFor();
+ await p.locator('.developer-app').filter({hasText:'Browser test application'}).getByRole('button',{name:'Удалить приложение',exact:true}).click();
+ await p.getByRole('heading',{name:'Browser test application',exact:true}).waitFor({state:'detached'});
+}
+
+{
+  const p=anna.page;
+  await p.goto(base+'/help');
+  await p.goto(base+'/statistics');
+  await p.getByRole('heading',{name:'Моя статистика',exact:true}).waitFor();
+  await p.locator('.stats-table').waitFor();
+  const statsDownload=p.waitForEvent('download');
+  await p.getByRole('button',{name:'Экспорт CSV',exact:true}).click();
+  assert.match((await statsDownload).suggestedFilename(),/socialnet-post.*csv/);
+  await p.getByRole('button',{name:'Истории',exact:true}).click();
+  await p.getByLabel('Состояние историй').selectOption('archive');
+  await p.getByRole('button',{name:'Аудитория',exact:true}).click();
+  await p.getByText('Демография и устройства зрителей пока не собираются. Данных для диаграмм аудитории нет.').waitFor();
+  await p.goto(base+'/help/comments');
+  const commentsDownload=p.waitForEvent('download');
+  await p.getByRole('button',{name:'Скачать мои комментарии',exact:true}).click();
+  assert.equal((await commentsDownload).suggestedFilename(),'socialnet-my-comments.csv');
+  await p.goto(base+'/help');
+  await p.getByLabel('Поиск по справке').fill('аудиофайлы');
+  await p.getByText('Какие аудиофайлы можно загрузить?',{exact:true}).click();
+  await p.locator('.help-question[open]').getByRole('link',{name:'Открыть музыку'}).waitFor();
+  assert.equal(await p.locator('.help-question').count(),1);
+  await p.getByLabel('Поиск по справке').fill('ничегонет12345');
+  await p.getByText('Ничего не найдено. Попробуйте другое слово или выберите все темы.').waitFor();
+  await p.goto(base+'/legal-info');
+  await p.locator('.info-links a').first().waitFor();
+  for(const a of await p.locator('.info-links a').all()) {
+    const response=await p.request.get(new URL(await a.getAttribute('href'),base).href);
+    assert.equal(response.status(),200,'legal document link');
+  }
+  const footer=p.locator('.sidenav .sidebar-footer');
+  await footer.locator('summary').click();
+  await footer.getByRole('link',{name:'О socialnet',exact:true}).click();
+  await p.getByRole('heading',{name:'Общение начинается с интереса',exact:true}).waitFor();
+}
+{
+  const p=anna.page;
+  await p.goto(base+'/settings');
+  await p.getByRole('button',{name:'Настроить пункты меню'}).click();
+  const menu=p.getByRole('dialog',{name:'Настройка пунктов меню'});
+  await menu.getByLabel('Музыка',{exact:true}).uncheck();
+  await menu.getByRole('button',{name:'Сохранить',exact:true}).click();
+  assert.equal(await p.locator('.sidenav a[href="/music"]').count(),0);
+  await p.reload();
+  await p.getByRole('button',{name:'Настроить пункты меню'}).click();
+  assert.equal(await menu.getByLabel('Музыка',{exact:true}).isChecked(),false);
+  await menu.getByLabel('Музыка',{exact:true}).check();
+  await menu.getByRole('button',{name:'Сохранить',exact:true}).click();
+  await p.locator('.sidenav a[href="/music"]').waitFor();
+  await p.goto(base+'/settings?tab=privacy');
+  await p.getByLabel('Кто видит моих друзей').selectOption('friends');
+  await p.getByRole('button',{name:'Сохранить',exact:true}).click();
+  await p.getByRole('status').filter({hasText:'Настройки сохранены.'}).waitFor();
+  await p.reload();
+  await p.getByLabel('Кто видит моих друзей').waitFor();
+  assert.equal(await p.getByLabel('Кто видит моих друзей').inputValue(),'friends');
+  await p.goto(base+'/settings?tab=notifications');
+  await p.getByLabel('Сводка на электронную почту').uncheck();
+  await p.getByRole('button',{name:'Сохранить',exact:true}).click();
+  await p.getByRole('status').filter({hasText:'Настройки сохранены.'}).waitFor();
+  await p.reload();
+  await p.getByLabel('Сводка на электронную почту').waitFor();
+  assert.equal(await p.getByLabel('Сводка на электронную почту').isChecked(),false);
+  await p.goto(base+'/settings?tab=blocks');
+  await p.getByRole('button',{name:'Добавить в чёрный список',exact:true}).click();
+  const blocks=p.getByRole('dialog',{name:'Добавление в чёрный список'});
+  await blocks.getByLabel('Имя или имя пользователя').fill('bob');
+  await blocks.getByRole('button',{name:'Заблокировать',exact:true}).click();
+  await p.getByRole('button',{name:'Разблокировать',exact:true}).click();
+  await p.getByText('Ваш чёрный список пуст.').waitFor();
+  await p.goto(base+'/settings?tab=security');
+  await p.locator('.security-factor').getByRole('button',{name:'Настроить',exact:true}).click();
+  const factor=p.getByRole('dialog',{name:'Двухфакторная аутентификация'});
+  await factor.getByLabel('Текущий пароль').fill('password-anna');
+  await factor.getByRole('button',{name:'Продолжить',exact:true}).click();
+  await factor.locator('.totp-secret').waitFor();
+  const secret=await factor.locator('.totp-secret').textContent();
+  const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let bits='';for(const c of secret)bits+=alphabet.indexOf(c).toString(2).padStart(5,'0');
+  const key=Buffer.from((bits.match(/.{8}/g)||[]).map(b=>parseInt(b,2)));const counter=Buffer.alloc(8);counter.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));
+  const {createHmac}=await import('node:crypto');const digest=createHmac('sha1',key).update(counter).digest();const offset=digest[digest.length-1]&15;const otp=String((digest.readUInt32BE(offset)&0x7fffffff)%1000000).padStart(6,'0');
+  await factor.getByLabel('Одноразовый код').fill(otp);
+  await factor.getByRole('button',{name:'Включить',exact:true}).click();
+  await factor.locator('.backup-codes').waitFor();
+  const backup=(await factor.locator('.backup-codes').textContent()).split('\n')[0];
+  await factor.getByRole('button',{name:'Я сохранил коды'}).click();
+  await p.getByText('Двухфакторная защита включена',{exact:true}).waitFor();
+  await p.evaluate(async backup=>{const api=await import('/static/app/api.js');await api.post('/users/me/2fa/disable',{password:'password-anna',backup_code:backup});},backup);
+  await p.reload();await p.getByText('Защиту можно усилить',{exact:true}).waitFor();
+}
+{
+  await anna.page.getByRole('button',{name:'Открыть уведомления',exact:true}).click();
+  const panel=anna.page.getByRole('region',{name:'Панель уведомлений'});
+  await panel.getByText('Показать все',{exact:true}).waitFor();
+  await panel.getByLabel('Источники уведомлений').selectOption('social');
+  await panel.screenshot({path:`${shots}/notifications-panel.png`});
+  await anna.page.keyboard.press('Escape');
+  await panel.waitFor({state:'detached'});
+}
+{
+  const p=anna.page;
+  await p.goto(base+"/photos");
+  const image=await p.locator('.brand-mark').screenshot();
+  await p.locator('.photo-library input[type=file]').setInputFiles([{name:'one.png',mimeType:'image/png',buffer:image},{name:'two.png',mimeType:'image/png',buffer:image}]);
+  await p.getByRole('status').filter({hasText:'Загружено фотографий: 2'}).waitFor();
+  await p.locator('.photo-menu summary').click();
+  await p.getByRole('button',{name:'Создать альбом',exact:true}).click();
+  await p.getByLabel('Название альбома').fill('Поход 2026');
+  await p.getByRole('dialog',{name:'Создать альбом'}).getByRole('button',{name:'Создать',exact:true}).click();
+  await p.getByRole('heading',{name:'Поход 2026'}).waitFor();
+  await p.getByRole('button',{name:'Фото',exact:true}).click();
+  await p.locator('.photo-tile').first().waitFor();
+  await p.locator('.photo-menu summary').click();
+  await p.getByRole('button',{name:'Выбрать несколько'}).click();
+  await p.locator('.photo-tile').first().click();
+  await p.getByLabel('В альбом').selectOption({label:'Поход 2026'});
+  await p.getByRole('button',{name:'Альбомы',exact:true}).click();
+  await p.locator('.album-tile').filter({hasText:'Поход 2026'}).click();
+  await p.locator('.photo-tile').click();
+  await p.getByRole('dialog',{name:'Просмотр фотографии'}).waitFor();
+  const viewer=p.getByRole('dialog',{name:'Просмотр фотографии'});
+  await viewer.getByRole('button',{name:'Редактировать описание'}).click();
+  await viewer.getByLabel('Описание фотографии').fill('Снимок из похода');
+  await viewer.getByRole('button',{name:'Сохранить',exact:true}).click();
+  await viewer.getByText('Снимок из похода',{exact:true}).waitFor();
+  await viewer.screenshot({path:`${shots}/photo-viewer-desktop.png`});
+  await p.setViewportSize({width:390,height:844});
+  assert.ok(await viewer.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'photo viewer mobile overflow');
+  await viewer.screenshot({path:`${shots}/photo-viewer-mobile.png`});
+  await p.setViewportSize({width:1280,height:860});
+  await p.keyboard.press('Escape');
+  await p.locator('.photo-menu summary').click();
+  await p.getByRole('button',{name:'Выбрать несколько'}).click();
+  await p.locator('.photo-tile').click();
+  await p.getByRole('button',{name:'В архив',exact:true}).click();
+  await p.getByText('Загрузите фотографии — они появятся здесь.').waitFor();
+  await p.locator('.photo-menu summary').click();
+  await p.getByRole('button',{name:'Архив',exact:true}).click();
+  await p.locator('.photo-tile').waitFor();
+  await p.reload();
+  await p.locator('.photo-menu summary').click();
+  await p.getByRole('button',{name:'Архив',exact:true}).click();
+  await p.locator('.photo-menu summary').click();
+  await p.getByRole('button',{name:'Выбрать несколько'}).click();
+  await p.locator('.photo-tile').click();
+  await p.getByRole('button',{name:'Восстановить',exact:true}).click();
+  await p.getByText('В архиве пока нет фотографий.').waitFor();
+  await p.screenshot({path:`${shots}/gallery-archive.png`});
+  await p.getByRole('button',{name:'Фото',exact:true}).click();
+  await p.getByRole('button',{name:'Настройки вкладки Фото',exact:true}).click();
+  const settings=p.getByRole('dialog',{name:'Настройки вкладки Фото'});
+  await settings.screenshot({path:`${shots}/gallery-settings.png`});
+  for(const checkbox of await settings.getByRole('checkbox').all()) await checkbox.uncheck();
+  await settings.getByRole('button',{name:'Сохранить',exact:true}).click();
+  await p.getByText('Нет фото из выбранных альбомов. Измените настройки вкладки.').waitFor();
+  await p.reload();
+  await p.getByText('Нет фото из выбранных альбомов. Измените настройки вкладки.').waitFor();
+  await p.getByRole('button',{name:'Настройки вкладки Фото',exact:true}).click();
+  await settings.getByRole('checkbox').first().check();
+  await settings.getByRole('button',{name:'Отмена',exact:true}).click();
+  assert.equal(await p.locator('.photo-tile').count(),0,'cancel must not change visible albums');
+  await p.getByRole('button',{name:'Настройки вкладки Фото',exact:true}).click();
+  for(const checkbox of await settings.getByRole('checkbox').all()) await checkbox.check();
+  await settings.getByRole('button',{name:'Сохранить',exact:true}).click();
+  await p.locator('.photo-tile').first().waitFor();
+}
+const auditPaths = ["/developers", "/developers?tab=docs", "/developers?tab=api", "/developers?tab=apps", "/developers?tab=rules", "/calls", "/statistics", "/help/comments", "/help", "/about", "/authors", "/business", "/safety", "/legal-info", "/settings?tab=privacy", "/settings?tab=notifications", "/settings?tab=blocks", "/settings?tab=security", "/settings?tab=wallet", "/settings?tab=plus", "/photos", "/", "/u/anna", "/im", "/notifications", "/communities", "/hikes", "/hikes/new", "/companions", "/rides", "/articles", "/articles/new", "/feeds", "/plus", "/fundraisers", "/offline", "/music", "/videos", "/wallet", "/settings", "/search?q=test", "/bookmarks", "/documents", "/scheduled", "/admin", "/admin?tab=roles", "/admin?tab=system", "/admin?tab=users", "/admin?tab=audit"];
+const layoutProblems = [];
+for (const width of [1280, 390]) {
+  await anna.page.setViewportSize({ width, height: 860 });
+  for (const [i, route] of auditPaths.entries()) {
+    await anna.page.goto(base + route);
+    await anna.page.locator('#main').waitFor();
+    await anna.page.waitForFunction(() => !document.querySelector('#main .loading'), { timeout: 10000 }).catch(() => {});
+    const issues = await anna.page.evaluate(() => ({
+      overflow: document.documentElement.scrollWidth > innerWidth + 1,
+      wide: [...document.querySelectorAll('#main *')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > innerWidth + 1 && getComputedStyle(e).position !== 'absolute'; }).slice(0, 5).map(e => e.className || e.tagName),
+    }));
+    if (issues.overflow) layoutProblems.push(`${width} ${route}: ${JSON.stringify(issues.wide)}`);
+    await anna.page.screenshot({ path: `${shots}/audit-${width}-${i}.png` });
+  }
+}
+assert.deepEqual(layoutProblems, [], 'page overflow');
+console.log(`layout audit: ${auditPaths.length * 2} screens`);
 await browser.close();
 if (problems.length) { console.error(problems.join("\n")); process.exit(1); }
 console.log("e2e ok");

@@ -8,6 +8,8 @@ import { coords } from "./print.js";
 import { ElevationProfile, km, RouteMap } from "./routes.js";
 import { Empty, Loading } from "./ui.js";
 
+import { OfflineMusic } from "./offlinemusic.js";
+
 export function OfflinePage() {
   const [list, setList] = useState<{ route: Route; saved_at: string }[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -16,6 +18,7 @@ export function OfflinePage() {
   if (!list) return <Loading />;
   return (
     <section class="offline">
+      <OfflineMusic/>
       <h1>Маршруты офлайн</h1>
       {!navigator.onLine && <p class="note">Нет связи. Здесь — маршруты, сохранённые на этом устройстве.</p>}
       {list.length === 0 ? <Empty>Сохранённых маршрутов нет. Откройте маршрут при связи и нажмите «Сохранить офлайн».</Empty> : (

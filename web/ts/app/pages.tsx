@@ -1,11 +1,16 @@
+export { CommunitiesPage } from "./communities.js";
+import { rememberCommunity } from "./communities.js";
+import { useMe } from "./session.js";
 import { h, Fragment } from "../vendor/preact/index.js";
 import { useEffect, useState } from "../vendor/preact/hooks.js";
 import { Page, Post, UserCard, del, get, post, upload } from "./api.js";
 import { Composer, Emoji, PostList, PostView, communityEmoji } from "./posts.js";
 import { query } from "./router.js";
-import { Avatar, Empty, ErrorLine, Loading, Time, UserLink, duration, useLoad } from "./ui.js";
+import { Avatar, Empty, ErrorLine, Loading, Time, UserLink, useLoad } from "./ui.js";
 import { DeleteAccount } from "./legal.js";
 import { CommunityFundraisers } from "./fundraisers.js";
+import { Stories } from "./stories.js";
+import { SecurityFactor } from "./securityfactor.js";
 
 // ---------- лента, запись, хэштег ----------
 
@@ -13,6 +18,7 @@ export function FeedPage() {
   return (
     <section>
       <h1 class="sr-only">Лента</h1>
+      <Stories />
       <PostList path="/feed" empty="Лента пустая. Добавьте друзей или вступите в сообщество — их записи появятся здесь."
         header={(add) => <Composer onPosted={add} />} />
     </section>
@@ -36,8 +42,8 @@ export function TagPage({ tag }: { tag: string }) {
 
 // ---------- уведомления ----------
 
-interface Notification { id: number; type: string; actor?: UserCard; post_id?: number; event_id?: number; ride_id?: number; created_at: string; read: boolean }
-const notifText: Record<string, string> = {
+export interface Notification { id: number; type: string; actor?: UserCard; post_id?: number; event_id?: number; ride_id?: number; created_at: string; read: boolean }
+export const notifText: Record<string, string> = {
   like: "оценил(а) вашу запись", comment: "прокомментировал(а) запись", reply: "ответил(а) на комментарий",
   mention: "упомянул(а) вас", friend_request: "хочет добавить вас в друзья", friend_accept: "принял(а) заявку в друзья",
   gift: "отправил(а) вам подарок", transfer: "перевёл(а) вам монеты", donation: "поддержал(а) сообщество", join_request: "просит вступить в сообщество", video_ready: "Видео обработано и опубликовано",
@@ -80,42 +86,10 @@ export function NotificationsPage({ onRead }: { onRead: () => void }) {
 
 interface Community { id: number; slug: string; name: string; description: string; members_count: number; my_role: string; visibility: "open" | "closed" }
 
-export function CommunitiesPage() {
-  const list = useLoad(() => get<Page<Community>>("/communities?limit=50"), []);
-  const [f, setF] = useState({ name: "", slug: "", visibility: "open" });
-  const [error, setError] = useState<unknown>(null);
-  async function create(e: Event) {
-    e.preventDefault();
-    try { await post("/communities", f); setF({ name: "", slug: "", visibility: "open" }); list.reload(); } catch (err) { setError(err); }
-  }
-  return (
-    <section>
-      <h1>Сообщества</h1>
-      {list.error ? <ErrorLine error={list.error} /> : !list.data ? <Loading /> : list.data.items.length === 0 ? <Empty>Вы пока не состоите в сообществах. Найдите их через поиск.</Empty> : (
-        <ul class="plain-list">
-          {list.data.items.map((c) => <li key={c.id}><a href={`/c/${c.slug}`}>{c.name}</a> <span class="muted">{c.members_count} уч.</span></li>)}
-        </ul>
-      )}
-      <details class="create">
-        <summary>Создать сообщество</summary>
-        <form onSubmit={create} class="stack">
-          <label>Название<input value={f.name} required maxLength={100} onInput={(e) => setF({ ...f, name: (e.target as HTMLInputElement).value })} /></label>
-          <label>Адрес<input value={f.slug} required pattern="[A-Za-z0-9_]{3,32}" title="3–32 символа: латиница, цифры, _" onInput={(e) => setF({ ...f, slug: (e.target as HTMLInputElement).value })} /></label>
-          <label>Кто видит записи
-            <select value={f.visibility} onChange={(e) => setF({ ...f, visibility: (e.target as HTMLSelectElement).value })}>
-              <option value="open">Все</option><option value="closed">Только участники (вступление по заявке)</option>
-            </select>
-          </label>
-          <ErrorLine error={error} />
-          <button class="primary">Создать</button>
-        </form>
-      </details>
-    </section>
-  );
-}
-
 export function CommunityPage({ slug }: { slug: string }) {
+  const me = useMe();
   const c = useLoad(() => get<Community>(`/communities/by-slug/${encodeURIComponent(slug)}`), [slug]);
+  useEffect(() => { if(c.data && me) rememberCommunity(c.data,me.id); },[c.data,me?.id]);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState<unknown>(null);
   if (c.error) return <ErrorLine error={c.error} />;
@@ -279,6 +253,7 @@ export function SettingsPage() {
   return (
     <section class="settings">
       <h1>Безопасность</h1>
+      <SecurityFactor/>
       <ErrorLine error={error} />
       <h2>Где выполнен вход</h2>
       {!sessions.data ? <Loading /> : (
@@ -350,29 +325,4 @@ export function OAuthPage() {
 }
 
 // ---------- музыка и поиск ----------
-
-interface Track { id: string; title: string; artist: string; duration_sec: number; url: string; in_my_music: boolean }
-
-export function MusicPage({ userId }: { userId: number }) {
-  const list = useLoad(() => get<Page<Track>>(`/users/${userId}/music?limit=50`), [userId]);
-  const [playing, setPlaying] = useState<Track | null>(null);
-  if (list.error) return <ErrorLine error={list.error} />;
-  if (!list.data) return <Loading />;
-  return (
-    <section>
-      <h1>Музыка</h1>
-      {list.data.items.length === 0 ? <Empty>В «Моей музыке» пока пусто. Добавляйте треки из записей и поиска.</Empty> : (
-        <ol class="tracks">
-          {list.data.items.map((t) => (
-            <li key={t.id}>
-              <button class={playing?.id === t.id ? "track-btn on" : "track-btn"} onClick={() => setPlaying(t)} aria-label={`Слушать: ${t.artist} — ${t.title}`}>▶</button>
-              <span>{t.artist} — {t.title}</span><span class="muted">{duration(t.duration_sec)}</span>
-            </li>
-          ))}
-        </ol>
-      )}
-      {playing && <div class="player"><span>{playing.artist} — {playing.title}</span><audio controls autoPlay src={playing.url} /></div>}
-    </section>
-  );
-}
 

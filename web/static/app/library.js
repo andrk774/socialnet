@@ -1,9 +1,9 @@
 // Закладки, документы и отложенные записи.
 import { h } from "../vendor/preact/index.js";
 import { useState } from "../vendor/preact/hooks.js";
-import { del, fileSize, get, patch, saveFile, upload } from "./api.js";
+import { del, get, patch } from "./api.js";
 import { PostView, Video } from "./posts.js";
-import { Empty, ErrorLine, Loading, Time, duration, useLoad } from "./ui.js";
+import { Empty, ErrorLine, Loading, duration, useLoad } from "./ui.js";
 const kinds = [["post", "Записи"], ["video", "Видео"], ["track", "Музыка"]];
 export function BookmarksPage() {
     const [kind, setKind] = useState("post");
@@ -27,57 +27,7 @@ export function BookmarksPage() {
                     h("audio", { controls: true, preload: "none", src: b.track.url }),
                     h("button", { class: "link", onClick: () => unsave(b, b.track.id) }, "\u0423\u0431\u0440\u0430\u0442\u044C"))) : null)));
 }
-export function DocumentsPage() {
-    const list = useLoad(() => get("/documents?limit=50"), []);
-    const [error, setError] = useState(null);
-    const [busy, setBusy] = useState(false);
-    async function add(files) {
-        if (!files)
-            return;
-        setBusy(true);
-        setError(null);
-        for (const f of Array.from(files)) {
-            try {
-                await upload("/documents", f);
-            }
-            catch (e) {
-                setError(e);
-            }
-        }
-        setBusy(false);
-        list.reload();
-    }
-    async function rename(d) {
-        const title = prompt("Новое название", d.title);
-        if (title === null || !title.trim())
-            return;
-        await patch(`/documents/${d.id}`, { title }).then(list.reload, setError);
-    }
-    async function remove(d) {
-        if (!confirm(`Удалить «${d.title}»? Документ пропадёт из записей и сообщений.`))
-            return;
-        await del(`/documents/${d.id}`).then(list.reload, setError);
-    }
-    return (h("section", null,
-        h("h1", null, "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B"),
-        h("p", { class: "muted" }, "PDF, Word, Excel, PowerPoint, OpenDocument, EPUB, DjVu, RTF, TXT, CSV \u0438 \u0430\u0440\u0445\u0438\u0432\u044B \u2014 \u0434\u043E 50 \u041C\u0411. \u0421\u043A\u0430\u0447\u0430\u0442\u044C \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442 \u043C\u043E\u0433\u0443\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u0442\u0435, \u043A\u043E\u043C\u0443 \u0432\u0438\u0434\u043D\u0430 \u0437\u0430\u043F\u0438\u0441\u044C \u0438\u043B\u0438 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435 \u0441 \u043D\u0438\u043C."),
-        h("label", { class: "ghost file-btn" },
-            busy ? "Загружаем…" : "Загрузить документ",
-            h("input", { type: "file", multiple: true, class: "sr-only", disabled: busy, onChange: (e) => add(e.target.files) })),
-        h(ErrorLine, { error: error ?? list.error }),
-        !list.data ? h(Loading, null) : list.data.items.length === 0 ? h(Empty, null, "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u043E\u0432 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442.") : (h("ul", { class: "doc-list" }, list.data.items.map((d) => (h("li", { key: d.id, class: "doc" },
-            h("span", { class: "doc-ext", "aria-hidden": "true" }, d.ext),
-            h("button", { class: "link doc-name", onClick: () => saveFile(d.url, `${d.title}.${d.ext}`).catch(setError) },
-                d.title,
-                ".",
-                d.ext),
-            h("span", { class: "muted" },
-                fileSize(d.size),
-                " \u00B7 ",
-                h(Time, { iso: d.created_at })),
-            h("button", { class: "link", onClick: () => rename(d) }, "\u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u0442\u044C"),
-            h("button", { class: "link", onClick: () => remove(d) }, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C"))))))));
-}
+export { DocumentsPage } from "./documents.js";
 const localInput = (iso) => { const d = new Date(iso); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
 export function ScheduledPage({ communityId }) {
     const list = useLoad(() => get("/scheduled-posts" + (communityId ? `?community_id=${communityId}` : "")), [communityId]);

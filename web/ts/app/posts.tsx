@@ -5,9 +5,11 @@ import { me } from "./session.js";
 import { RouteCard, km } from "./routes.js";
 import { Avatar, Empty, ErrorLine, Loading, RichText, Time, UserLink, duration, useLoad } from "./ui.js";
 import { ReportButton } from "./report.js";
+import { Icon } from "./shellparts.js";
+import { CommentExtras, CommentMedia, emptyDraft } from "./commenttools.js";
 
 const reactions: [Reaction, string, string][] = [
-  ["like", "👍", "Нравится"], ["love", "❤️", "Люблю"], ["haha", "😄", "Смешно"],
+  ["like", "❤️", "Нравится"], ["love", "😍", "Люблю"], ["haha", "😂", "Смешно"],
   ["wow", "😮", "Ого"], ["sad", "😢", "Грустно"], ["angry", "😠", "Возмутительно"],
 ];
 
@@ -22,10 +24,15 @@ export function communityEmoji(id: number, fresh = false): Promise<Emoji[]> {
 }
 
 function ReactionIcon({ r, custom }: { r: string; custom: Emoji[] }) {
+  if (r === "like") return <Heart filled />;
   const std = reactions.find(([k]) => k === r);
   if (std) return <>{std[1]}</>;
   const e = custom.find((x) => x.reaction === r);
   return e ? <img class="emoji" src={e.url} alt={`:${e.shortcode}:`} title={`:${e.shortcode}:`} width={20} height={20} /> : <>👍</>;
+}
+
+function Heart({ filled = false }: { filled?: boolean }) {
+  return <svg class={filled ? "heart-icon heart-active" : "heart-icon"} width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill={filled ? "currentColor" : "none"} stroke="currentColor" stroke-width="1.8"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" /></svg>;
 }
 
 const audienceLabel: Record<Audience, string> = { everyone: "Все", friends: "Друзья", only_me: "Только я", list: "Выбранные друзья" };
@@ -286,6 +293,7 @@ export function PostView({ initial, onDelete }: { initial: Post; onDelete?: () =
   const [p, setP] = useState(initial);
   const [open, setOpen] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [photoIndex, setPhotoIndex] = useState<number | null>(null);
   const mine = me()?.id === p.author.id;
 
   const [error, setError] = useState<unknown>(null);
@@ -344,7 +352,7 @@ export function PostView({ initial, onDelete }: { initial: Post; onDelete?: () =
       {p.text && <p class="post-text"><RichText text={p.text} /></p>}
       {p.photos.length > 0 && (
         <div class={`post-photos n${Math.min(p.photos.length, 4)}`}>
-          {p.photos.map((ph) => <a key={ph.id} href={ph.url} target="_blank" rel="noopener" data-external><img src={ph.thumb_url} alt="" loading="lazy" /></a>)}
+          {p.photos.map((ph, index) => <a key={ph.id} href={ph.url} aria-label={`Открыть фотографию ${index + 1}`} onClick={(e) => { if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return; e.preventDefault(); setPhotoIndex(index); }}><img src={ph.url} alt="" loading="lazy" decoding="async" /></a>)}
         </div>
       )}
       {p.tracks.map((t) => (
@@ -357,9 +365,10 @@ export function PostView({ initial, onDelete }: { initial: Post; onDelete?: () =
       <footer class="post-actions">
         <div class="react-wrap">
           <button class={p.my_reaction ? "chip active" : "chip"} aria-pressed={!!p.my_reaction}
+            title={p.my_reaction ? "Убрать реакцию" : "Нравится"}
             onClick={() => (p.my_reaction ? react(null) : react("like"))}
             onContextMenu={(e) => { e.preventDefault(); setPicking(!picking); }}>
-            {p.my_reaction ? <ReactionIcon r={p.my_reaction} custom={custom} /> : "👍"} {p.likes_count > 0 ? p.likes_count : ""}
+            {p.my_reaction ? <ReactionIcon r={p.my_reaction} custom={custom} /> : <Heart />}
             <span class="sr-only">{mineR ? `Ваша реакция: ${mineR[2]}. Убрать` : mineCustom ? `Ваша реакция: ${mineCustom.shortcode}. Убрать` : "Нравится"}</span>
           </button>
           <button class="chip" aria-expanded={picking} aria-label="Выбрать реакцию" onClick={() => setPicking(!picking)}>…</button>
@@ -367,13 +376,16 @@ export function PostView({ initial, onDelete }: { initial: Post; onDelete?: () =
             <div class="react-picker" role="menu">
               {reactions.map(([r, emoji, label]) => <button role="menuitem" key={r} title={label} aria-label={label} onClick={() => react(r)}>{emoji}</button>)}
               {custom.map((e) => <button role="menuitem" key={e.id} title={`:${e.shortcode}:`} aria-label={e.shortcode} onClick={() => react(e.reaction)}><img class="emoji" src={e.url} alt="" width={22} height={22} /></button>)}
+              <div class="reaction-picker-footer"><ReactionUsers postId={p.id} count={p.likes_count} custom={custom} panel /></div>
             </div>
           )}
+          <ReactionUsers postId={p.id} count={p.likes_count} custom={custom} />
           {top.length > 1 && <span class="muted react-top">{top.map(([r]) => <ReactionIcon key={r} r={r} custom={custom} />)}</span>}
         </div>
-        <button class="chip" aria-expanded={open} onClick={() => setOpen(!open)}>
-          Комментарии{p.comments_count > 0 ? ` ${p.comments_count}` : ""}
+        <button class="chip post-comment-action" title="Оставить комментарий" aria-label={`Комментарии${p.comments_count>0?` ${p.comments_count}`:""}`} aria-expanded={open} onClick={() => setOpen(!open)}>
+          <Icon name="message"/><span>{p.comments_count}</span>
         </button>
+        <SharePost postId={p.id}/>
         <button class={p.bookmarked ? "chip active" : "chip"} aria-pressed={p.bookmarked} onClick={bookmark}>
           {p.bookmarked ? "В закладках" : "В закладки"}
         </button>
@@ -383,11 +395,87 @@ export function PostView({ initial, onDelete }: { initial: Post; onDelete?: () =
           </select>
         )}
         {!mine && <ReportButton target={{ type: "post", id: p.id }} cls="chip" />}
+        <a class="post-footer-time" href={`/p/${p.id}`}><Time iso={p.created_at}/></a>
       </footer>
       <ErrorLine error={error} />
-      {open && <Comments post={p} onCount={(n) => setP({ ...p, comments_count: n })} />}
+      {open && photoIndex === null && <Comments post={p} onCount={(n) => setP({ ...p, comments_count: n })} />}
+      {photoIndex !== null && <PhotoViewer p={p} initialIndex={photoIndex} close={() => setPhotoIndex(null)} react={() => react(p.my_reaction ? null : "like")} bookmark={bookmark} onCount={(n) => setP((current) => ({ ...current, comments_count: n }))} error={error} />}
     </article>
   );
+}
+
+function ReactionUsers({ postId, count, custom = [], panel = false, comment = false }: { postId: number; count: number; custom?: Emoji[]; panel?: boolean; comment?: boolean }) {
+  const endpoint=`/${comment?"comments":"posts"}/${postId}/reactions`;
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [items, setItems] = useState<{ user: UserCard; reaction: string }[]>([]);
+  const [cursor, setCursor] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const [preview,setPreview] = useState<UserCard[]>([]);
+  const requested = useRef(false);
+  useEffect(()=>{requested.current=false;setPreview([]);},[postId,count]);
+  const previewUsers=()=>{if(requested.current||!count)return;requested.current=true;get<Page<{user:UserCard}>>(`${endpoint}?limit=3`).then(r=>setPreview(r.items.map(x=>x.user)),()=>{requested.current=false;});};
+  useEffect(()=>{if(panel)previewUsers();},[panel,postId,count]);
+  const openList=()=>{setItems([]);setCursor(null);dialog.current?.showModal();void load();};
+  const load = async (after = 0) => {
+    setBusy(true); setError(null);
+    try {
+      const result = await get<Page<{ user: UserCard; reaction: string }>>(`${endpoint}?limit=50&after=${after}`);
+      setItems((old) => after ? [...old, ...result.items] : result.items);
+      setCursor(result.next_cursor);
+    } catch (e) { setError(e); } finally { setBusy(false); }
+  };
+  return <><span class={panel?"reaction-summary reaction-summary-panel":"reaction-summary"} onMouseEnter={previewUsers} onFocus={previewUsers}>{!panel&&<button class="chip reaction-count" title="Посмотреть реакции" aria-label={`Кто поставил реакцию: ${count}`} onClick={openList}>{count}</button>}<span class="reaction-preview"><span class="reaction-preview-avatars">{preview.map(user=><Avatar key={user.id} user={user} size={30}/>)}</span><button class="link" onClick={openList}>{count===0?"Пока нет реакций":`Реакции: ${count}`}</button></span></span>
+    <dialog class="reaction-dialog" ref={dialog} aria-label={comment?"Реакции на комментарий":"Реакции на публикацию"} onClick={(e) => { if (e.target === e.currentTarget) dialog.current?.close(); }} onKeyDown={(e) => e.stopPropagation()}>
+      <header><h2>{comment?"Оценили комментарий":"Оценили публикацию"}</h2><button class="icon-btn" aria-label="Закрыть список" onClick={() => dialog.current?.close()}>×</button></header>
+      <ul>{items.map((item) => <li key={item.user.id}><Avatar user={item.user} /><UserLink user={item.user} /><ReactionIcon r={item.reaction} custom={custom} /></li>)}</ul>
+      {!busy && !error && items.length === 0 && <p class="muted">Пока нет реакций</p>}
+      <ErrorLine error={error} />
+      {busy ? <Loading /> : error ? <button class="chip" onClick={() => load(cursor ?? 0)}>Повторить</button> : cursor !== null && <button class="chip" onClick={() => load(cursor)}>Показать ещё</button>}
+    </dialog></>;
+}
+
+function SharePost({postId}:{postId:number}){
+  const dialog=useRef<HTMLDialogElement>(null);const input=useRef<HTMLInputElement>(null);const [copied,setCopied]=useState(false);const [error,setError]=useState<unknown>(null);const url=new URL(`/p/${postId}`,location.origin).href;
+  return <><button class="chip post-share-action" title="Поделиться" aria-label="Поделиться" onClick={()=>{setCopied(false);setError(null);dialog.current?.showModal();}}><svg class="nav-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M14 3l8 7-8 7v-5C7 12 4 15 2 20c0-10 5-14 12-14z"/></svg></button><dialog class="music-dialog share-post-dialog" ref={dialog} aria-label="Поделиться записью"><h2>Поделиться записью</h2><p>Получатель сможет открыть запись, если ему разрешён доступ к ней.</p><label>Ссылка на запись<input ref={input} readOnly value={url} onFocus={e=>e.currentTarget.select()}/></label><ErrorLine error={error}/><p role="status">{copied?"Ссылка скопирована":""}</p><div class="library-actions"><button class="primary" onClick={async()=>{try{await navigator.clipboard.writeText(url);setCopied(true);setError(null);}catch{input.current?.focus();input.current?.select();setError(new Error("Выделите и скопируйте ссылку вручную."));}}}>Копировать ссылку</button><button class="ghost" onClick={()=>dialog.current?.close()}>Закрыть</button></div></dialog></>;
+}
+
+function PhotoViewer({ p, initialIndex, close, react, bookmark, onCount, error }: {
+  p: Post; initialIndex: number; close: () => void; react: () => void;
+  bookmark: () => void; onCount: (n: number) => void; error: unknown;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [index, setIndex] = useState(initialIndex);
+  const move = (step: number) => setIndex((i) => (i + step + p.photos.length) % p.photos.length);
+  useEffect(() => {
+    const el = dialog.current!;
+    const previous = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    el.showModal();
+    return () => { el.close(); document.body.style.overflow = overflow; previous?.focus(); };
+  }, []);
+  return <dialog ref={dialog} class="photo-viewer" aria-label="Просмотр фотографий" onCancel={(e) => { e.preventDefault(); close(); }} onClick={(e) => { if (e.target === e.currentTarget) close(); }} onKeyDown={(e) => {
+    if ((e.target as HTMLElement).closest("input, textarea, select, [contenteditable]")) return;
+    if (e.key === "ArrowLeft") { e.preventDefault(); move(-1); }
+    if (e.key === "ArrowRight") { e.preventDefault(); move(1); }
+  }}>
+    <div class="photo-viewer-layout">
+      <button class="photo-close" aria-label="Закрыть просмотр" onClick={close} autoFocus>×</button>
+      <div class="photo-stage">
+        <div class="photo-image-wrap">
+          <img key={p.photos[index].id} src={p.photos[index].url} alt={`Фотография ${index + 1} из ${p.photos.length}`} />
+          {p.photos.length > 1 && <><button class="photo-prev" aria-label="Предыдущая фотография" onClick={() => move(-1)}>‹</button><button class="photo-next" aria-label="Следующая фотография" onClick={() => move(1)}>›</button></>}
+        </div>
+        <footer class="photo-toolbar"><span>{index + 1} / {p.photos.length}</span><a href={p.photos[index].url} target="_blank" rel="noopener" data-external>Открыть оригинал</a><a href={`/p/${p.id}`}>К публикации</a></footer>
+      </div>
+      <aside class="photo-details">
+        <header class="photo-author"><Avatar user={p.author} /><div>{p.community ? <a href={`/c/${p.community.slug}`}>{p.community.name}</a> : <UserLink user={p.author} />}<div class="muted"><Time iso={p.created_at} /></div></div></header>
+        <div class="photo-description"><div class="photo-actions"><button class="chip" aria-pressed={!!p.my_reaction} onClick={react} aria-label="Нравится"><Heart filled={!!p.my_reaction} /></button><ReactionUsers postId={p.id} count={p.likes_count} /><button class="chip" aria-pressed={p.bookmarked} onClick={bookmark}>{p.bookmarked ? "В закладках" : "В закладки"}</button></div>{p.text && <p class="post-text"><RichText text={p.text} /></p>}<ErrorLine error={error} /></div>
+        <Comments post={p} onCount={onCount} />
+      </aside>
+    </div>
+  </dialog>;
 }
 
 export function Video({ src, mp4, poster, title }: { src: string; mp4?: string; poster: string; title?: string }) {
@@ -415,6 +503,8 @@ function Comments({ post: p, onCount }: { post: Post; onCount: (n: number) => vo
   const roots = useLoad(() => get<Page<Comment>>(`/posts/${p.id}/comments?limit=50`), [p.id]);
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [text, setText] = useState("");
+  const [draft,setDraft]=useState(emptyDraft);
+  const [sending,setSending]=useState(false);
   const [error, setError] = useState<unknown>(null);
   const [expanded, setExpanded] = useState<Record<number, Comment[]>>({});
 
@@ -425,16 +515,19 @@ function Comments({ post: p, onCount }: { post: Post; onCount: (n: number) => vo
 
   async function send(e: Event) {
     e.preventDefault();
+    if(sending)return;
+    setSending(true);
     setError(null);
     try {
-      await post(`/posts/${p.id}/comments`, { text, ...(replyTo ? { reply_to_id: replyTo.id } : {}) });
+      await post(`/posts/${p.id}/comments`, { text, photo_ids:draft.photos.map(x=>x.id),track_ids:draft.tracks.map(x=>x.id),video_ids:draft.videos.map(x=>x.id),document_ids:draft.documents.map(x=>x.id),sticker:draft.sticker, ...(replyTo ? { reply_to_id: replyTo.id } : {}) });
       setText("");
+      setDraft(emptyDraft());
       const root = replyTo ? (replyTo.parent_id ?? replyTo.id) : null;
       setReplyTo(null);
       onCount(p.comments_count + 1);
       if (root) { const c = roots.data?.items.find((x) => x.id === root); if (c) await loadReplies(c); }
       roots.reload();
-    } catch (err) { setError(err); }
+    } catch (err) { setError(err); } finally {setSending(false);}
   }
 
   async function remove(c: Comment) {
@@ -443,17 +536,24 @@ function Comments({ post: p, onCount }: { post: Post; onCount: (n: number) => vo
     if (c.parent_id) setExpanded((x) => ({ ...x, [c.parent_id!]: (x[c.parent_id!] ?? []).filter((r) => r.id !== c.id) }));
   }
 
+  const reactComment=async(c:Comment,r:string)=>{try{if(r===c.my_reaction)await del(`/comments/${c.id}/reactions`);else await post(`/comments/${c.id}/reactions`,{reaction:r});roots.reload();if(c.parent_id){const root=roots.data?.items.find(x=>x.id===c.parent_id);if(root)await loadReplies(root)}}catch(e){setError(e)}};
   const one = (c: Comment) => (
-    <li key={c.id} class="comment">
+    <li key={c.id} class="comment" id={`comment-${c.id}`}>
       <Avatar user={c.author} size={28} />
       <div>
         <UserLink user={c.author} />{c.reply_to && <span class="muted"> ответ {c.reply_to.first_name}</span>}
         <p><RichText text={c.text} /></p>
+        <CommentMedia c={c}/>
         <div class="comment-meta">
           <Time iso={c.created_at} />
           <button class="link" onClick={() => { setReplyTo(c); setText(`${c.author.first_name}, `); }}>Ответить</button>
+          <button class="link" title="Скопировать ссылку на публикацию" onClick={()=>navigator.clipboard.writeText(`${location.origin}/p/${p.id}`).catch(setError)}>Поделиться</button>
+          <button class="chip" aria-label="Нравится комментарий" aria-pressed={!!c.my_reaction} onClick={()=>reactComment(c,c.my_reaction||"like")}>{c.my_reaction?<ReactionIcon r={c.my_reaction} custom={[]}/>:<Heart/>}</button>
+          <details class="comment-reaction-menu"><summary aria-label="Выбрать реакцию на комментарий">…</summary><div>{reactions.map(([id,emoji,label])=><button title={label} aria-label={label} onClick={e=>{void reactComment(c,id);e.currentTarget.closest("details")?.removeAttribute("open");}}>{emoji}</button>)}</div></details>
+          <ReactionUsers postId={c.id} count={c.likes_count} comment/>
           {me()?.id === c.author.id && <button class="link" onClick={() => remove(c)}>Удалить</button>}
         </div>
+        {me()?.id!==c.author.id&&<ReportButton target={{type:"comment",id:c.id}}/>}
         {!c.parent_id && c.replies_count > 0 && !expanded[c.id] && (
           <button class="link" onClick={() => loadReplies(c)}>Показать ответы: {c.replies_count}</button>
         )}
@@ -465,11 +565,13 @@ function Comments({ post: p, onCount }: { post: Post; onCount: (n: number) => vo
   return (
     <section class="comments" aria-label="Комментарии">
       {roots.error ? <ErrorLine error={roots.error} /> : !roots.data ? <Loading /> : <ul>{roots.data.items.map(one)}</ul>}
+      {roots.data?.next_cursor&&<button class="link" onClick={async()=>{try{const old=roots.data!;const page=await get<Page<Comment>>(`/posts/${p.id}/comments?limit=50&after=${old.next_cursor}`);roots.set({...page,items:[...old.items,...page.items]});}catch(e){setError(e)}}}>Показать следующие комментарии</button>}
+      <CommentExtras value={draft} onChange={setDraft} disabled={sending}/>
       <form class="comment-form" onSubmit={send}>
         {replyTo && <p class="muted">Ответ для {replyTo.author.first_name} <button type="button" class="link" onClick={() => setReplyTo(null)}>отменить</button></p>}
         <label class="sr-only" for={`c-${p.id}`}>Комментарий</label>
         <input id={`c-${p.id}`} value={text} maxLength={2000} placeholder="Написать комментарий" onInput={(e) => setText((e.target as HTMLInputElement).value)} />
-        <button class="primary" disabled={!text.trim()}>Отправить</button>
+        <button class="primary" disabled={sending||(!text.trim()&&!draft.sticker&&!draft.photos.length&&!draft.tracks.length&&!draft.videos.length&&!draft.documents.length)}>{sending?"Отправляем…":"Отправить"}</button>
       </form>
       <ErrorLine error={error} />
     </section>

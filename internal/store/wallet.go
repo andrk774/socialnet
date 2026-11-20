@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -26,6 +27,30 @@ func UserAccount(id int64) Account      { return Account{"user", id} }
 func CommunityAccount(id int64) Account { return Account{"community", id} }
 
 var SystemAccount = Account{"system", 0}
+
+// AdminAdjustBalance records a balanced ledger operation and serializes retries.
+func (s *Store) AdminAdjustBalance(ctx context.Context, actor, user, amount int64, remove bool, memo, key string) (*TxRecord, error) {
+	t := Transfer{Kind: "transfer", From: SystemAccount, To: UserAccount(user), Amount: amount, Memo: memo, Initiator: actor, IdemKey: key}
+	if remove {
+		t.From, t.To = t.To, t.From
+	}
+	var rec *TxRecord
+	err := s.inTx(ctx, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, fmt.Sprintf("admin-wallet:%d:%s", actor, key)); err != nil {
+			return err
+		}
+		prev, err := findByIdemKey(ctx, tx, actor, key)
+		if err != nil {
+			return err
+		}
+		if prev != nil && prev.Memo != memo {
+			return ErrIdempotencyReuse
+		}
+		rec, err = transferTx(ctx, tx, t)
+		return err
+	})
+	return rec, err
+}
 
 type Transfer struct {
 	Kind      string // transfer | gift | donation | reward | mint | payout

@@ -113,6 +113,9 @@ export async function logout() {
         setToken(null);
         // маршруты, сохранённые для офлайна, не остаются на чужом устройстве
         if (typeof caches !== "undefined") {
+            for (const name of await caches.keys())
+                if (name.startsWith("sn-offline-music-"))
+                    await caches.delete(name);
             await caches.delete("sn-offline-routes").catch(() => false);
             await caches.delete("sn-offline-tiles").catch(() => false);
         }

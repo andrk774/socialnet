@@ -577,29 +577,43 @@ func (s *Store) Unlike(ctx context.Context, postID, userID int64) (int, error) {
 // ---------- комментарии ----------
 
 type Comment struct {
-	ID           int64     `json:"id"`
-	PostID       int64     `json:"post_id"`
-	ParentID     *int64    `json:"parent_id,omitempty"` // корневой комментарий ветки
-	ReplyTo      *UserCard `json:"reply_to,omitempty"`  // кому ответили
-	RepliesCount int       `json:"replies_count"`
-	Author       UserCard  `json:"author"`
-	Text         string    `json:"text"`
-	CreatedAt    time.Time `json:"created_at"`
+	Photos       []Photo        `json:"photos"`
+	Tracks       []PostTrack    `json:"tracks"`
+	Videos       []PostVideo    `json:"videos"`
+	Documents    []PostDocument `json:"documents"`
+	Sticker      string         `json:"sticker"`
+	LikesCount   int            `json:"likes_count"`
+	MyReaction   string         `json:"my_reaction"`
+	ID           int64          `json:"id"`
+	PostID       int64          `json:"post_id"`
+	ParentID     *int64         `json:"parent_id,omitempty"` // корневой комментарий ветки
+	ReplyTo      *UserCard      `json:"reply_to,omitempty"`  // кому ответили
+	RepliesCount int            `json:"replies_count"`
+	Author       UserCard       `json:"author"`
+	Text         string         `json:"text"`
+	CreatedAt    time.Time      `json:"created_at"`
 }
 
 // AddComment: parentID — корень ветки (nil для корневого), replyTo — на что ответили.
-func (s *Store) AddComment(ctx context.Context, postID, authorID int64, text string, parentID, replyTo *int64) (int64, error) {
+func (s *Store) AddComment(ctx context.Context, postID, authorID int64, text string, parentID, replyTo *int64, content ...CommentContent) (int64, error) {
+	var extra CommentContent
+	if len(content) > 0 {
+		extra = content[0]
+	}
+	if err := s.CheckPostAttachments(ctx, authorID, NewPost{MediaIDs: extra.MediaIDs, TrackIDs: extra.TrackIDs, VideoIDs: extra.VideoIDs, DocumentIDs: extra.DocumentIDs}); err != nil {
+		return 0, err
+	}
 	var id int64
 	err := s.pool.QueryRow(ctx, `
 		WITH c AS (
-			INSERT INTO comments (post_id, author_id, text, parent_id, reply_to_id)
-			VALUES ($1, $2, $3, $4, $5) RETURNING id
+			INSERT INTO comments (post_id, author_id, text, parent_id, reply_to_id,media_ids,track_ids,video_ids,document_ids,sticker)
+			VALUES ($1, $2, $3, $4, $5,$6::uuid[],$7::uuid[],$8::uuid[],$9::uuid[],$10) RETURNING id
 		), root AS (
 			UPDATE comments SET replies_count = replies_count + 1 WHERE id = $4
 		)
 		UPDATE posts SET comments_count = comments_count + 1
 		WHERE id = $1
-		RETURNING (SELECT id FROM c)`, postID, authorID, text, parentID, replyTo).Scan(&id)
+		RETURNING (SELECT id FROM c)`, postID, authorID, text, parentID, replyTo, nonNil(extra.MediaIDs), nonNil(extra.TrackIDs), nonNil(extra.VideoIDs), nonNil(extra.DocumentIDs), extra.Sticker).Scan(&id)
 	return id, err
 }
 
@@ -672,7 +686,16 @@ func (s *Store) queryComments(ctx context.Context, sql string, args ...any) ([]C
 		}
 		out = append(out, c)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	for i := range out {
+		if err := s.commentContent(ctx, &out[i], args[0].(int64)); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 // Comments — корневые комментарии поста (ответы — через Replies).

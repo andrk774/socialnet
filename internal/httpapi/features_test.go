@@ -422,6 +422,21 @@ func TestDocuments(t *testing.T) {
 	}
 
 	// список, переименование, чужое не трогается
+	filtered := anna.req("GET", p("/documents?kind=text&q=notes"), nil, 200)
+	if len(items(filtered)) != 0 {
+		t.Fatal("search must use the saved title")
+	}
+	filtered = anna.req("GET", p("/documents?kind=text&q=pdf"), nil, 200)
+	if len(items(filtered)) != 1 || filtered["total"] != float64(1) {
+		t.Fatalf("document filter: %v", filtered)
+	}
+	if len(items(bob.req("GET", p("/documents?kind=text&q=pdf"), nil, 200))) != 0 {
+		t.Fatal("document search leaked another owner's files")
+	}
+	if len(items(anna.req("GET", p("/documents?kind=gif"), nil, 200))) != 0 {
+		t.Fatal("GIF category contains non-GIF documents")
+	}
+	anna.req("GET", p("/documents?kind=invalid"), nil, 400)
 	if l := items(anna.req("GET", p("/documents"), nil, 200)); len(l) != 2 {
 		t.Errorf("my documents: %v", l)
 	}

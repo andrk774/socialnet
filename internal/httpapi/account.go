@@ -35,7 +35,7 @@ func (s *Server) sendMail(to, subject, body string) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		if err := s.mailer.Send(ctx, mailer.Message{To: to, Subject: subject, Body: body}); err != nil {
+		if err := s.sendConfiguredMail(ctx, mailer.Message{To: to, Subject: subject, Body: body}); err != nil {
 			s.log.Warn("send mail failed", "err", err, "subject", subject)
 		}
 	}()
@@ -53,7 +53,7 @@ func (s *Server) sendVerification(r *http.Request, user *store.User) {
 	}
 	s.sendMail(user.Email, "Подтвердите email",
 		"Здравствуйте, "+user.FirstName+"!\n\nПодтвердите адрес, перейдя по ссылке (действует 48 часов):\n"+
-			s.cfg.AppURL+"/verify-email?token="+url.QueryEscape(token)+"\n\n"+
+			s.publicURL(r.Context())+"/verify-email?token="+url.QueryEscape(token)+"\n\n"+
 			"Если вы не регистрировались, просто проигнорируйте письмо.\n")
 }
 
@@ -128,7 +128,7 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		}
 		s.sendMail(user.Email, "Сброс пароля",
 			"Кто-то (надеемся, вы) запросил сброс пароля.\n\nСсылка действует 1 час:\n"+
-				s.cfg.AppURL+"/reset-password?token="+url.QueryEscape(token)+"\n\n"+
+				s.publicURL(r.Context())+"/reset-password?token="+url.QueryEscape(token)+"\n\n"+
 				"Если это были не вы, ничего не делайте: пароль останется прежним.\n")
 	} else if err != nil && !errors.Is(err, store.ErrNotFound) {
 		s.internalError(w, r, err)
@@ -233,7 +233,7 @@ func (s *Server) passwordChangedMail(userID int64) {
 	}
 	s.sendMail(u.Email, "Пароль изменён",
 		"Пароль вашего аккаунта только что был изменён.\n\n"+
-			"Если это были не вы, срочно восстановите доступ: "+s.cfg.AppURL+"/forgot-password\n")
+			"Если это были не вы, срочно восстановите доступ: "+s.publicURL(context.Background())+"/forgot-password\n")
 }
 
 // checkPassword: для опасных действий (2FA, смена пароля) просим пароль ещё раз.
@@ -384,7 +384,7 @@ func (s *Server) handle2FAEnable(w http.ResponseWriter, r *http.Request) {
 	s.event(r, me, "2fa_enabled")
 	s.sendMail(user.Email, "Двухфакторная аутентификация включена",
 		"Для вашего аккаунта включена двухфакторная аутентификация.\n\n"+
-			"Если это были не вы, срочно восстановите доступ: "+s.cfg.AppURL+"/forgot-password\n")
+			"Если это были не вы, срочно восстановите доступ: "+s.publicURL(r.Context())+"/forgot-password\n")
 	// резервные коды показываются один раз
 	writeJSON(w, http.StatusOK, map[string]any{"backup_codes": codes})
 }
@@ -438,7 +438,7 @@ func (s *Server) handle2FADisable(w http.ResponseWriter, r *http.Request) {
 	s.event(r, user.ID, "2fa_disabled")
 	s.sendMail(user.Email, "Двухфакторная аутентификация отключена",
 		"Для вашего аккаунта отключена двухфакторная аутентификация.\n\n"+
-			"Если это были не вы, срочно восстановите доступ: "+s.cfg.AppURL+"/forgot-password\n")
+			"Если это были не вы, срочно восстановите доступ: "+s.publicURL(r.Context())+"/forgot-password\n")
 	w.WriteHeader(http.StatusNoContent)
 }
 

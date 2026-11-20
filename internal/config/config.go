@@ -114,7 +114,8 @@ type Config struct {
 	BackupS3   bool // класть копии в S3 (backups/)
 
 	// REDIS_URL — общие лимиты, тикеты WebSocket и события между экземплярами API.
-	RedisURL string
+	RedisURL                                          string
+	KubeURL, KubeNamespace, KubeCAFile, KubeTokenFile string
 }
 
 func Load() (Config, error) {
@@ -178,6 +179,10 @@ func Load() (Config, error) {
 	c.AppURL = strings.TrimRight(getenv("APP_URL", "http://localhost:3000"), "/")
 
 	c.RedisURL = os.Getenv("REDIS_URL")
+	c.KubeURL = strings.TrimRight(os.Getenv("KUBE_API_URL"), "/")
+	c.KubeNamespace = getenv("KUBE_NAMESPACE", "socialnet")
+	c.KubeCAFile = getenv("KUBE_CA_FILE", "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+	c.KubeTokenFile = getenv("KUBE_TOKEN_FILE", "/var/run/secrets/kubernetes.io/serviceaccount/token")
 	c.MetricsAddr = getenv("METRICS_ADDR", ":9090")
 	c.BackupDir = getenv("BACKUP_DIR", "")
 	if k := os.Getenv("BACKUP_ENC_KEY"); k != "" {

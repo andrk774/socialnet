@@ -43,6 +43,7 @@ export interface Scheduled {
   error?: string; payload: { text?: string; poll?: { question: string }; photo_ids?: string[]; document_ids?: string[] }; created_at: string;
 }
 export interface Comment {
+  photos: Photo[]; tracks: PostTrack[]; videos: PostVideo[]; documents: PostDocument[]; sticker: string; likes_count: number; my_reaction: string;
   id: number; post_id: number; parent_id?: number; reply_to?: UserCard; replies_count: number;
   author: UserCard; text: string; created_at: string;
 }
@@ -157,7 +158,7 @@ export async function logout() {
   try { await api("POST", "/auth/logout"); } finally {
     setToken(null);
     // маршруты, сохранённые для офлайна, не остаются на чужом устройстве
-    if (typeof caches !== "undefined") { await caches.delete("sn-offline-routes").catch(() => false); await caches.delete("sn-offline-tiles").catch(() => false); }
+    if (typeof caches !== "undefined") { for(const name of await caches.keys()) if(name.startsWith("sn-offline-music-")) await caches.delete(name); await caches.delete("sn-offline-routes").catch(() => false); await caches.delete("sn-offline-tiles").catch(() => false); }
   }
 }
 

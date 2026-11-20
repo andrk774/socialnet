@@ -6,6 +6,8 @@ import { navigate } from "./router.js";
 import { Avatar, ErrorLine, Loading, useLoad } from "./ui.js";
 import { ReportButton } from "./report.js";
 import { OrganizerReviews } from "./reviews.js";
+import { AvatarUpload } from "./uploads.js";
+import { startCall } from "./calls.js";
 
 interface Profile extends UserCard {
   closed: boolean; plus?: boolean; status_text?: string; city?: string; about?: string;
@@ -37,17 +39,19 @@ export function ProfilePage({ username }: { username: string }) {
   return (
     <div class="profile">
       <header class="profile-head">
-        <Avatar user={u} size={96} />
+        {rel === "self" ? <AvatarUpload user={u} onSaved={prof.reload} /> : <Avatar user={u} size={144} />}
         <div>
           <h1>{fullName(u)}{u.plus && <span class="plus-badge" title="Подписка «Плюс»">Плюс</span>}</h1>
           <p class="muted">@{u.username}{u.presence?.online ? " · в сети" : ""}</p>
           {u.status_text && <p class="status">{u.status_text}</p>}
           {u.city && <p class="muted">{u.city}</p>}
         </div>
+        {rel === "self" && <a class="button ghost" href="/statistics">Статистика</a>}
         {rel !== "self" && (
           <div class="profile-actions">
             <button class={rel === "none" || rel === "request_received" ? "primary" : "ghost"} onClick={friend}>{friendLabel[rel]}</button>
             {u.relationship.can_write && <button class="ghost" onClick={() => navigate(`/im/u/${u.id}`)}>Написать</button>}
+            {u.relationship.can_write && <button class="ghost" onClick={() => startCall(u)}>Позвонить</button>}
             <ReportButton target={{ type: "user", id: u.id }} cls="ghost" />
           </div>
         )}

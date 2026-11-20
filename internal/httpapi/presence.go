@@ -109,6 +109,9 @@ func (s *Server) handlePutNotificationSettings(w http.ResponseWriter, r *http.Re
 		}
 	}
 	n.MutedTypes = slices.Compact(slices.Sorted(slices.Values(n.MutedTypes)))
+	if n.MutedTypes == nil {
+		n.MutedTypes = []string{}
+	}
 	if (n.QuietStart == nil) != (n.QuietEnd == nil) {
 		errs["quiet_start"] = "set both quiet_start and quiet_end, or neither"
 	}

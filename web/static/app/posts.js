@@ -5,8 +5,10 @@ import { me } from "./session.js";
 import { RouteCard, km } from "./routes.js";
 import { Avatar, Empty, ErrorLine, Loading, RichText, Time, UserLink, duration, useLoad } from "./ui.js";
 import { ReportButton } from "./report.js";
+import { Icon } from "./shellparts.js";
+import { CommentExtras, CommentMedia, emptyDraft } from "./commenttools.js";
 const reactions = [
-    ["like", "👍", "Нравится"], ["love", "❤️", "Люблю"], ["haha", "😄", "Смешно"],
+    ["like", "❤️", "Нравится"], ["love", "😍", "Люблю"], ["haha", "😂", "Смешно"],
     ["wow", "😮", "Ого"], ["sad", "😢", "Грустно"], ["angry", "😠", "Возмутительно"],
 ];
 const emojiCache = new Map();
@@ -17,11 +19,17 @@ export function communityEmoji(id, fresh = false) {
     return emojiCache.get(id);
 }
 function ReactionIcon({ r, custom }) {
+    if (r === "like")
+        return h(Heart, { filled: true });
     const std = reactions.find(([k]) => k === r);
     if (std)
         return h(Fragment, null, std[1]);
     const e = custom.find((x) => x.reaction === r);
     return e ? h("img", { class: "emoji", src: e.url, alt: `:${e.shortcode}:`, title: `:${e.shortcode}:`, width: 20, height: 20 }) : h(Fragment, null, "\uD83D\uDC4D");
+}
+function Heart({ filled = false }) {
+    return h("svg", { class: filled ? "heart-icon heart-active" : "heart-icon", width: "22", height: "22", viewBox: "0 0 24 24", "aria-hidden": "true", fill: filled ? "currentColor" : "none", stroke: "currentColor", "stroke-width": "1.8" },
+        h("path", { d: "M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" }));
 }
 const audienceLabel = { everyone: "Все", friends: "Друзья", only_me: "Только я", list: "Выбранные друзья" };
 // localInput: значение для <input type="datetime-local"> в часовом поясе браузера.
@@ -268,6 +276,7 @@ export function PostView({ initial, onDelete }) {
     const [p, setP] = useState(initial);
     const [open, setOpen] = useState(false);
     const [picking, setPicking] = useState(false);
+    const [photoIndex, setPhotoIndex] = useState(null);
     const mine = me()?.id === p.author.id;
     const [error, setError] = useState(null);
     // любое действие с записью: ошибка показывается под записью, а состояние
@@ -328,8 +337,9 @@ export function PostView({ initial, onDelete }) {
             mine && h("button", { class: "icon-btn post-menu", "aria-label": "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0437\u0430\u043F\u0438\u0441\u044C", onClick: remove }, "\u00D7")),
         p.text && h("p", { class: "post-text" },
             h(RichText, { text: p.text })),
-        p.photos.length > 0 && (h("div", { class: `post-photos n${Math.min(p.photos.length, 4)}` }, p.photos.map((ph) => h("a", { key: ph.id, href: ph.url, target: "_blank", rel: "noopener", "data-external": true },
-            h("img", { src: ph.thumb_url, alt: "", loading: "lazy" }))))),
+        p.photos.length > 0 && (h("div", { class: `post-photos n${Math.min(p.photos.length, 4)}` }, p.photos.map((ph, index) => h("a", { key: ph.id, href: ph.url, "aria-label": `Открыть фотографию ${index + 1}`, onClick: (e) => { if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey)
+                return; e.preventDefault(); setPhotoIndex(index); } },
+            h("img", { src: ph.url, alt: "", loading: "lazy", decoding: "async" }))))),
         p.tracks.map((t) => (h("div", { class: "track", key: t.id },
             h("span", null,
                 t.artist,
@@ -343,25 +353,168 @@ export function PostView({ initial, onDelete }) {
         p.poll && h(PollView, { postId: p.id, initial: p.poll }),
         h("footer", { class: "post-actions" },
             h("div", { class: "react-wrap" },
-                h("button", { class: p.my_reaction ? "chip active" : "chip", "aria-pressed": !!p.my_reaction, onClick: () => (p.my_reaction ? react(null) : react("like")), onContextMenu: (e) => { e.preventDefault(); setPicking(!picking); } },
-                    p.my_reaction ? h(ReactionIcon, { r: p.my_reaction, custom: custom }) : "👍",
-                    " ",
-                    p.likes_count > 0 ? p.likes_count : "",
+                h("button", { class: p.my_reaction ? "chip active" : "chip", "aria-pressed": !!p.my_reaction, title: p.my_reaction ? "Убрать реакцию" : "Нравится", onClick: () => (p.my_reaction ? react(null) : react("like")), onContextMenu: (e) => { e.preventDefault(); setPicking(!picking); } },
+                    p.my_reaction ? h(ReactionIcon, { r: p.my_reaction, custom: custom }) : h(Heart, null),
                     h("span", { class: "sr-only" }, mineR ? `Ваша реакция: ${mineR[2]}. Убрать` : mineCustom ? `Ваша реакция: ${mineCustom.shortcode}. Убрать` : "Нравится")),
                 h("button", { class: "chip", "aria-expanded": picking, "aria-label": "\u0412\u044B\u0431\u0440\u0430\u0442\u044C \u0440\u0435\u0430\u043A\u0446\u0438\u044E", onClick: () => setPicking(!picking) }, "\u2026"),
                 picking && (h("div", { class: "react-picker", role: "menu" },
                     reactions.map(([r, emoji, label]) => h("button", { role: "menuitem", key: r, title: label, "aria-label": label, onClick: () => react(r) }, emoji)),
                     custom.map((e) => h("button", { role: "menuitem", key: e.id, title: `:${e.shortcode}:`, "aria-label": e.shortcode, onClick: () => react(e.reaction) },
-                        h("img", { class: "emoji", src: e.url, alt: "", width: 22, height: 22 }))))),
+                        h("img", { class: "emoji", src: e.url, alt: "", width: 22, height: 22 }))),
+                    h("div", { class: "reaction-picker-footer" },
+                        h(ReactionUsers, { postId: p.id, count: p.likes_count, custom: custom, panel: true })))),
+                h(ReactionUsers, { postId: p.id, count: p.likes_count, custom: custom }),
                 top.length > 1 && h("span", { class: "muted react-top" }, top.map(([r]) => h(ReactionIcon, { key: r, r: r, custom: custom })))),
-            h("button", { class: "chip", "aria-expanded": open, onClick: () => setOpen(!open) },
-                "\u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438",
-                p.comments_count > 0 ? ` ${p.comments_count}` : ""),
+            h("button", { class: "chip post-comment-action", title: "\u041E\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439", "aria-label": `Комментарии${p.comments_count > 0 ? ` ${p.comments_count}` : ""}`, "aria-expanded": open, onClick: () => setOpen(!open) },
+                h(Icon, { name: "message" }),
+                h("span", null, p.comments_count)),
+            h(SharePost, { postId: p.id }),
             h("button", { class: p.bookmarked ? "chip active" : "chip", "aria-pressed": p.bookmarked, onClick: bookmark }, p.bookmarked ? "В закладках" : "В закладки"),
             mine && !p.community && (h("select", { class: "chip-select", "aria-label": "\u041A\u0442\u043E \u0432\u0438\u0434\u0438\u0442 \u0437\u0430\u043F\u0438\u0441\u044C", value: p.audience, onChange: (e) => { const el = e.target; changeAudience(el.value, el); } }, Object.keys(audienceLabel).filter((a) => a !== "list" || p.audience === "list").map((a) => h("option", { key: a, value: a }, audienceLabel[a])))),
-            !mine && h(ReportButton, { target: { type: "post", id: p.id }, cls: "chip" })),
+            !mine && h(ReportButton, { target: { type: "post", id: p.id }, cls: "chip" }),
+            h("a", { class: "post-footer-time", href: `/p/${p.id}` },
+                h(Time, { iso: p.created_at }))),
         h(ErrorLine, { error: error }),
-        open && h(Comments, { post: p, onCount: (n) => setP({ ...p, comments_count: n }) })));
+        open && photoIndex === null && h(Comments, { post: p, onCount: (n) => setP({ ...p, comments_count: n }) }),
+        photoIndex !== null && h(PhotoViewer, { p: p, initialIndex: photoIndex, close: () => setPhotoIndex(null), react: () => react(p.my_reaction ? null : "like"), bookmark: bookmark, onCount: (n) => setP((current) => ({ ...current, comments_count: n })), error: error })));
+}
+function ReactionUsers({ postId, count, custom = [], panel = false, comment = false }) {
+    const endpoint = `/${comment ? "comments" : "posts"}/${postId}/reactions`;
+    const dialog = useRef(null);
+    const [items, setItems] = useState([]);
+    const [cursor, setCursor] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(null);
+    const [preview, setPreview] = useState([]);
+    const requested = useRef(false);
+    useEffect(() => { requested.current = false; setPreview([]); }, [postId, count]);
+    const previewUsers = () => { if (requested.current || !count)
+        return; requested.current = true; get(`${endpoint}?limit=3`).then(r => setPreview(r.items.map(x => x.user)), () => { requested.current = false; }); };
+    useEffect(() => { if (panel)
+        previewUsers(); }, [panel, postId, count]);
+    const openList = () => { setItems([]); setCursor(null); dialog.current?.showModal(); void load(); };
+    const load = async (after = 0) => {
+        setBusy(true);
+        setError(null);
+        try {
+            const result = await get(`${endpoint}?limit=50&after=${after}`);
+            setItems((old) => after ? [...old, ...result.items] : result.items);
+            setCursor(result.next_cursor);
+        }
+        catch (e) {
+            setError(e);
+        }
+        finally {
+            setBusy(false);
+        }
+    };
+    return h(Fragment, null,
+        h("span", { class: panel ? "reaction-summary reaction-summary-panel" : "reaction-summary", onMouseEnter: previewUsers, onFocus: previewUsers },
+            !panel && h("button", { class: "chip reaction-count", title: "\u041F\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u0442\u044C \u0440\u0435\u0430\u043A\u0446\u0438\u0438", "aria-label": `Кто поставил реакцию: ${count}`, onClick: openList }, count),
+            h("span", { class: "reaction-preview" },
+                h("span", { class: "reaction-preview-avatars" }, preview.map(user => h(Avatar, { key: user.id, user: user, size: 30 }))),
+                h("button", { class: "link", onClick: openList }, count === 0 ? "Пока нет реакций" : `Реакции: ${count}`))),
+        h("dialog", { class: "reaction-dialog", ref: dialog, "aria-label": comment ? "Реакции на комментарий" : "Реакции на публикацию", onClick: (e) => { if (e.target === e.currentTarget)
+                dialog.current?.close(); }, onKeyDown: (e) => e.stopPropagation() },
+            h("header", null,
+                h("h2", null, comment ? "Оценили комментарий" : "Оценили публикацию"),
+                h("button", { class: "icon-btn", "aria-label": "\u0417\u0430\u043A\u0440\u044B\u0442\u044C \u0441\u043F\u0438\u0441\u043E\u043A", onClick: () => dialog.current?.close() }, "\u00D7")),
+            h("ul", null, items.map((item) => h("li", { key: item.user.id },
+                h(Avatar, { user: item.user }),
+                h(UserLink, { user: item.user }),
+                h(ReactionIcon, { r: item.reaction, custom: custom })))),
+            !busy && !error && items.length === 0 && h("p", { class: "muted" }, "\u041F\u043E\u043A\u0430 \u043D\u0435\u0442 \u0440\u0435\u0430\u043A\u0446\u0438\u0439"),
+            h(ErrorLine, { error: error }),
+            busy ? h(Loading, null) : error ? h("button", { class: "chip", onClick: () => load(cursor ?? 0) }, "\u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C") : cursor !== null && h("button", { class: "chip", onClick: () => load(cursor) }, "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0435\u0449\u0451")));
+}
+function SharePost({ postId }) {
+    const dialog = useRef(null);
+    const input = useRef(null);
+    const [copied, setCopied] = useState(false);
+    const [error, setError] = useState(null);
+    const url = new URL(`/p/${postId}`, location.origin).href;
+    return h(Fragment, null,
+        h("button", { class: "chip post-share-action", title: "\u041F\u043E\u0434\u0435\u043B\u0438\u0442\u044C\u0441\u044F", "aria-label": "\u041F\u043E\u0434\u0435\u043B\u0438\u0442\u044C\u0441\u044F", onClick: () => { setCopied(false); setError(null); dialog.current?.showModal(); } },
+            h("svg", { class: "nav-icon", width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "1.7", "stroke-linejoin": "round", "aria-hidden": "true" },
+                h("path", { d: "M14 3l8 7-8 7v-5C7 12 4 15 2 20c0-10 5-14 12-14z" }))),
+        h("dialog", { class: "music-dialog share-post-dialog", ref: dialog, "aria-label": "\u041F\u043E\u0434\u0435\u043B\u0438\u0442\u044C\u0441\u044F \u0437\u0430\u043F\u0438\u0441\u044C\u044E" },
+            h("h2", null, "\u041F\u043E\u0434\u0435\u043B\u0438\u0442\u044C\u0441\u044F \u0437\u0430\u043F\u0438\u0441\u044C\u044E"),
+            h("p", null, "\u041F\u043E\u043B\u0443\u0447\u0430\u0442\u0435\u043B\u044C \u0441\u043C\u043E\u0436\u0435\u0442 \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u0437\u0430\u043F\u0438\u0441\u044C, \u0435\u0441\u043B\u0438 \u0435\u043C\u0443 \u0440\u0430\u0437\u0440\u0435\u0448\u0451\u043D \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u043D\u0435\u0439."),
+            h("label", null,
+                "\u0421\u0441\u044B\u043B\u043A\u0430 \u043D\u0430 \u0437\u0430\u043F\u0438\u0441\u044C",
+                h("input", { ref: input, readOnly: true, value: url, onFocus: e => e.currentTarget.select() })),
+            h(ErrorLine, { error: error }),
+            h("p", { role: "status" }, copied ? "Ссылка скопирована" : ""),
+            h("div", { class: "library-actions" },
+                h("button", { class: "primary", onClick: async () => { try {
+                        await navigator.clipboard.writeText(url);
+                        setCopied(true);
+                        setError(null);
+                    }
+                    catch {
+                        input.current?.focus();
+                        input.current?.select();
+                        setError(new Error("Выделите и скопируйте ссылку вручную."));
+                    } } }, "\u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443"),
+                h("button", { class: "ghost", onClick: () => dialog.current?.close() }, "\u0417\u0430\u043A\u0440\u044B\u0442\u044C"))));
+}
+function PhotoViewer({ p, initialIndex, close, react, bookmark, onCount, error }) {
+    const dialog = useRef(null);
+    const [index, setIndex] = useState(initialIndex);
+    const move = (step) => setIndex((i) => (i + step + p.photos.length) % p.photos.length);
+    useEffect(() => {
+        const el = dialog.current;
+        const previous = document.activeElement;
+        const overflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        el.showModal();
+        return () => { el.close(); document.body.style.overflow = overflow; previous?.focus(); };
+    }, []);
+    return h("dialog", { ref: dialog, class: "photo-viewer", "aria-label": "\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0444\u043E\u0442\u043E\u0433\u0440\u0430\u0444\u0438\u0439", onCancel: (e) => { e.preventDefault(); close(); }, onClick: (e) => { if (e.target === e.currentTarget)
+            close(); }, onKeyDown: (e) => {
+            if (e.target.closest("input, textarea, select, [contenteditable]"))
+                return;
+            if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                move(-1);
+            }
+            if (e.key === "ArrowRight") {
+                e.preventDefault();
+                move(1);
+            }
+        } },
+        h("div", { class: "photo-viewer-layout" },
+            h("button", { class: "photo-close", "aria-label": "\u0417\u0430\u043A\u0440\u044B\u0442\u044C \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", onClick: close, autoFocus: true }, "\u00D7"),
+            h("div", { class: "photo-stage" },
+                h("div", { class: "photo-image-wrap" },
+                    h("img", { key: p.photos[index].id, src: p.photos[index].url, alt: `Фотография ${index + 1} из ${p.photos.length}` }),
+                    p.photos.length > 1 && h(Fragment, null,
+                        h("button", { class: "photo-prev", "aria-label": "\u041F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0430\u044F \u0444\u043E\u0442\u043E\u0433\u0440\u0430\u0444\u0438\u044F", onClick: () => move(-1) }, "\u2039"),
+                        h("button", { class: "photo-next", "aria-label": "\u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0430\u044F \u0444\u043E\u0442\u043E\u0433\u0440\u0430\u0444\u0438\u044F", onClick: () => move(1) }, "\u203A"))),
+                h("footer", { class: "photo-toolbar" },
+                    h("span", null,
+                        index + 1,
+                        " / ",
+                        p.photos.length),
+                    h("a", { href: p.photos[index].url, target: "_blank", rel: "noopener", "data-external": true }, "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043E\u0440\u0438\u0433\u0438\u043D\u0430\u043B"),
+                    h("a", { href: `/p/${p.id}` }, "\u041A \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0438"))),
+            h("aside", { class: "photo-details" },
+                h("header", { class: "photo-author" },
+                    h(Avatar, { user: p.author }),
+                    h("div", null,
+                        p.community ? h("a", { href: `/c/${p.community.slug}` }, p.community.name) : h(UserLink, { user: p.author }),
+                        h("div", { class: "muted" },
+                            h(Time, { iso: p.created_at })))),
+                h("div", { class: "photo-description" },
+                    h("div", { class: "photo-actions" },
+                        h("button", { class: "chip", "aria-pressed": !!p.my_reaction, onClick: react, "aria-label": "\u041D\u0440\u0430\u0432\u0438\u0442\u0441\u044F" },
+                            h(Heart, { filled: !!p.my_reaction })),
+                        h(ReactionUsers, { postId: p.id, count: p.likes_count }),
+                        h("button", { class: "chip", "aria-pressed": p.bookmarked, onClick: bookmark }, p.bookmarked ? "В закладках" : "В закладки")),
+                    p.text && h("p", { class: "post-text" },
+                        h(RichText, { text: p.text })),
+                    h(ErrorLine, { error: error })),
+                h(Comments, { post: p, onCount: onCount }))));
 }
 export function Video({ src, mp4, poster, title }) {
     // Браузер берёт первый источник, который умеет играть: HLS (Safari, iOS,
@@ -378,6 +531,8 @@ function Comments({ post: p, onCount }) {
     const roots = useLoad(() => get(`/posts/${p.id}/comments?limit=50`), [p.id]);
     const [replyTo, setReplyTo] = useState(null);
     const [text, setText] = useState("");
+    const [draft, setDraft] = useState(emptyDraft);
+    const [sending, setSending] = useState(false);
     const [error, setError] = useState(null);
     const [expanded, setExpanded] = useState({});
     async function loadReplies(c) {
@@ -386,10 +541,14 @@ function Comments({ post: p, onCount }) {
     }
     async function send(e) {
         e.preventDefault();
+        if (sending)
+            return;
+        setSending(true);
         setError(null);
         try {
-            await post(`/posts/${p.id}/comments`, { text, ...(replyTo ? { reply_to_id: replyTo.id } : {}) });
+            await post(`/posts/${p.id}/comments`, { text, photo_ids: draft.photos.map(x => x.id), track_ids: draft.tracks.map(x => x.id), video_ids: draft.videos.map(x => x.id), document_ids: draft.documents.map(x => x.id), sticker: draft.sticker, ...(replyTo ? { reply_to_id: replyTo.id } : {}) });
             setText("");
+            setDraft(emptyDraft());
             const root = replyTo ? (replyTo.parent_id ?? replyTo.id) : null;
             setReplyTo(null);
             onCount(p.comments_count + 1);
@@ -403,6 +562,9 @@ function Comments({ post: p, onCount }) {
         catch (err) {
             setError(err);
         }
+        finally {
+            setSending(false);
+        }
     }
     async function remove(c) {
         await del(`/comments/${c.id}`);
@@ -410,7 +572,22 @@ function Comments({ post: p, onCount }) {
         if (c.parent_id)
             setExpanded((x) => ({ ...x, [c.parent_id]: (x[c.parent_id] ?? []).filter((r) => r.id !== c.id) }));
     }
-    const one = (c) => (h("li", { key: c.id, class: "comment" },
+    const reactComment = async (c, r) => { try {
+        if (r === c.my_reaction)
+            await del(`/comments/${c.id}/reactions`);
+        else
+            await post(`/comments/${c.id}/reactions`, { reaction: r });
+        roots.reload();
+        if (c.parent_id) {
+            const root = roots.data?.items.find(x => x.id === c.parent_id);
+            if (root)
+                await loadReplies(root);
+        }
+    }
+    catch (e) {
+        setError(e);
+    } };
+    const one = (c) => (h("li", { key: c.id, class: "comment", id: `comment-${c.id}` },
         h(Avatar, { user: c.author, size: 28 }),
         h("div", null,
             h(UserLink, { user: c.author }),
@@ -419,16 +596,33 @@ function Comments({ post: p, onCount }) {
                 c.reply_to.first_name),
             h("p", null,
                 h(RichText, { text: c.text })),
+            h(CommentMedia, { c: c }),
             h("div", { class: "comment-meta" },
                 h(Time, { iso: c.created_at }),
                 h("button", { class: "link", onClick: () => { setReplyTo(c); setText(`${c.author.first_name}, `); } }, "\u041E\u0442\u0432\u0435\u0442\u0438\u0442\u044C"),
+                h("button", { class: "link", title: "\u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443 \u043D\u0430 \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u044E", onClick: () => navigator.clipboard.writeText(`${location.origin}/p/${p.id}`).catch(setError) }, "\u041F\u043E\u0434\u0435\u043B\u0438\u0442\u044C\u0441\u044F"),
+                h("button", { class: "chip", "aria-label": "\u041D\u0440\u0430\u0432\u0438\u0442\u0441\u044F \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439", "aria-pressed": !!c.my_reaction, onClick: () => reactComment(c, c.my_reaction || "like") }, c.my_reaction ? h(ReactionIcon, { r: c.my_reaction, custom: [] }) : h(Heart, null)),
+                h("details", { class: "comment-reaction-menu" },
+                    h("summary", { "aria-label": "\u0412\u044B\u0431\u0440\u0430\u0442\u044C \u0440\u0435\u0430\u043A\u0446\u0438\u044E \u043D\u0430 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439" }, "\u2026"),
+                    h("div", null, reactions.map(([id, emoji, label]) => h("button", { title: label, "aria-label": label, onClick: e => { void reactComment(c, id); e.currentTarget.closest("details")?.removeAttribute("open"); } }, emoji)))),
+                h(ReactionUsers, { postId: c.id, count: c.likes_count, comment: true }),
                 me()?.id === c.author.id && h("button", { class: "link", onClick: () => remove(c) }, "\u0423\u0434\u0430\u043B\u0438\u0442\u044C")),
+            me()?.id !== c.author.id && h(ReportButton, { target: { type: "comment", id: c.id } }),
             !c.parent_id && c.replies_count > 0 && !expanded[c.id] && (h("button", { class: "link", onClick: () => loadReplies(c) },
                 "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u043E\u0442\u0432\u0435\u0442\u044B: ",
                 c.replies_count)),
             expanded[c.id] && h("ul", { class: "replies" }, expanded[c.id].map(one)))));
     return (h("section", { class: "comments", "aria-label": "\u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438" },
         roots.error ? h(ErrorLine, { error: roots.error }) : !roots.data ? h(Loading, null) : h("ul", null, roots.data.items.map(one)),
+        roots.data?.next_cursor && h("button", { class: "link", onClick: async () => { try {
+                const old = roots.data;
+                const page = await get(`/posts/${p.id}/comments?limit=50&after=${old.next_cursor}`);
+                roots.set({ ...page, items: [...old.items, ...page.items] });
+            }
+            catch (e) {
+                setError(e);
+            } } }, "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0435 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438"),
+        h(CommentExtras, { value: draft, onChange: setDraft, disabled: sending }),
         h("form", { class: "comment-form", onSubmit: send },
             replyTo && h("p", { class: "muted" },
                 "\u041E\u0442\u0432\u0435\u0442 \u0434\u043B\u044F ",
@@ -437,7 +631,7 @@ function Comments({ post: p, onCount }) {
                 h("button", { type: "button", class: "link", onClick: () => setReplyTo(null) }, "\u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C")),
             h("label", { class: "sr-only", for: `c-${p.id}` }, "\u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439"),
             h("input", { id: `c-${p.id}`, value: text, maxLength: 2000, placeholder: "\u041D\u0430\u043F\u0438\u0441\u0430\u0442\u044C \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439", onInput: (e) => setText(e.target.value) }),
-            h("button", { class: "primary", disabled: !text.trim() }, "\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C")),
+            h("button", { class: "primary", disabled: sending || (!text.trim() && !draft.sticker && !draft.photos.length && !draft.tracks.length && !draft.videos.length && !draft.documents.length) }, sending ? "Отправляем…" : "Отправить")),
         h(ErrorLine, { error: error })));
 }
 // Лента с подгрузкой по курсору.

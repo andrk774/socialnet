@@ -40,7 +40,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   if (p.startsWith("/static/")) {
-    event.respondWith(caches.open(SHELL).then((c) => c.match(req, { ignoreSearch: true })).then((hit) => hit || fetch(req)));
+    // Prefer the current design online; keep the installed shell for offline use.
+    event.respondWith(fetch(req, { cache: "no-cache" }).catch(async () => {
+      const hit = await caches.open(SHELL).then((c) => c.match(req, { ignoreSearch: true }));
+      if (hit) return hit;
+      return Response.error();
+    }));
     return;
   }
   if (req.mode === "navigate") {

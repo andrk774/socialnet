@@ -36,7 +36,7 @@ func (s *Server) handleQRLoginStart(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
-	link := s.cfg.AppURL + "/qr-login?c=" + id
+	link := s.publicURL(r.Context()) + "/qr-login?c=" + id
 	code, err := qr.Encode([]byte(link), qr.M)
 	if err != nil {
 		s.internalError(w, r, err)

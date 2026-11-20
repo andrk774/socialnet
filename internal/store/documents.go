@@ -71,17 +71,21 @@ func (s *Store) Document(ctx context.Context, id string) (*Document, error) {
 	return &list[0], nil
 }
 
-func (s *Store) MyDocuments(ctx context.Context, owner, before int64, limit int) ([]Document, error) {
+func (s *Store) MyDocuments(ctx context.Context, owner, before int64, limit int, query string, extensions []string) ([]Document, int, error) {
 	if before <= 0 {
 		before = 1<<63 - 1
 	}
-	rows, err := s.pool.Query(ctx, `SELECT `+docCols+` FROM documents
-		WHERE owner_id = $1 AND deleted_at IS NULL AND hidden_at IS NULL AND seq < $2
-		ORDER BY seq DESC LIMIT $3`, owner, before, limit)
-	if err != nil {
-		return nil, err
+	const filter = `owner_id=$1 AND deleted_at IS NULL AND hidden_at IS NULL AND strpos(lower(title||'.'||ext),lower($2))>0 AND (cardinality($3::text[])=0 OR ext=ANY($3::text[]))`
+	var total int
+	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM documents WHERE `+filter, owner, query, extensions).Scan(&total); err != nil {
+		return nil, 0, err
 	}
-	return scanDocs(rows)
+	rows, err := s.pool.Query(ctx, `SELECT `+docCols+` FROM documents WHERE `+filter+` AND seq<$4 ORDER BY seq DESC LIMIT $5`, owner, query, extensions, before, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	items, err := scanDocs(rows)
+	return items, total, err
 }
 
 func (s *Store) RenameDocument(ctx context.Context, id string, owner int64, title string) error {
@@ -118,6 +122,11 @@ func (s *Store) DocumentAccess(ctx context.Context, viewer int64, id string) (bo
 		    OR EXISTS (SELECT 1 FROM message_attachments ma
 		               JOIN messages m ON m.id = ma.message_id
 		               JOIN conversation_state st ON st.conversation_id = m.conversation_id AND st.user_id = $1
-		               WHERE ma.document_id = $2::uuid)`, viewer, id).Scan(&ok)
+		               WHERE ma.document_id = $2::uuid)
+		    OR EXISTS (SELECT 1 FROM comments cm JOIN posts p ON p.id=cm.post_id
+		               JOIN users a ON a.id=p.author_id LEFT JOIN communities c ON c.id=p.community_id
+		               WHERE $2::uuid=ANY(cm.document_ids) AND cm.deleted_at IS NULL AND cm.hidden_at IS NULL
+		               AND (cm.parent_id IS NULL OR EXISTS(SELECT 1 FROM comments root WHERE root.id=cm.parent_id AND root.deleted_at IS NULL AND root.hidden_at IS NULL))
+		               AND `+postVisible+`)`, viewer, id).Scan(&ok)
 	return ok, err
 }

@@ -3,12 +3,13 @@
 // сервер хранит лишь необратимый хэш, а помочь со входом можно письмом
 // со ссылкой на сброс — её получает владелец почты, не администратор.
 import { h, Fragment } from "../vendor/preact/index.js";
-import { useState } from "../vendor/preact/hooks.js";
+import { useEffect, useRef, useState } from "../vendor/preact/hooks.js";
 import { Page, UserCard, fullName, get, post, put } from "./api.js";
 import { navigate, query } from "./router.js";
 import { me } from "./session.js";
 import { Avatar, Empty, ErrorLine, Loading, Time, useLoad } from "./ui.js";
 import { NoticesTab } from "./notices.js";
+import { SystemTab } from "./system.js";
 
 interface Stats {
   users: number; users_new_24h: number; users_new_7d: number; active_24h: number; banned: number;
@@ -21,6 +22,8 @@ interface AdminUser extends UserCard {
 }
 interface SecEvent { id: number; type: string; ip: string | null; user_agent: string; created_at: string }
 interface Card extends AdminUser {
+  birthday: string|null;
+  subscription: {active:boolean;expires_at:string|null;auto_renew:boolean};
   two_factor_enabled: boolean; active_sessions: number; posts: number; comments: number; friends: number;
   open_reports_against: number; reports_filed: number; balance: number; debt: number; last_login_at?: string;
   recent_security_events: SecEvent[];
@@ -30,8 +33,9 @@ interface Report { id: number; reporter: UserCard; target_type: string; target_i
 interface Alert { id: number; rule: string; subject: string; severity: "low" | "medium" | "high"; details: Record<string, unknown>; created_at: string; acknowledged_by: number | null }
 interface Audit { id: number; actor_id: number; actor_role: string; action: string; target: string; status: number; ip: string; created_at: string }
 
-type Tab = "stats" | "users" | "reports" | "notices" | "alerts" | "audit";
+type Tab = "stats" | "system" | "roles" | "users" | "reports" | "notices" | "alerts" | "audit";
 const tabs: [Tab, string, boolean][] = [
+  ["system", "Система", true], ["roles", "Роли", true],
   ["stats", "Сводка", true], ["users", "Пользователи", true], ["reports", "Жалобы", false],
   ["notices", "Предупреждения", false], ["alerts", "Тревоги", true], ["audit", "Журнал", true],
 ];
@@ -43,13 +47,19 @@ export function AdminPage() {
   if (me()?.role === "user") return <section><h1>Нет доступа</h1></section>;
   return (
     <section class="admin">
-      <h1>{isAdmin ? "Администрирование" : "Модерация"}</h1>
-      <div class="tabs" role="tablist">
+      <header class="admin-heading"><div><span class="admin-eyebrow">Управление socialnet</span><h1>{isAdmin ? "Администрирование" : "Модерация"}</h1></div><span class={`admin-role-badge role-${isAdmin?"admin":"moderator"}`}>{isAdmin?"Администратор":"Модератор"}</span></header>
+      <div class="tabs admin-navigation" role="tablist" aria-label="Разделы администрирования">
         {tabs.filter(([, , adminOnly]) => isAdmin || !adminOnly).map(([k, label]) => (
           <button key={k} role="tab" aria-selected={tab === k} class={tab === k ? "tab on" : "tab"} onClick={() => navigate(`/admin?tab=${k}`)}>{label}</button>
         ))}
       </div>
       {tab === "stats" && isAdmin && <StatsTab />}
+      {tab === "system" && isAdmin && <SystemTab />}
+      {tab === "roles" && isAdmin && <><section class="admin-role-panel"><div class="admin-section-heading"><div><h2>Роли и права</h2><p class="muted">Выберите пользователя ниже, чтобы открыть его карточку и изменить доступ.</p></div><a class="link" href="/admin?tab=audit">Журнал изменений →</a></div><div class="admin-role-grid">
+        <article><span class="admin-role-badge role-user">Пользователь</span><h3>Личный аккаунт</h3><p>Профиль, публикации, сообщения и медиа в пределах настроек доступа.</p></article>
+        <article><span class="admin-role-badge role-moderator">Модератор</span><h3>Порядок в сообществе</h3><p>Разбор жалоб и предупреждений. Без доступа к метрикам системы и назначению ролей.</p></article>
+        <article><span class="admin-role-badge role-admin">Администратор</span><h3>Управление платформой</h3><p>Пользователи, роли, системные метрики, тревоги и журнал действий.</p></article>
+      </div><p class="admin-role-note">Все изменения записываются в журнал. Свою роль изменить нельзя; последний администратор сохраняет доступ.</p></section><UsersTab /></>}
       {tab === "users" && isAdmin && (user ? <UserCardView id={+user} /> : <UsersTab />)}
       {tab === "reports" && <ReportsTab />}
       {tab === "notices" && <NoticesTab />}
@@ -87,6 +97,7 @@ function StatsTab() {
 const roleLabel = { user: "пользователь", moderator: "модератор", admin: "администратор" };
 
 function UsersTab() {
+  const [editing,setEditing] = useState<number|null>(null);
   const [q, setQ] = useState("");
   const [applied, setApplied] = useState({ q: "", filter: "all" });
   const [extra, setExtra] = useState<AdminUser[]>([]);
@@ -104,8 +115,9 @@ function UsersTab() {
   }
   const all = [...(list.data?.items ?? []), ...extra];
   return (
-    <Fragment>
-      <form class="row" onSubmit={(e) => { e.preventDefault(); setCursor(null); setApplied({ ...applied, q }); }}>
+    <section class="admin-user-panel" aria-label="Управление пользователями">
+      <div class="admin-section-heading"><div><h2>Пользователи</h2><p class="muted">Поиск аккаунта и управление доступом</p></div>{list.data&&<span class="admin-result-count">Показано: {all.length}{next?"+":""}</span>}</div>
+      <form class="row admin-search" onSubmit={(e) => { e.preventDefault(); setCursor(null); setApplied({ ...applied, q }); }}>
         <label class="sr-only" for="admin-q">Поиск</label>
         <input id="admin-q" type="search" placeholder="id, почта, имя пользователя или имя" value={q} maxLength={100} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
         <label class="sr-only" for="admin-filter">Фильтр</label>
@@ -117,24 +129,70 @@ function UsersTab() {
       </form>
       <ErrorLine error={list.error} />
       {!list.data ? <Loading /> : all.length === 0 ? <Empty>Никого не нашлось.</Empty> : (
-        <table class="tx admin-users">
-          <thead><tr><th scope="col">Пользователь</th><th scope="col">Почта</th><th scope="col">Роль</th><th scope="col">Регистрация</th></tr></thead>
+        <div class="admin-table-scroll" tabIndex={0} role="region" aria-label="Список пользователей"><table class="tx admin-users">
+          <thead><tr><th scope="col">Пользователь</th><th scope="col">Почта</th><th scope="col">Роль</th><th scope="col">Регистрация</th><th scope="col">Управление</th></tr></thead>
           <tbody>
             {all.map((u) => (
               <tr key={u.id}>
-                <td><a href={`/admin?tab=users&user=${u.id}`}>{fullName(u)}</a> <span class="muted">@{u.username} · #{u.id}</span>
-                  {u.banned_at && <span class="pill bad">бан</span>}{u.is_bot && <span class="pill">бот</span>}</td>
-                <td>{u.email}{!u.email_verified && <span class="muted"> (не подтв.)</span>}</td>
-                <td>{roleLabel[u.role]}</td>
+                <td><div class="admin-person"><Avatar user={u} size={38}/><div><a href={`/admin?tab=users&user=${u.id}`}>{fullName(u)}</a><span class="muted">@{u.username} · #{u.id}</span>
+                  {u.banned_at && <span class="pill bad">Заблокирован</span>}{u.is_bot && <span class="pill">Бот</span>}</div></div></td>
+                <td><span class="admin-email">{u.email}</span>{!u.email_verified && <small class="muted">Не подтверждена</small>}</td>
+                <td><span class={`admin-role-badge role-${u.role}`}>{roleLabel[u.role]}</span></td>
                 <td><Time iso={u.created_at} /></td>
+                <td><button class="ghost" onClick={()=>setEditing(u.id)}>Редактировать</button></td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
       {next ? <button class="ghost more" onClick={more}>Показать ещё</button> : null}
-    </Fragment>
+      {editing!==null&&<UserEditDialog key={editing} id={editing} onClose={()=>setEditing(null)} onSaved={(id,role)=>{list.set({...list.data!,items:list.data!.items.map(u=>u.id===id?{...u,role}:u)});setExtra(xs=>xs.map(u=>u.id===id?{...u,role}:u));}}/>}
+    </section>
   );
+}
+
+function UserEditDialog({id,onClose,onSaved}:{id:number;onClose:()=>void;onSaved:(id:number,role:AdminUser["role"])=>void}){
+  const dialog=useRef<HTMLDialogElement>(null);
+  const card=useLoad(()=>get<Card>(`/admin/users/${id}`),[id]);
+  const [role,setRole]=useState<AdminUser["role"]>("user");
+  const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[saved,setSaved]=useState(false);
+  useEffect(()=>{dialog.current?.showModal();},[]);
+  useEffect(()=>{if(card.data)setRole(card.data.role);},[card.data]);
+  const u=card.data,locked=!u||u.id===me()?.id||u.is_bot;
+  async function save(e:Event){e.preventDefault();if(!u||busy||locked)return;setBusy(true);setError(null);try{await put(`/admin/users/${id}/role`,{role});onSaved(id,role);card.set({...u,role});setSaved(true);}catch(e){setError(e);}finally{setBusy(false);}}
+  return <dialog ref={dialog} class="admin-edit-dialog" aria-label="Редактирование пользователя" onCancel={e=>{if(busy)e.preventDefault();}} onClose={onClose}>
+    <form onSubmit={save}><header><div><span class="admin-eyebrow">Управление аккаунтом</span><h2>Карточка пользователя</h2></div><button type="button" class="icon-btn" aria-label="Закрыть карточку" disabled={busy} onClick={()=>dialog.current?.close()}>×</button></header>
+    <div class="admin-edit-body"><ErrorLine error={card.error||error}/>{!u&&!card.error&&<Loading/>}{u&&<>
+      <div class="admin-edit-person"><Avatar user={u} size={96}/><h3>{fullName(u)}</h3><span class="muted">@{u.username} · #{u.id}</span><span class={`admin-role-badge role-${u.role}`}>{roleLabel[u.role]}</span></div>
+      <div class="admin-edit-fields"><label>Имя и фамилия<input readOnly value={fullName(u)}/></label><label>Баланс, монеты<input readOnly value={u.balance.toLocaleString("ru")}/></label><label class="wide">Электронная почта<input readOnly value={u.email}/></label><label class="wide">Роль<select value={role} disabled={locked||busy} onChange={e=>{setRole(e.currentTarget.value as AdminUser["role"]);setSaved(false);}}><option value="user">Пользователь</option><option value="moderator">Модератор</option><option value="admin">Администратор</option></select></label></div>
+      <p class="muted">{locked?"Роль собственного аккаунта и служебного бота изменить нельзя.":"Изменение роли применяется после сохранения и записывается в журнал."}</p>
+      <div class="admin-edit-metrics"><div><strong>{u.posts}</strong><span>Публикаций</span></div><div><strong>{u.friends}</strong><span>Друзей</span></div><div><strong>{u.open_reports_against}</strong><span>Открытых жалоб</span></div></div>
+      <AdminSubscription subscription={u.subscription}/>
+      <BalanceAdjustment id={id} balance={u.balance} debt={u.debt} onSaved={()=>card.reload()}/>
+      <AdminProfileEditor user={u} onSaved={()=>card.reload()}/>{saved&&<p role="status" class="note">Изменения сохранены.</p>}
+    </>}</div><footer>{u&&<a href={`/admin?tab=users&user=${id}`}>Полная карточка</a>}<button type="button" class="ghost" disabled={busy} onClick={()=>dialog.current?.close()}>Закрыть</button><button class="primary" disabled={busy||locked||role===u?.role}>{busy?"Сохраняю…":"Сохранить"}</button></footer></form>
+  </dialog>;
+}
+
+function BalanceAdjustment({id,balance,debt,onSaved}:{id:number;balance:number;debt:number;onSaved:()=>void}){
+ const [direction,setDirection]=useState("add"),[amount,setAmount]=useState(""),[memo,setMemo]=useState("");
+ const [key,setKey]=useState(()=>crypto.randomUUID()),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[note,setNote]=useState("");
+ const change=()=>{setKey(crypto.randomUUID());setNote("");setError(null);};
+ const n=Number(amount),valid=Number.isInteger(n)&&n>0&&n<=1000000&&memo.trim().length>0;
+ async function apply(){if(!valid||busy)return;setBusy(true);setError(null);try{const r=await post<{balance:number}>(`/admin/users/${id}/balance`,{amount:n,direction,memo: memo.trim(),idempotency_key:key});setNote(`Операция выполнена. Баланс: ${r.balance} монет.`);setKey(crypto.randomUUID());setAmount("");setMemo("");onSaved();}catch(e){setError(e);}finally{setBusy(false);}}
+ return <fieldset class="admin-balance" disabled={busy}><legend>Изменить баланс</legend><p class="muted">Сейчас: {balance} монет. {debt>0?`Долг: ${debt} монет. Начисление сначала погасит долг.`:"Корректировка появится в кошельке и журнале администратора."}</p><div class="admin-edit-fields"><label>Операция<select value={direction} onChange={e=>{change();setDirection(e.currentTarget.value);}}><option value="add">Начислить</option><option value="remove">Списать</option></select></label><label>Сумма, монеты<input type="number" min={1} max={1000000} step={1} value={amount} onInput={e=>{change();setAmount(e.currentTarget.value);}}/></label><label class="wide">Причина корректировки<input maxLength={160} value={memo} placeholder="Укажите причину" onInput={e=>{change();setMemo(e.currentTarget.value);}}/></label></div><ErrorLine error={error}/>{note&&<p role="status" class="note">{note}</p>}<button type="button" class="primary" disabled={!valid||busy} onClick={apply}>{busy?"Применяю…":direction==="add"?"Начислить монеты":"Списать монеты"}</button></fieldset>;
+}
+
+function AdminSubscription({subscription:s}:{subscription:Card["subscription"]}){
+ return <section class="admin-subscription"><div><h3>Подписка «Плюс»</h3><span class={s.active?"pill":"muted"}>{s.active?"Активна":s.expires_at?"Истекла":"Не подключена"}</span></div><dl><div><dt>{s.active?"Действует до":"Дата окончания"}</dt><dd>{s.expires_at?<Time iso={s.expires_at}/>:"—"}</dd></div><div><dt>Автопродление</dt><dd>{s.auto_renew?"Включено":"Выключено"}</dd></div></dl></section>;
+}
+
+function AdminProfileEditor({user:u,onSaved}:{user:Card;onSaved:()=>void}){
+ const [first,setFirst]=useState(u.first_name),[last,setLast]=useState(u.last_name),[email,setEmail]=useState(u.email),[birthday,setBirthday]=useState(u.birthday||"");
+ const localDate=(value:string)=>{const d=new Date(value);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);};
+ const [created,setCreated]=useState(()=>localDate(u.created_at)),[password,setPassword]=useState(""),[repeat,setRepeat]=useState(""),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[note,setNote]=useState("");
+ async function save(pass:boolean){setBusy(true);setError(null);setNote("");try{if(pass){await put(`/admin/users/${u.id}/password`,{password});setPassword("");setRepeat("");setNote("Новый пароль установлен. Старые сеансы завершены.");}else{await put(`/admin/users/${u.id}/profile`,{first_name:first,last_name:last,email,birthday:birthday||null,created_at:created===localDate(u.created_at)?u.created_at:new Date(created).toISOString()});setNote("Данные пользователя сохранены.");}onSaved();}catch(e){setError(e);}finally{setBusy(false);}}
+ return <fieldset class="admin-balance" disabled={busy}><legend>Данные пользователя</legend><div class="admin-edit-fields"><label>Имя<input value={first} maxLength={64} onInput={e=>setFirst(e.currentTarget.value)}/></label><label>Фамилия<input value={last} maxLength={64} onInput={e=>setLast(e.currentTarget.value)}/></label><label class="wide">Новый email<input type="email" value={email} maxLength={254} onInput={e=>setEmail(e.currentTarget.value)}/></label><label>Дата рождения<input type="date" value={birthday} onInput={e=>setBirthday(e.currentTarget.value)}/></label><label>Дата создания аккаунта<input type="datetime-local" value={created} onInput={e=>setCreated(e.currentTarget.value)}/></label></div><p class="muted">При смене email подтверждение адреса снимается, старые сеансы и ссылки восстановления отзываются. Время регистрации указано в часовом поясе устройства.</p><button type="button" class="primary" disabled={busy||!first.trim()||!email.trim()||!created} onClick={()=>save(false)}>Сохранить данные</button>{!u.is_bot&&<><h3>Задать новый пароль</h3><div class="admin-edit-fields"><label>Новый пароль<input type="password" autoComplete="new-password" value={password} minLength={8} maxLength={128} onInput={e=>setPassword(e.currentTarget.value)}/></label><label>Повторите пароль<input type="password" autoComplete="new-password" value={repeat} onInput={e=>setRepeat(e.currentTarget.value)}/></label></div><p class="muted">От 8 до 128 символов. Текущий пароль посмотреть нельзя.</p><button type="button" class="ghost danger" disabled={busy||password.length<8||password!==repeat} onClick={()=>save(true)}>Установить новый пароль</button></>}<ErrorLine error={error}/>{note&&<p class="note" role="status">{note}</p>}</fieldset>;
 }
 
 const eventLabel: Record<string, string> = {
@@ -191,6 +249,9 @@ function UserCardView({ id }: { id: number }) {
         <div><dt>Подал жалоб</dt><dd>{u.reports_filed}</dd></div>
         <div><dt>Баланс</dt><dd>{u.balance} монет{u.debt > 0 && `, долг ${u.debt}`}</dd></div>
       </dl>
+      <AdminSubscription subscription={u.subscription}/>
+      <BalanceAdjustment id={id} balance={u.balance} debt={u.debt} onSaved={()=>card.reload()}/>
+      <AdminProfileEditor key={id} user={u} onSaved={()=>card.reload()}/>
       {!self && !u.is_bot && (
         <div class="row">
           {!u.banned_at && <button class="ghost" onClick={reset}>Отправить ссылку для сброса пароля</button>}
@@ -360,7 +421,7 @@ function AuditTab() {
       </div>
       <ErrorLine error={error ?? list.error} />
       {!list.data ? <Loading /> : list.data.items.length === 0 ? <Empty>Записей нет.</Empty> : (
-        <table class="tx">
+        <div class="table-scroll" tabIndex={0} role="region" aria-label="Audit log"><table class="tx">
           <thead><tr><th scope="col">Когда</th><th scope="col">Кто</th><th scope="col">Действие</th><th scope="col" class="num">Код</th></tr></thead>
           <tbody>
             {list.data.items.map((a) => (
@@ -372,7 +433,7 @@ function AuditTab() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </Fragment>
   );

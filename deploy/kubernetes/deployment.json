@@ -1,0 +1,271 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "Deployment",
+  "metadata": {
+    "name": "socialnet"
+  },
+  "spec": {
+    "replicas": 1,
+    "strategy": {
+      "type": "Recreate"
+    },
+    "selector": {
+      "matchLabels": {
+        "app": "socialnet"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "socialnet"
+        }
+      },
+      "spec": {
+        "serviceAccountName": "socialnet-monitor",
+        "automountServiceAccountToken": false,
+        "securityContext": {
+          "runAsNonRoot": true,
+          "runAsUser": 65532,
+          "runAsGroup": 65532,
+          "fsGroup": 65532,
+          "seccompProfile": {
+            "type": "RuntimeDefault"
+          }
+        },
+        "containers": [
+          {
+            "name": "api",
+            "image": "socialnet:local",
+            "args": [],
+            "envFrom": [
+              {
+                "configMapRef": {
+                  "name": "socialnet-config"
+                }
+              },
+              {
+                "secretRef": {
+                  "name": "socialnet-secrets"
+                }
+              }
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "100m",
+                "memory": "128Mi"
+              },
+              "limits": {
+                "cpu": "2",
+                "memory": "1Gi"
+              }
+            },
+            "securityContext": {
+              "allowPrivilegeEscalation": false,
+              "readOnlyRootFilesystem": true,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "media",
+                "mountPath": "/data/media",
+                "readOnly": false
+              },
+              {
+                "name": "tmp-api",
+                "mountPath": "/tmp"
+              },
+              {
+                "name": "kube-access",
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "readOnly": true
+              }
+            ],
+            "ports": [
+              {
+                "name": "http",
+                "containerPort": 8080
+              }
+            ],
+            "startupProbe": {
+              "httpGet": {
+                "path": "/health",
+                "port": "http"
+              },
+              "periodSeconds": 5,
+              "failureThreshold": 60
+            },
+            "readinessProbe": {
+              "httpGet": {
+                "path": "/health",
+                "port": "http"
+              },
+              "periodSeconds": 10
+            }
+          },
+          {
+            "name": "worker",
+            "image": "socialnet:local",
+            "args": [
+              "worker"
+            ],
+            "envFrom": [
+              {
+                "configMapRef": {
+                  "name": "socialnet-config"
+                }
+              },
+              {
+                "secretRef": {
+                  "name": "socialnet-secrets"
+                }
+              }
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "100m",
+                "memory": "128Mi"
+              },
+              "limits": {
+                "cpu": "2",
+                "memory": "2Gi"
+              }
+            },
+            "securityContext": {
+              "allowPrivilegeEscalation": false,
+              "readOnlyRootFilesystem": true,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "media",
+                "mountPath": "/data/media",
+                "readOnly": false
+              },
+              {
+                "name": "tmp-worker",
+                "mountPath": "/tmp"
+              }
+            ]
+          },
+          {
+            "name": "backup",
+            "image": "socialnet:local",
+            "args": [
+              "backup-loop"
+            ],
+            "envFrom": [
+              {
+                "configMapRef": {
+                  "name": "socialnet-config"
+                }
+              },
+              {
+                "secretRef": {
+                  "name": "socialnet-secrets"
+                }
+              }
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "100m",
+                "memory": "128Mi"
+              },
+              "limits": {
+                "cpu": "2",
+                "memory": "1Gi"
+              }
+            },
+            "securityContext": {
+              "allowPrivilegeEscalation": false,
+              "readOnlyRootFilesystem": true,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "media",
+                "mountPath": "/data/media",
+                "readOnly": true
+              },
+              {
+                "name": "tmp-backup",
+                "mountPath": "/tmp"
+              },
+              {
+                "name": "backups",
+                "mountPath": "/backups"
+              }
+            ]
+          }
+        ],
+        "volumes": [
+          {
+            "name": "media",
+            "persistentVolumeClaim": {
+              "claimName": "media"
+            }
+          },
+          {
+            "name": "backups",
+            "persistentVolumeClaim": {
+              "claimName": "backups"
+            }
+          },
+          {
+            "name": "tmp-api",
+            "emptyDir": {
+              "sizeLimit": "2Gi"
+            }
+          },
+          {
+            "name": "tmp-worker",
+            "emptyDir": {
+              "sizeLimit": "2Gi"
+            }
+          },
+          {
+            "name": "tmp-backup",
+            "emptyDir": {
+              "sizeLimit": "2Gi"
+            }
+          },
+          {
+            "name": "kube-access",
+            "projected": {
+              "sources": [
+                {
+                  "serviceAccountToken": {
+                    "path": "token",
+                    "expirationSeconds": 3600
+                  }
+                },
+                {
+                  "configMap": {
+                    "name": "kube-root-ca.crt",
+                    "items": [
+                      {
+                        "key": "ca.crt",
+                        "path": "ca.crt"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

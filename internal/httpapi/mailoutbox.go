@@ -53,7 +53,7 @@ func (s *Server) DeliverMail(ctx context.Context) (int, error) {
 
 func (s *Server) deliverOne(ctx context.Context, m store.QueuedMail) bool {
 	sendCtx, cancel := context.WithTimeout(ctx, mailSendTimeout)
-	err := s.mailer.Send(sendCtx, mailer.Message{To: m.To, Subject: m.Subject, Body: m.Body})
+	err := s.sendConfiguredMail(sendCtx, mailer.Message{To: m.To, Subject: m.Subject, Body: m.Body})
 	cancel()
 	if err == nil {
 		if err := s.store.MailSent(ctx, m.ID); err != nil {

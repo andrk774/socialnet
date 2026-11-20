@@ -1,9 +1,9 @@
 // Закладки, документы и отложенные записи.
 import { h } from "../vendor/preact/index.js";
 import { useState } from "../vendor/preact/hooks.js";
-import { Doc, Page, Post, Scheduled, del, fileSize, get, patch, saveFile, upload } from "./api.js";
+import { Page, Post, Scheduled, del, get, patch } from "./api.js";
 import { PostView, Video } from "./posts.js";
-import { Empty, ErrorLine, Loading, Time, duration, useLoad } from "./ui.js";
+import { Empty, ErrorLine, Loading, duration, useLoad } from "./ui.js";
 
 interface BVideo { id: string; title: string; poster_url?: string; hls_url?: string; mp4_url?: string }
 interface BTrack { id: string; title: string; artist: string; duration_sec: number; url: string }
@@ -42,54 +42,7 @@ export function BookmarksPage() {
   );
 }
 
-export function DocumentsPage() {
-  const list = useLoad(() => get<Page<Doc>>("/documents?limit=50"), []);
-  const [error, setError] = useState<unknown>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function add(files: FileList | null) {
-    if (!files) return;
-    setBusy(true); setError(null);
-    for (const f of Array.from(files)) {
-      try { await upload<Doc>("/documents", f); } catch (e) { setError(e); }
-    }
-    setBusy(false); list.reload();
-  }
-  async function rename(d: Doc) {
-    const title = prompt("Новое название", d.title);
-    if (title === null || !title.trim()) return;
-    await patch(`/documents/${d.id}`, { title }).then(list.reload, setError);
-  }
-  async function remove(d: Doc) {
-    if (!confirm(`Удалить «${d.title}»? Документ пропадёт из записей и сообщений.`)) return;
-    await del(`/documents/${d.id}`).then(list.reload, setError);
-  }
-
-  return (
-    <section>
-      <h1>Документы</h1>
-      <p class="muted">PDF, Word, Excel, PowerPoint, OpenDocument, EPUB, DjVu, RTF, TXT, CSV и архивы — до 50 МБ.
-        Скачать документ могут только те, кому видна запись или сообщение с ним.</p>
-      <label class="ghost file-btn">{busy ? "Загружаем…" : "Загрузить документ"}
-        <input type="file" multiple class="sr-only" disabled={busy} onChange={(e) => add((e.target as HTMLInputElement).files)} />
-      </label>
-      <ErrorLine error={error ?? list.error} />
-      {!list.data ? <Loading /> : list.data.items.length === 0 ? <Empty>Документов пока нет.</Empty> : (
-        <ul class="doc-list">
-          {list.data.items.map((d) => (
-            <li key={d.id} class="doc">
-              <span class="doc-ext" aria-hidden="true">{d.ext}</span>
-              <button class="link doc-name" onClick={() => saveFile(d.url, `${d.title}.${d.ext}`).catch(setError)}>{d.title}.{d.ext}</button>
-              <span class="muted">{fileSize(d.size)} · <Time iso={d.created_at} /></span>
-              <button class="link" onClick={() => rename(d)}>Переименовать</button>
-              <button class="link" onClick={() => remove(d)}>Удалить</button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
+export { DocumentsPage } from "./documents.js";
 
 const localInput = (iso: string) => { const d = new Date(iso); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
 

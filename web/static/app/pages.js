@@ -1,15 +1,21 @@
+export { CommunitiesPage } from "./communities.js";
+import { rememberCommunity } from "./communities.js";
+import { useMe } from "./session.js";
 import { h, Fragment } from "../vendor/preact/index.js";
 import { useEffect, useState } from "../vendor/preact/hooks.js";
 import { del, get, post, upload } from "./api.js";
 import { Composer, PostList, PostView, communityEmoji } from "./posts.js";
 import { query } from "./router.js";
-import { Avatar, Empty, ErrorLine, Loading, Time, UserLink, duration, useLoad } from "./ui.js";
+import { Avatar, Empty, ErrorLine, Loading, Time, UserLink, useLoad } from "./ui.js";
 import { DeleteAccount } from "./legal.js";
 import { CommunityFundraisers } from "./fundraisers.js";
+import { Stories } from "./stories.js";
+import { SecurityFactor } from "./securityfactor.js";
 // ---------- лента, запись, хэштег ----------
 export function FeedPage() {
     return (h("section", null,
         h("h1", { class: "sr-only" }, "\u041B\u0435\u043D\u0442\u0430"),
+        h(Stories, null),
         h(PostList, { path: "/feed", empty: "\u041B\u0435\u043D\u0442\u0430 \u043F\u0443\u0441\u0442\u0430\u044F. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u0434\u0440\u0443\u0437\u0435\u0439 \u0438\u043B\u0438 \u0432\u0441\u0442\u0443\u043F\u0438\u0442\u0435 \u0432 \u0441\u043E\u043E\u0431\u0449\u0435\u0441\u0442\u0432\u043E \u2014 \u0438\u0445 \u0437\u0430\u043F\u0438\u0441\u0438 \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u0437\u0434\u0435\u0441\u044C.", header: (add) => h(Composer, { onPosted: add }) })));
 }
 export function PostPage({ id }) {
@@ -25,7 +31,7 @@ export function TagPage({ tag }) {
             tag),
         h(PostList, { path: `/hashtags/${encodeURIComponent(tag)}/posts`, empty: "\u0421 \u044D\u0442\u0438\u043C \u0445\u044D\u0448\u0442\u0435\u0433\u043E\u043C \u0437\u0430\u043F\u0438\u0441\u0435\u0439 \u043D\u0435\u0442." })));
 }
-const notifText = {
+export const notifText = {
     like: "оценил(а) вашу запись", comment: "прокомментировал(а) запись", reply: "ответил(а) на комментарий",
     mention: "упомянул(а) вас", friend_request: "хочет добавить вас в друзья", friend_accept: "принял(а) заявку в друзья",
     gift: "отправил(а) вам подарок", transfer: "перевёл(а) вам монеты", donation: "поддержал(а) сообщество", join_request: "просит вступить в сообщество", video_ready: "Видео обработано и опубликовано",
@@ -57,48 +63,11 @@ export function NotificationsPage({ onRead }) {
                 h("br", null),
                 h(Time, { iso: n.created_at })))))))));
 }
-export function CommunitiesPage() {
-    const list = useLoad(() => get("/communities?limit=50"), []);
-    const [f, setF] = useState({ name: "", slug: "", visibility: "open" });
-    const [error, setError] = useState(null);
-    async function create(e) {
-        e.preventDefault();
-        try {
-            await post("/communities", f);
-            setF({ name: "", slug: "", visibility: "open" });
-            list.reload();
-        }
-        catch (err) {
-            setError(err);
-        }
-    }
-    return (h("section", null,
-        h("h1", null, "\u0421\u043E\u043E\u0431\u0449\u0435\u0441\u0442\u0432\u0430"),
-        list.error ? h(ErrorLine, { error: list.error }) : !list.data ? h(Loading, null) : list.data.items.length === 0 ? h(Empty, null, "\u0412\u044B \u043F\u043E\u043A\u0430 \u043D\u0435 \u0441\u043E\u0441\u0442\u043E\u0438\u0442\u0435 \u0432 \u0441\u043E\u043E\u0431\u0449\u0435\u0441\u0442\u0432\u0430\u0445. \u041D\u0430\u0439\u0434\u0438\u0442\u0435 \u0438\u0445 \u0447\u0435\u0440\u0435\u0437 \u043F\u043E\u0438\u0441\u043A.") : (h("ul", { class: "plain-list" }, list.data.items.map((c) => h("li", { key: c.id },
-            h("a", { href: `/c/${c.slug}` }, c.name),
-            " ",
-            h("span", { class: "muted" },
-                c.members_count,
-                " \u0443\u0447."))))),
-        h("details", { class: "create" },
-            h("summary", null, "\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u0441\u043E\u043E\u0431\u0449\u0435\u0441\u0442\u0432\u043E"),
-            h("form", { onSubmit: create, class: "stack" },
-                h("label", null,
-                    "\u041D\u0430\u0437\u0432\u0430\u043D\u0438\u0435",
-                    h("input", { value: f.name, required: true, maxLength: 100, onInput: (e) => setF({ ...f, name: e.target.value }) })),
-                h("label", null,
-                    "\u0410\u0434\u0440\u0435\u0441",
-                    h("input", { value: f.slug, required: true, pattern: "[A-Za-z0-9_]{3,32}", title: "3\u201332 \u0441\u0438\u043C\u0432\u043E\u043B\u0430: \u043B\u0430\u0442\u0438\u043D\u0438\u0446\u0430, \u0446\u0438\u0444\u0440\u044B, _", onInput: (e) => setF({ ...f, slug: e.target.value }) })),
-                h("label", null,
-                    "\u041A\u0442\u043E \u0432\u0438\u0434\u0438\u0442 \u0437\u0430\u043F\u0438\u0441\u0438",
-                    h("select", { value: f.visibility, onChange: (e) => setF({ ...f, visibility: e.target.value }) },
-                        h("option", { value: "open" }, "\u0412\u0441\u0435"),
-                        h("option", { value: "closed" }, "\u0422\u043E\u043B\u044C\u043A\u043E \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u0438 (\u0432\u0441\u0442\u0443\u043F\u043B\u0435\u043D\u0438\u0435 \u043F\u043E \u0437\u0430\u044F\u0432\u043A\u0435)"))),
-                h(ErrorLine, { error: error }),
-                h("button", { class: "primary" }, "\u0421\u043E\u0437\u0434\u0430\u0442\u044C")))));
-}
 export function CommunityPage({ slug }) {
+    const me = useMe();
     const c = useLoad(() => get(`/communities/by-slug/${encodeURIComponent(slug)}`), [slug]);
+    useEffect(() => { if (c.data && me)
+        rememberCommunity(c.data, me.id); }, [c.data, me?.id]);
     const [msg, setMsg] = useState("");
     const [error, setError] = useState(null);
     if (c.error)
@@ -272,6 +241,7 @@ export function SettingsPage() {
     const act = (fn, then) => fn().then(then, setError);
     return (h("section", { class: "settings" },
         h("h1", null, "\u0411\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C"),
+        h(SecurityFactor, null),
         h(ErrorLine, { error: error }),
         h("h2", null, "\u0413\u0434\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D \u0432\u0445\u043E\u0434"),
         !sessions.data ? h(Loading, null) : (h("ul", { class: "plain-list" }, sessions.data.items.map((s) => (h("li", { key: s.id },
@@ -346,26 +316,4 @@ export function OAuthPage() {
             h("button", { class: "primary", onClick: () => decide(true) }, "\u0420\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044C"),
             h("button", { class: "ghost", onClick: () => decide(false) }, "\u041E\u0442\u043A\u043B\u043E\u043D\u0438\u0442\u044C"))));
 }
-export function MusicPage({ userId }) {
-    const list = useLoad(() => get(`/users/${userId}/music?limit=50`), [userId]);
-    const [playing, setPlaying] = useState(null);
-    if (list.error)
-        return h(ErrorLine, { error: list.error });
-    if (!list.data)
-        return h(Loading, null);
-    return (h("section", null,
-        h("h1", null, "\u041C\u0443\u0437\u044B\u043A\u0430"),
-        list.data.items.length === 0 ? h(Empty, null, "\u0412 \u00AB\u041C\u043E\u0435\u0439 \u043C\u0443\u0437\u044B\u043A\u0435\u00BB \u043F\u043E\u043A\u0430 \u043F\u0443\u0441\u0442\u043E. \u0414\u043E\u0431\u0430\u0432\u043B\u044F\u0439\u0442\u0435 \u0442\u0440\u0435\u043A\u0438 \u0438\u0437 \u0437\u0430\u043F\u0438\u0441\u0435\u0439 \u0438 \u043F\u043E\u0438\u0441\u043A\u0430.") : (h("ol", { class: "tracks" }, list.data.items.map((t) => (h("li", { key: t.id },
-            h("button", { class: playing?.id === t.id ? "track-btn on" : "track-btn", onClick: () => setPlaying(t), "aria-label": `Слушать: ${t.artist} — ${t.title}` }, "\u25B6"),
-            h("span", null,
-                t.artist,
-                " \u2014 ",
-                t.title),
-            h("span", { class: "muted" }, duration(t.duration_sec))))))),
-        playing && h("div", { class: "player" },
-            h("span", null,
-                playing.artist,
-                " \u2014 ",
-                playing.title),
-            h("audio", { controls: true, autoPlay: true, src: playing.url }))));
-}
+// ---------- музыка и поиск ----------

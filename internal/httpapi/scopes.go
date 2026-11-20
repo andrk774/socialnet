@@ -62,6 +62,7 @@ var scopeRoutes = map[string][]string{
 		"POST /api/v1/posts/{id}/reactions", "DELETE /api/v1/posts/{id}/reactions",
 		"GET /api/v1/posts/{id}/comments", "POST /api/v1/posts/{id}/comments",
 		"DELETE /api/v1/comments/{id}", "GET /api/v1/comments/{id}/replies",
+		"GET /api/v1/comments/{id}/reactions", "POST /api/v1/comments/{id}/reactions", "DELETE /api/v1/comments/{id}/reactions",
 		"GET /api/v1/users/{id}/posts", "GET /api/v1/users/{id}/reviews", "GET /api/v1/feed", "GET /api/v1/hashtags/{tag}/posts",
 		"GET /api/v1/communities/{id}/posts",
 		"GET /api/v1/posts/{id}/audience", "POST /api/v1/posts/{id}/poll/votes", "DELETE /api/v1/posts/{id}/poll/votes",

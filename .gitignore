@@ -1,4 +1,10 @@
 .env
+docker-compose.override.yml
 /bin/
 dump.rdb
 .vscode/
+.qa/
+VKCOM/
+VKCOM-repositories/
+VKCOM-repositories.zip*
+security-review/

@@ -114,7 +114,7 @@ func (s *Server) handleAdminPasswordReset(w http.ResponseWriter, r *http.Request
 	}
 	s.sendMail(user.Email, "Сброс пароля",
 		"Администратор сайта отправил вам ссылку для смены пароля — обычно это делают по вашей просьбе в поддержку.\n\n"+
-			"Ссылка действует 1 час:\n"+s.cfg.AppURL+"/reset-password?token="+url.QueryEscape(token)+"\n\n"+
+			"Ссылка действует 1 час:\n"+s.publicURL(r.Context())+"/reset-password?token="+url.QueryEscape(token)+"\n\n"+
 			"Если вы ни о чём не просили, просто ничего не делайте: пароль останется прежним.\n")
 	// В журнал пользователя — без IP и браузера админа.
 	s.m.events.Inc("admin_password_reset")

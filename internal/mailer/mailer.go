@@ -3,7 +3,9 @@ package mailer
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"io"
 	"log/slog"
 	"mime"
 	"net"
@@ -27,6 +29,7 @@ type Mailer interface {
 // SMTP отправляет письма через SMTP-сервер. Если сервер поддерживает
 // STARTTLS, net/smtp включит шифрование автоматически.
 type SMTP struct {
+	TLSMode  string // empty=legacy auto, starttls, tls, none
 	Addr     string // host:port
 	User     string
 	Password string
@@ -56,14 +59,60 @@ func (s *SMTP) Send(ctx context.Context, m Message) error {
 		"Content-Transfer-Encoding: 8bit\r\n\r\n" +
 		strings.ReplaceAll(m.Body, "\n", "\r\n")
 
-	done := make(chan error, 1)
-	go func() { done <- smtp.SendMail(s.Addr, auth, envelope, []string{m.To}, []byte(msg)) }()
-	select {
-	case err := <-done:
-		return err
-	case <-ctx.Done():
-		return ctx.Err()
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	dialer := &net.Dialer{}
+	var conn net.Conn
+	tlsConfig := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
+	if s.TLSMode == "tls" {
+		conn, err = (&tls.Dialer{NetDialer: dialer, Config: tlsConfig}).DialContext(ctx, "tcp", s.Addr)
+	} else {
+		conn, err = dialer.DialContext(ctx, "tcp", s.Addr)
 	}
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	deadline, _ := ctx.Deadline()
+	_ = conn.SetDeadline(deadline)
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stop()
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	if s.TLSMode == "starttls" || s.TLSMode == "" {
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err = client.StartTLS(tlsConfig); err != nil {
+				return err
+			}
+		} else if s.TLSMode == "starttls" {
+			return fmt.Errorf("SMTP STARTTLS required")
+		}
+	}
+	if auth != nil {
+		if err = client.Auth(auth); err != nil {
+			return err
+		}
+	}
+	if err = client.Mail(envelope); err != nil {
+		return err
+	}
+	if err = client.Rcpt(m.To); err != nil {
+		return err
+	}
+	writer, err := client.Data()
+	if err != nil {
+		return err
+	}
+	if _, err = io.WriteString(writer, msg); err != nil {
+		return err
+	}
+	if err = writer.Close(); err != nil {
+		return err
+	}
+	return client.Quit()
 }
 
 // splitFrom разбирает MAIL_FROM («Socialnet <no-reply@example.com>» или

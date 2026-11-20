@@ -81,6 +81,8 @@ func (s *Store) AdminSearchUsers(ctx context.Context, q, filter string, before i
 
 type AdminUserCard struct {
 	AdminUser
+	Birthday       *string         `json:"birthday"`
+	Subscription   Plus            `json:"subscription"`
 	TwoFactor      bool            `json:"two_factor_enabled"`
 	Sessions       int             `json:"active_sessions"`
 	Posts          int             `json:"posts"`
@@ -107,6 +109,12 @@ func (s *Store) AdminUserCard(ctx context.Context, id int64) (*AdminUserCard, er
 		return nil, ErrNotFound
 	}
 	c := &AdminUserCard{AdminUser: list[0]}
+	if err = s.pool.QueryRow(ctx, `SELECT to_char(birthday,'YYYY-MM-DD') FROM users WHERE id=$1`, id).Scan(&c.Birthday); err != nil {
+		return nil, err
+	}
+	if c.Subscription, err = s.PlusStatus(ctx, id); err != nil {
+		return nil, err
+	}
 	err = s.pool.QueryRow(ctx, `
 		SELECT
 		  (SELECT totp_enabled_at IS NOT NULL FROM users WHERE id = $1),

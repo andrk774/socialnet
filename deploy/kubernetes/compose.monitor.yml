@@ -1,0 +1,14 @@
+# Use from the project root after preparing the CA and service-account token:
+# docker compose -f docker-compose.yml -f deploy/kubernetes/compose.monitor.yml up -d api
+services:
+  api:
+    environment:
+      KUBE_API_URL: ${KUBE_API_URL:?set the HTTPS Kubernetes API endpoint}
+      KUBE_NAMESPACE: ${KUBE_NAMESPACE:-socialnet}
+      KUBE_CA_FILE: /run/socialnet-kubernetes/ca.crt
+      KUBE_TOKEN_FILE: /run/socialnet-kubernetes/token
+    volumes:
+      - type: bind
+        source: ${KUBE_CREDENTIALS_DIR:?set a private directory outside the repository}
+        target: /run/socialnet-kubernetes
+        read_only: true

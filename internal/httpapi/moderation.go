@@ -393,6 +393,10 @@ func (s *Server) handleSetRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err := s.store.SetRole(r.Context(), id, req.Role)
+	if errors.Is(err, store.ErrLastAdmin) {
+		writeError(w, http.StatusConflict, "last_admin", "cannot demote the last administrator")
+		return
+	}
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not_found", "user not found")
 		return

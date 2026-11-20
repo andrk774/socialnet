@@ -520,12 +520,36 @@ func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Text      string `json:"text"`
 		ReplyToID *int64 `json:"reply_to_id"` // ответ на комментарий
+		store.CommentContent
 	}
 	if !decodeJSON(w, r, &req) {
 		return
 	}
 	req.Text = strings.TrimSpace(req.Text)
-	if n := utf8.RuneCountInString(req.Text); n < 1 || n > 2000 {
+	fields := map[string]string{}
+	for name, ids := range map[string]*[]string{"photo_ids": &req.MediaIDs, "track_ids": &req.TrackIDs, "video_ids": &req.VideoIDs, "document_ids": &req.DocumentIDs} {
+		var problem string
+		*ids, problem = dedupeUUIDs(*ids, 10)
+		if problem != "" {
+			fields[name] = problem
+		}
+	}
+	total := len(req.MediaIDs) + len(req.TrackIDs) + len(req.VideoIDs) + len(req.DocumentIDs)
+	if total > 10 {
+		fields["attachments"] = "maximum 10 attachments"
+	}
+	if req.Sticker != "" {
+		switch req.Sticker {
+		case "hello", "thanks", "hug", "wow", "yes", "sad":
+		default:
+			fields["sticker"] = "unknown sticker"
+		}
+	}
+	if len(fields) > 0 {
+		writeFieldErrors(w, 422, "validation_failed", "invalid input", fields)
+		return
+	}
+	if n := utf8.RuneCountInString(req.Text); (n < 1 && total == 0 && req.Sticker == "") || n > 2000 {
 		writeFieldErrors(w, http.StatusUnprocessableEntity, "validation_failed", "invalid input",
 			map[string]string{"text": "1-2000 characters"})
 		return
@@ -558,7 +582,11 @@ func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request) {
 		parentID, replyAuthor = &root, meta.AuthorID
 	}
 
-	id, err := s.store.AddComment(r.Context(), post.ID, me, req.Text, parentID, req.ReplyToID)
+	id, err := s.store.AddComment(r.Context(), post.ID, me, req.Text, parentID, req.ReplyToID, req.CommentContent)
+	if errors.Is(err, store.ErrBadMedia) {
+		writeError(w, 422, "invalid_attachments", "attachment not available")
+		return
+	}
 	if err != nil {
 		s.internalError(w, r, err)
 		return

@@ -1,4 +1,10 @@
 .env
+docker-compose.override.yml
 .git
 bin
 frontend/node_modules
+VKCOM/
+VKCOM-repositories/
+VKCOM-repositories.zip*
+security-review/
+.qa/

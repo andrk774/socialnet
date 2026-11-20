@@ -195,7 +195,7 @@ func (s *Server) finishLogin(w http.ResponseWriter, r *http.Request, user *store
 				"В ваш аккаунт выполнен вход с нового устройства.\n"+
 				"Браузер: "+meta.UserAgent+"\nIP: "+ipString(meta.IP)+"\n\n"+
 				"Если это были не вы, смените пароль и завершите все сеансы:\n"+
-				s.cfg.AppURL+"/settings/security\n")
+				s.publicURL(r.Context())+"/settings/security\n")
 	} else {
 		s.event(r, user.ID, "login")
 	}
@@ -279,7 +279,7 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 			s.sendMail(u.Email, "Подозрительная активность: все сеансы завершены",
 				"Кто-то попытался использовать старый ключ сеанса вашего аккаунта. "+
 					"Это бывает, если ключ был украден. На всякий случай мы завершили все сеансы.\n\n"+
-					"Войдите заново и смените пароль: "+s.cfg.AppURL+"/settings/security\n")
+					"Войдите заново и смените пароль: "+s.publicURL(r.Context())+"/settings/security\n")
 		}
 		s.clearRefreshCookie(w)
 		writeError(w, http.StatusUnauthorized, "unauthorized", "session revoked, please log in again")

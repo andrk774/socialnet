@@ -6,6 +6,8 @@ import { navigate } from "./router.js";
 import { Avatar, ErrorLine, Loading, useLoad } from "./ui.js";
 import { ReportButton } from "./report.js";
 import { OrganizerReviews } from "./reviews.js";
+import { AvatarUpload } from "./uploads.js";
+import { startCall } from "./calls.js";
 const friendLabel = {
     none: "Добавить в друзья", request_sent: "Отменить заявку", request_received: "Принять заявку", friends: "Удалить из друзей",
 };
@@ -33,7 +35,7 @@ export function ProfilePage({ username }) {
     }
     return (h("div", { class: "profile" },
         h("header", { class: "profile-head" },
-            h(Avatar, { user: u, size: 96 }),
+            rel === "self" ? h(AvatarUpload, { user: u, onSaved: prof.reload }) : h(Avatar, { user: u, size: 144 }),
             h("div", null,
                 h("h1", null,
                     fullName(u),
@@ -44,9 +46,11 @@ export function ProfilePage({ username }) {
                     u.presence?.online ? " · в сети" : ""),
                 u.status_text && h("p", { class: "status" }, u.status_text),
                 u.city && h("p", { class: "muted" }, u.city)),
+            rel === "self" && h("a", { class: "button ghost", href: "/statistics" }, "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430"),
             rel !== "self" && (h("div", { class: "profile-actions" },
                 h("button", { class: rel === "none" || rel === "request_received" ? "primary" : "ghost", onClick: friend }, friendLabel[rel]),
                 u.relationship.can_write && h("button", { class: "ghost", onClick: () => navigate(`/im/u/${u.id}`) }, "\u041D\u0430\u043F\u0438\u0441\u0430\u0442\u044C"),
+                u.relationship.can_write && h("button", { class: "ghost", onClick: () => startCall(u) }, "\u041F\u043E\u0437\u0432\u043E\u043D\u0438\u0442\u044C"),
                 h(ReportButton, { target: { type: "user", id: u.id }, cls: "ghost" })))),
         h(ErrorLine, { error: error }),
         u.about && h("p", { class: "about" }, u.about),

@@ -15,6 +15,47 @@ const (
 	dailyBonus  = 5
 )
 
+func (s *Server) handleAdminBalance(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var req struct {
+		moneyRequest
+		Direction string `json:"direction"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	errs := req.validate(r)
+	if utf8.RuneCountInString(req.Memo) > 160 {
+		errs["memo"] = "max 160 characters"
+	}
+	if req.Memo == "" {
+		errs["memo"] = "reason required"
+	}
+	if req.Direction != "add" && req.Direction != "remove" {
+		errs["direction"] = "add or remove"
+	}
+	if len(errs) > 0 {
+		writeFieldErrors(w, http.StatusUnprocessableEntity, "validation_failed", "invalid input", errs)
+		return
+	}
+	if _, err := s.store.UserByID(r.Context(), id); err != nil {
+		s.moneyError(w, r, err)
+		return
+	}
+	rec, err := s.store.AdminAdjustBalance(r.Context(), userIDFrom(r.Context()), id, req.Amount, req.Direction == "remove", "Корректировка администратором: "+req.Memo, req.IdempotencyKey)
+	if err != nil {
+		s.moneyError(w, r, err)
+		return
+	}
+	if !rec.Replayed {
+		s.modLog(r, "balance:"+req.Direction+":"+strconv.FormatInt(req.Amount, 10), "user", id, nil, req.Memo)
+	}
+	s.respondTx(w, r, rec, store.UserAccount(id))
+}
+
 // moneyRequest — общие поля денежных операций.
 type moneyRequest struct {
 	Amount         int64  `json:"amount"`
