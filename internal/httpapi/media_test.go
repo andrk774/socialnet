@@ -56,17 +56,56 @@ func TestMediaFlow(t *testing.T) {
 	id := m["id"].(string)
 
 	// отдача: правильный тип, кэш, без авторизации
-	resp, err := http.Get(ts.URL + m["thumb_url"].(string))
-	if err != nil || resp.StatusCode != 200 || resp.Header.Get("Content-Type") != "image/png" {
-		t.Fatalf("serve: %v %v", resp.StatusCode, resp.Header)
+	checkPhoto := func(u *tuser, cookie bool, status int) {
+		t.Helper()
+		req, _ := http.NewRequest("GET", ts.URL+m["thumb_url"].(string), nil)
+		if u != nil {
+			if cookie {
+				req.AddCookie(&http.Cookie{Name: "media_access", Value: u.Token})
+			} else {
+				req.Header.Set("Authorization", "Bearer "+u.Token)
+			}
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != status {
+			t.Fatalf("photo status: got %d want %d", resp.StatusCode, status)
+		}
+		if resp.Header.Get("Cache-Control") != "private, no-store" {
+			t.Fatal("photo must not be cached")
+		}
+		if status == 200 && resp.Header.Get("Content-Type") != "image/png" {
+			t.Fatal("invalid image content type")
+		}
 	}
-	resp.Body.Close()
-	if r, _ := http.Get(ts.URL + "/media/" + id + "/original"); r.StatusCode != 404 {
-		t.Fatal("unknown size served")
-	}
-	if r, _ := http.Get(ts.URL + "/media/..%2F..%2Fetc%2Fpasswd/full"); r.StatusCode != 404 {
-		t.Fatal("traversal")
-	}
+	checkPhoto(nil, false, 401)
+	checkPhoto(anna, false, 200)
+	checkPhoto(anna, true, 200)
+	checkPhoto(bob, false, 404)
+	// A private message grants access only to its participants.
+	_, chatPhoto := upload(t, ts, anna, pngBytes(24, 24))
+	anna.req("POST", p("/users/%d/messages", bob.ID), map[string]any{"attachments": []map[string]string{{"kind": "photo", "id": chatPhoto["id"].(string)}}}, 201)
+	evidence := m
+	m = chatPhoto
+	checkPhoto(bob, true, 200)
+	eve := register(t, ts, "eve")
+	checkPhoto(eve, true, 404)
+	m = evidence
+	anna.req("POST", p("/posts"), map[string]any{"photo_ids": []string{id}, "audience": "only_me"}, 201)
+	checkPhoto(bob, false, 404)
+	pub := anna.req("POST", p("/posts"), map[string]any{"photo_ids": []string{id}, "audience": "everyone"}, 201)
+	checkPhoto(bob, false, 200)
+	anna.req("PATCH", p("/users/me/privacy"), map[string]any{"profile_visibility": "only_me"}, 200)
+	checkPhoto(bob, false, 404)
+	anna.req("PATCH", p("/users/me/privacy"), map[string]any{"profile_visibility": "everyone"}, 200)
+	anna.req("POST", p("/users/%d/block", bob.ID), nil, 204)
+	checkPhoto(bob, false, 404)
+	anna.req("DELETE", p("/users/%d/block", bob.ID), nil, 204)
+	anna.req("DELETE", p("/posts/%d", int64(pub["id"].(float64))), nil, 204)
+	checkPhoto(bob, false, 404)
 
 	// неверные файлы
 	if code, _ := upload(t, ts, anna, []byte("<?php echo 1; ?>")); code != 415 {
@@ -79,6 +118,7 @@ func TestMediaFlow(t *testing.T) {
 		t.Fatalf("avatar: %v", me)
 	}
 	bob.req("PUT", p("/users/me/avatar"), map[string]any{"media_id": id}, 422)
+	checkPhoto(bob, true, 200)
 
 	// фото в посте: своё можно, чужое нельзя
 	post := anna.req("POST", p("/posts"), map[string]any{"text": "фото", "photo_ids": []string{id}}, 201)
@@ -96,7 +136,9 @@ func TestMediaFlow(t *testing.T) {
 	if me := anna.req("GET", p("/users/me"), nil, 200); me["avatar_url"] != nil {
 		t.Fatal("avatar not cleared")
 	}
-	if r, _ := http.Get(ts.URL + "/media/" + id + "/full"); r.StatusCode != 404 {
-		t.Fatal("deleted media still served")
-	}
+	checkPhoto(anna, true, 404)
+	m = chatPhoto
+	checkPhoto(anna, true, 200)
+	anna.req("POST", p("/auth/logout"), nil, 204)
+	checkPhoto(anna, true, 401) // A copied cookie cannot outlive the revoked session.
 }

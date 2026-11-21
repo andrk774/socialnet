@@ -72,7 +72,7 @@ func (s *Server) handleStickers(w http.ResponseWriter, r *http.Request) {
 			s.internalError(w, r, e)
 			return
 		}
-		items = append(items, map[string]string{"id": id, "title": title, "url": "/media/" + id + "/full", "thumb_url": "/media/" + id + "/thumb"})
+		items = append(items, map[string]string{"id": id, "title": title, "url": "/media/" + id + "/full?acl=2", "thumb_url": "/media/" + id + "/thumb?acl=2"})
 	}
 	if e = rows.Err(); e != nil {
 		s.internalError(w, r, e)

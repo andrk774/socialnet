@@ -638,7 +638,7 @@ func (s *Server) Router() http.Handler {
 	r.With(deadlines(30*time.Minute)).Get("/audio/{file}", s.handleServeAudio)
 
 	// Отдача фото — публичная, для тегов <img>.
-	r.With(deadlines(60*time.Second)).Get("/media/{id}/{size}", s.handleServeMedia)
+	r.With(deadlines(60*time.Second), s.mediaAuth).Get("/media/{id}/{size}", s.handleServeMedia)
 
 	// Фронтенд: файлы и все «страничные» адреса.
 	r.With(deadlines(60*time.Second)).Get("/static/*", s.handleStatic)

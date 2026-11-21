@@ -27,8 +27,12 @@ func (s *Server) handleVideoView(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"views": n})
 }
 func (s *Server) handleGetCover(w http.ResponseWriter, r *http.Request) {
-	u, _, ok := s.targetUser(w, r)
+	u, rel, ok := s.targetUser(w, r)
 	if !ok {
+		return
+	}
+	if !canSee(u.ProfileVisibility, userIDFrom(r.Context()) == u.ID, rel) {
+		writeError(w, http.StatusNotFound, "not_found", "cover not found")
 		return
 	}
 	var id string
@@ -39,7 +43,7 @@ func (s *Server) handleGetCover(w http.ResponseWriter, r *http.Request) {
 	}
 	link := ""
 	if id != "" {
-		link = "/media/" + id + "/full"
+		link = "/media/" + id + "/full?acl=2"
 	}
 	writeJSON(w, 200, map[string]string{"url": link})
 }

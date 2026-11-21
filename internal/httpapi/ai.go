@@ -224,5 +224,5 @@ func (s *Server) handleGenerateAI(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, e)
 		return
 	}
-	writeJSON(w, 200, map[string]string{"id": id, "url": "/media/" + id + "/full", "thumb_url": "/media/" + id + "/thumb"})
+	writeJSON(w, 200, map[string]string{"id": id, "url": "/media/" + id + "/full?acl=2", "thumb_url": "/media/" + id + "/thumb?acl=2"})
 }

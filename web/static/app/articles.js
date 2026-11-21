@@ -30,7 +30,7 @@ export function ArticleBody({ blocks }) {
                 h(Spans, { spans: b.spans }));
             case "hr": return h("hr", { key: i });
             case "img": return (h("figure", { key: i },
-                h("img", { src: `/media/${b.media_id}/full`, alt: b.caption ?? "", loading: "lazy" }),
+                h("img", { src: `/media/${b.media_id}/full?acl=2`, alt: b.caption ?? "", loading: "lazy" }),
                 b.caption && h("figcaption", null, b.caption)));
             default: return h("p", { key: i },
                 h(Spans, { spans: b.spans }));
@@ -157,7 +157,7 @@ function Editor({ initial }) {
                             }
                         }
                     } })),
-            cover && h("img", { src: `/media/${cover}/thumb`, alt: "\u041E\u0431\u043B\u043E\u0436\u043A\u0430", width: 96, height: 72, class: "cover-preview" }),
+            cover && h("img", { src: `/media/${cover}/thumb?acl=2`, alt: "\u041E\u0431\u043B\u043E\u0436\u043A\u0430", width: 96, height: 72, class: "cover-preview" }),
             cover && h("button", { class: "link", onClick: () => setCover(null) }, "\u0423\u0431\u0440\u0430\u0442\u044C \u043E\u0431\u043B\u043E\u0436\u043A\u0443")),
         h("label", null,
             "\u041C\u0430\u0440\u0448\u0440\u0443\u0442",

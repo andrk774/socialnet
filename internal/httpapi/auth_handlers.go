@@ -253,6 +253,7 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request, user *stor
 		return
 	}
 	s.setRefreshCookie(w, refresh, s.cfg.RefreshTTL)
+	s.setMediaCookie(w, access, int(s.cfg.AccessTTL.Seconds()))
 	self := toSelf(user)
 	writeJSON(w, status, authResponse{AccessToken: access, TokenType: "Bearer", ExpiresAt: exp, User: &self})
 }
@@ -299,6 +300,7 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.setRefreshCookie(w, newToken, s.cfg.RefreshTTL)
+	s.setMediaCookie(w, access, int(s.cfg.AccessTTL.Seconds()))
 	writeJSON(w, http.StatusOK, authResponse{AccessToken: access, TokenType: "Bearer", ExpiresAt: exp})
 }
 
@@ -328,6 +330,7 @@ func (s *Server) setRefreshCookie(w http.ResponseWriter, value string, ttl time.
 }
 
 func (s *Server) clearRefreshCookie(w http.ResponseWriter) {
+	s.setMediaCookie(w, "", -1)
 	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- HttpOnly и SameSite=Strict всегда; Secure выключается только COOKIE_SECURE=false для разработки по http
 		Name:     refreshCookie,
 		Value:    "",

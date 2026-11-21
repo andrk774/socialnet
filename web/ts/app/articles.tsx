@@ -40,7 +40,7 @@ export function ArticleBody({ blocks }: { blocks: Block[] }) {
           case "hr": return <hr key={i} />;
           case "img": return (
             <figure key={i}>
-              <img src={`/media/${b.media_id}/full`} alt={b.caption ?? ""} loading="lazy" />
+              <img src={`/media/${b.media_id}/full?acl=2`} alt={b.caption ?? ""} loading="lazy" />
               {b.caption && <figcaption>{b.caption}</figcaption>}
             </figure>
           );
@@ -153,7 +153,7 @@ function Editor({ initial }: { initial: Article | null }) {
           const f = (e.target as HTMLInputElement).files?.[0];
           if (f) { try { setCover((await upload<{ id: string }>("/media", f)).id); } catch (err) { setError(err); } }
         }} /></label>
-        {cover && <img src={`/media/${cover}/thumb`} alt="Обложка" width={96} height={72} class="cover-preview" />}
+        {cover && <img src={`/media/${cover}/thumb?acl=2`} alt="Обложка" width={96} height={72} class="cover-preview" />}
         {cover && <button class="link" onClick={() => setCover(null)}>Убрать обложку</button>}
       </div>
       <label>Маршрут

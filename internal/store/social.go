@@ -85,7 +85,7 @@ func MediaURL(id *string, size string) *string {
 	if id == nil {
 		return nil
 	}
-	u := "/media/" + *id + "/" + size
+	u := "/media/" + *id + "/" + size + "?acl=2"
 	return &u
 }
 

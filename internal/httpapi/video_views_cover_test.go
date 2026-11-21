@@ -16,9 +16,15 @@ func TestVideoViewsAndCover(t *testing.T) {
 	b.req("PUT", p("/users/me/cover"), map[string]any{"media_id": id}, 404)
 	a.req("PUT", p("/users/me/cover"), map[string]any{"media_id": id}, 204)
 	got := a.req("GET", p(fmt.Sprintf("/users/%d/cover", a.ID)), nil, 200)
-	if got["url"] != "/media/"+id+"/full" {
+	if got["url"] != "/media/"+id+"/full?acl=2" {
 		t.Fatal(got)
 	}
+	a.req("PATCH", p("/users/me/privacy"), map[string]any{"profile_visibility": "only_me"}, 200)
+	b.req("GET", p("/users/%d/cover", a.ID), nil, 404)
+	a.req("GET", p("/users/%d/cover", a.ID), nil, 200)
+	a.req("PATCH", p("/users/me/privacy"), map[string]any{"profile_visibility": "everyone"}, 200)
+	a.req("POST", p("/users/%d/block", b.ID), nil, 204)
+	b.req("GET", p("/users/%d/cover", a.ID), nil, 404)
 	a.req("PUT", p("/users/me/cover"), map[string]any{"media_id": nil}, 204)
 	vid := "11111111-1111-4111-8111-111111111111"
 	e = s.store.CreateVideo(ctx, store.NewVideo{ID: vid, OwnerID: a.ID, Title: "Test", SourceSHA: make([]byte, 32), Format: "mp4"})

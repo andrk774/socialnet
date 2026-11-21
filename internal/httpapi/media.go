@@ -81,8 +81,7 @@ func (s *Server) saveFiles(id string, res *media.Result) error {
 	return nil
 }
 
-// handleServeMedia: GET /media/{id}/{size}. Публичный адрес для <img>:
-// id — случайный UUID, перебрать его невозможно.
+// Photos are served only after session and resource authorization.
 func (s *Server) handleServeMedia(w http.ResponseWriter, r *http.Request) {
 	id, size := strings.ToLower(chi.URLParam(r, "id")), chi.URLParam(r, "size")
 	if !validUUID(id) || (size != "full" && size != "thumb") {
@@ -98,9 +97,13 @@ func (s *Server) handleServeMedia(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
-	if _, remote := s.files.(*media.S3); remote && s.cfg.MediaCDNURL != "" {
-		w.Header().Set("Cache-Control", "public, max-age=3600")
-		http.Redirect(w, r, s.cfg.MediaCDNURL+"/photos/"+id+"/"+size, http.StatusFound) // #nosec G710 -- адрес CDN из настроек, id и size проверены выше
+	allowed, err := s.store.MediaAccess(r.Context(), userIDFrom(r.Context()), id)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	if !allowed {
+		http.NotFound(w, r)
 		return
 	}
 	f, mod, err := s.files.Open(id, size)
@@ -117,8 +120,8 @@ func (s *Server) handleServeMedia(w http.ResponseWriter, r *http.Request) {
 	// Тип берём из базы (мы его сами определили при загрузке), а не угадываем.
 	w.Header().Set("Content-Type", info.Mime)
 	w.Header().Set("Content-Disposition", "inline")
-	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
 	http.ServeContent(w, r, "", mod, f)
 }
 

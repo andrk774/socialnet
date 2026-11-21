@@ -37,7 +37,7 @@ func (s *Store) CommunityEmoji(ctx context.Context, community int64) ([]Emoji, e
 		if err := rows.Scan(&e.ID, &e.CommunityID, &e.Shortcode, &media, &e.CreatedAt); err != nil {
 			return nil, err
 		}
-		e.URL = "/media/" + media + "/thumb"
+		e.URL = "/media/" + media + "/thumb?acl=2"
 		e.Reaction = "e:" + strconv.FormatInt(e.ID, 10)
 		out = append(out, e)
 	}

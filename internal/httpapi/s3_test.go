@@ -27,10 +27,12 @@ func TestMediaInS3(t *testing.T) {
 	if keys := fake.Keys(); !slices.Equal(keys, []string{"photos/" + pid + "/full", "photos/" + pid + "/thumb"}) {
 		t.Fatalf("photo keys: %v", keys)
 	}
-	resp, err := http.Get(ts.URL + "/media/" + pid + "/thumb")
+	srv.cfg.MediaCDNURL = "https://cdn.invalid" // Photos must never bypass authorization via CDN.
+	resp, err := anna.http.Get(ts.URL + "/media/" + pid + "/thumb")
 	if err != nil {
 		t.Fatal(err)
 	}
+	srv.cfg.MediaCDNURL = ""
 	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if resp.StatusCode != 200 || len(body) < 100 || resp.Header.Get("Content-Type") == "" {
