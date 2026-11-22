@@ -1,4 +1,5 @@
 import { NotificationMenu } from "./notificationmenu.js";
+import { NearbyPage } from "./nearby.js";
 import { StatisticsPage } from "./statistics.js";
 import { CommentArchivePage } from "./commentarchive.js";
 import { CallsPage, CallManager } from "./calls.js";
@@ -42,6 +43,7 @@ import { QRApprovePage } from "./qrlogin.js";
 import { AccountMenu, FeedAside, Icon, navIcon } from "./shellparts.js";
 
 function routes(path: string, onRead: () => void, myId: number): ComponentChildren {
+  if (match("/nearby", path)) return <NearbyPage />;
   let p;
   if (match("/help",path)) return <HelpPage/>;
   if (match("/legal-info",path)) return <LegalIndex/>;
@@ -95,7 +97,7 @@ function routes(path: string, onRead: () => void, myId: number): ComponentChildr
 // телефоне — нижняя панель из главных разделов и экран «Ещё».
 type NavItem = [string, string];
 const navGroups: [string, NavItem[]][] = [
-  ["Общение", [["/", "Лента"], ["/feeds", "Мои ленты"], ["/im", "Сообщения"], ["/calls", "Звонки"], ["/notifications", "Уведомления"], ["/communities", "Сообщества"]]],
+  ["Общение", [["/", "Лента"], ["/feeds", "Мои ленты"], ["/im", "Сообщения"], ["/nearby", "Люди рядом"], ["/calls", "Звонки"], ["/notifications", "Уведомления"], ["/communities", "Сообщества"]]],
   ["Походы", [["/hikes", "Походы"], ["/record", "Записать трек"], ["/companions", "Попутчики"], ["/rides", "Подвоз"], ["/articles", "Статьи"], ["/fundraisers", "Сборы"], ["/offline", "Офлайн"]]],
   ["Моё", [["/photos", "Фото"], ["/music", "Музыка"], ["/videos", "Видео"], ["/bookmarks", "Закладки"], ["/documents", "Документы"], ["/scheduled", "Отложенные"],
     ["/wallet", "Кошелёк"], ["/plus", "Плюс"], ["/settings", "Настройки"]]],

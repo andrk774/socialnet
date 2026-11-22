@@ -1,4 +1,5 @@
 import { NotificationMenu } from "./notificationmenu.js";
+import { NearbyPage } from "./nearby.js";
 import { StatisticsPage } from "./statistics.js";
 import { CommentArchivePage } from "./commentarchive.js";
 import { CallsPage, CallManager } from "./calls.js";
@@ -41,6 +42,8 @@ import { setupNative } from "./native.js";
 import { QRApprovePage } from "./qrlogin.js";
 import { AccountMenu, FeedAside, Icon, navIcon } from "./shellparts.js";
 function routes(path, onRead, myId) {
+    if (match("/nearby", path))
+        return h(NearbyPage, null);
     let p;
     if (match("/help", path))
         return h(HelpPage, null);
@@ -141,7 +144,7 @@ function routes(path, onRead, myId) {
             h("a", { href: "/" }, "\u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u0432 \u043B\u0435\u043D\u0442\u0443")));
 }
 const navGroups = [
-    ["Общение", [["/", "Лента"], ["/feeds", "Мои ленты"], ["/im", "Сообщения"], ["/calls", "Звонки"], ["/notifications", "Уведомления"], ["/communities", "Сообщества"]]],
+    ["Общение", [["/", "Лента"], ["/feeds", "Мои ленты"], ["/im", "Сообщения"], ["/nearby", "Люди рядом"], ["/calls", "Звонки"], ["/notifications", "Уведомления"], ["/communities", "Сообщества"]]],
     ["Походы", [["/hikes", "Походы"], ["/record", "Записать трек"], ["/companions", "Попутчики"], ["/rides", "Подвоз"], ["/articles", "Статьи"], ["/fundraisers", "Сборы"], ["/offline", "Офлайн"]]],
     ["Моё", [["/photos", "Фото"], ["/music", "Музыка"], ["/videos", "Видео"], ["/bookmarks", "Закладки"], ["/documents", "Документы"], ["/scheduled", "Отложенные"],
             ["/wallet", "Кошелёк"], ["/plus", "Плюс"], ["/settings", "Настройки"]]],

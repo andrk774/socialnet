@@ -37,7 +37,7 @@ func (req *sendMessageRequest) validate(group bool) map[string]string {
 	for i := range req.Attachments {
 		a := &req.Attachments[i]
 		a.ID = strings.ToLower(a.ID)
-		if (a.Kind != "photo" && a.Kind != "track" && a.Kind != "voice" && a.Kind != "document") || !validUUID(a.ID) {
+		if (a.Kind != "photo" && a.Kind != "track" && a.Kind != "voice" && a.Kind != "video" && a.Kind != "document") || !validUUID(a.ID) {
 			errs["attachments"] = "each attachment needs kind photo|track|voice|document and a valid id"
 		}
 	}

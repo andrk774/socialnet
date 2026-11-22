@@ -1,0 +1,11 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><title>Перенос музыки</title>
+<link rel="stylesheet" href="popup.css">
+<h1>VK → socialnet</h1>
+<p>В VK откройте «Моя музыка» или плейлист и прокрутите список, чтобы загрузить записи. Собираются только записи, присутствующие на странице.</p>
+<label>Название открытого плейлиста (необязательно)<input id="playlist" maxlength="100"></label>
+<button id="collect">Добавить записи с этой страницы VK</button>
+<p>Повторите для других плейлистов. Затем откройте socialnet на localhost:8080 или 127.0.0.1:8080.</p>
+<button id="allow">Разрешить перенос в эту вкладку socialnet</button>
+<button id="clear">Очистить собранный список и отключить доступ</button>
+<p id="status" role="status"></p><p class="muted">Пароли и cookies не читаются. Список хранится до закрытия браузера. Аудиофайлы загружаются только после выбора в socialnet. HLS и защищённые ссылки не преобразуются.</p>
+<script src="core.js"></script><script src="popup.js"></script></html>

@@ -9,6 +9,7 @@ import { ElevationProfile, km, RouteMap } from "./routes.js";
 import { Empty, Loading } from "./ui.js";
 
 import { OfflineMusic } from "./offlinemusic.js";
+import { OfflineVideos } from "./offlinevideo.js";
 
 export function OfflinePage() {
   const [list, setList] = useState<{ route: Route; saved_at: string }[] | null>(null);
@@ -19,6 +20,7 @@ export function OfflinePage() {
   return (
     <section class="offline">
       <OfflineMusic/>
+      <OfflineVideos/>
       <h1>Маршруты офлайн</h1>
       {!navigator.onLine && <p class="note">Нет связи. Здесь — маршруты, сохранённые на этом устройстве.</p>}
       {list.length === 0 ? <Empty>Сохранённых маршрутов нет. Откройте маршрут при связи и нажмите «Сохранить офлайн».</Empty> : (

@@ -1278,3 +1278,46 @@ dialog.call-overlay{width:100vw;height:100dvh;max-width:none;max-height:none;bor
 .photo-comments form { position:sticky;bottom:0;background:var(--surface);display:flex;flex-wrap:wrap;gap:8px;padding:12px;border-top:1px solid var(--line); }
 .photo-comments textarea { flex:1;min-width:140px;resize:vertical;max-height:160px; }
 .photo-comments form button { align-self:center; }
+
+/* Messenger: full-width rows and a composer with reply/edit context. */
+.chat-top{display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);padding:12px 18px}
+.chat-top h1{flex:1;font-size:17px;margin:0}.chat-top svg{width:22px;height:22px}
+.chat .msg,.chat .msg.mine{position:relative;align-self:stretch;max-width:none;margin:0 10px;padding:14px 54px 14px 18px;background:transparent;border:0;border-radius:12px;box-shadow:none}
+.chat .msg:hover,.chat .msg:focus-within{background:var(--tint)}
+.message-author{color:var(--accent,#3478bd);font-weight:600;margin-bottom:5px;font-size:14px}
+.chat .msg>img{max-width:min(100%,420px);max-height:480px;object-fit:contain;margin:6px 0}
+.chat-day{text-align:center;color:var(--ink-2);font-size:13px;margin:0 0 20px}
+.message-actions{position:absolute;right:8px;top:10px;z-index:3}
+.message-actions:has(.message-menu){z-index:8}
+.message-menu{position:absolute;right:0;top:36px;width:245px;padding:6px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 5px 24px #0002}
+.message-menu button{display:flex;align-items:center;gap:10px;text-align:left;width:100%;padding:10px 12px;border:0;border-radius:8px;background:transparent;color:var(--ink);font-size:14px}
+.message-menu button:hover,.message-menu button:focus-visible{background:var(--tint)}
+.message-menu svg{width:20px;height:20px}.message-menu .danger{color:#e34b57}
+.chat-form{flex-wrap:wrap;border:1px solid var(--line);border-radius:18px;box-shadow:0 3px 16px #0001;margin:12px}
+.message-context{position:relative;flex-basis:100%;border-bottom:1px solid var(--line);padding:12px 40px 12px 14px;max-height:140px;overflow:auto}
+.message-context strong{color:var(--accent,#3478bd)}.message-context p{margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.message-context button{position:absolute;right:6px;top:8px;background:transparent;border:0}.message-context svg{width:20px;height:20px}
+.message-selection{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px;background:var(--tint)}
+.chat-attachment{position:relative}.chat-attachment .message-menu{top:auto;bottom:48px;left:0;right:auto;z-index:10}
+.chat-sticker-suggestions{display:flex;gap:8px;overflow-x:auto;padding:10px;border-radius:16px;border:1px solid var(--line);background:var(--surface)}
+.chat-sticker-suggestions button{background:none;border:0;flex-shrink:0}.chat-sticker-suggestions img{width:90px;height:90px;object-fit:contain}
+.chat-emoji{display:flex;flex-wrap:wrap;gap:6px;padding:10px}.chat-emoji button{font-size:24px;background:none;border:0}
+.chat .chat-log{background:var(--surface)}
+.chat .msg,.chat .msg.mine{padding-left:58px}
+.message-avatar{position:absolute;left:8px;top:14px}.message-avatar .avatar{width:36px;height:36px}
+.msg:has(.chat-day) .message-avatar{top:48px}
+.message-time{display:block;text-align:right;font-size:12px;color:var(--ink-2)}
+.chat-form .chat-send,.chat-form .icon-btn{flex-shrink:0;width:36px;min-width:36px;padding:4px}
+.chat-form textarea{flex-basis:120px}.chat-send{font-size:20px}
+@media(max-width:600px){.chat .msg,.chat .msg.mine{margin:0;padding-left:8px}.message-menu{width:220px}.chat-form{margin:6px}.chat-top{padding:10px}.chat-form .ghost{font-size:12px;padding:6px}}
+.chat-video video { display:block; width:min(100%,320px); max-height:360px; border-radius:18px; background:#15171a; margin:10px 0; }
+.chat-video video[hidden] { display:none; }
+.chat-video label { display:block; margin:12px 0; }
+.chat-video input { max-width:100%; }
+.chat-service-card { display:block; padding:18px; border:1px solid #dce4ef; border-radius:12px; background:#f0f5fc; text-decoration:none; margin:8px 0; }
+.vk-import { margin-block: 12px; padding: 16px; }
+.vk-import summary { cursor: pointer; font-weight: 600; }
+.vk-import button { margin: 4px; }
+.vk-import-list { max-height: 360px; overflow: auto; margin-block: 16px; }
+.vk-import-list label { display: flex; align-items: center; gap: 12px; padding: 10px; border-bottom: 1px solid #dce1e6; }
+.vk-import-list small { display: block; color: #718096; }

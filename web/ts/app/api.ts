@@ -48,10 +48,10 @@ export interface Comment {
   author: UserCard; text: string; created_at: string;
 }
 export interface Attachment {
-  kind: "photo" | "track" | "voice" | "document"; id: string; url: string; thumb_url?: string; title?: string;
+  kind: "photo" | "track" | "voice" | "document" | "video"; id: string; url: string; thumb_url?: string; title?: string;
   artist?: string; duration_sec?: number; ext?: string; size?: number;
 }
-export interface Message { id: number; conversation_id: number; sender_id: number; kind: "text" | "service"; body?: string; encrypted: boolean; attachments: Attachment[]; created_at: string }
+export interface Message { id: number; conversation_id: number; sender_id: number; kind: "text" | "service"; body?: string; encrypted: boolean; attachments: Attachment[]; created_at: string; edited_at?:string; deleted_at?:string }
 export interface Conversation { id: number; kind: "direct" | "group"; title?: string; members_count?: number; event_id?: number; peer?: UserCard; last_message: Message; unread: number }
 export interface Page<T> { items: T[]; next_cursor: number | null }
 export interface ApiErrorBody { error: { code: string; message: string; fields?: Record<string, string> } }
@@ -158,7 +158,7 @@ export async function logout() {
   try { await api("POST", "/auth/logout"); } finally {
     setToken(null);
     // маршруты, сохранённые для офлайна, не остаются на чужом устройстве
-    if (typeof caches !== "undefined") { for(const name of await caches.keys()) if(name.startsWith("sn-offline-music-")) await caches.delete(name); await caches.delete("sn-offline-routes").catch(() => false); await caches.delete("sn-offline-tiles").catch(() => false); }
+    if (typeof caches !== "undefined") { for(const name of await caches.keys()) if((name.startsWith("sn-offline-music-")||name.startsWith("sn-offline-video-"))) await caches.delete(name); await caches.delete("sn-offline-routes").catch(() => false); await caches.delete("sn-offline-tiles").catch(() => false); }
   }
 }
 

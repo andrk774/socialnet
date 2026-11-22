@@ -7,6 +7,8 @@ import { Icon } from "./shellparts.js";
 import type { MiniPlayerState } from "./miniplayer.js";
 
 import { MusicDownloads, OfflineMusic } from "./offlinemusic.js";
+import { MusicImport } from "./musicimport.js";
+import { VKMusicImport } from "./vkimport.js";
 
 interface Track { id: string; title: string; artist: string; duration_sec: number; url: string; in_my_music: boolean }
 interface Playlist { id: number; title: string; track_count: number; tracks?: Track[] }
@@ -117,6 +119,8 @@ export function MusicPage({ userId, active=true, onPlayerChange }: { userId: num
       {tracks.some(t=>t.id===playing.id)&&<button class="icon-btn" title="Удалить из моей музыки" aria-label="Удалить из моей музыки" onClick={removeCurrent}>✓</button>}
     </div></div>}
     <div class="music-panel music-top">
+      <MusicImport done={()=>{void load();playlists.reload();}}/>
+      <VKMusicImport done={()=>{void load();playlists.reload();}}/>
       <div class="music-navigation"><nav aria-label="Разделы музыки">{([["offline", "\u041e\u0444\u043b\u0430\u0439\u043d"], ["home", "Главная"], ["mine", "Моя музыка"], ["playlists", "Плейлисты"]] as [Tab, string][]).map(([id, name]) => <button class={tab === id ? "music-tab active" : "music-tab"} aria-pressed={tab === id} onClick={() => { if(id === "offline") audio.current?.pause(); setTab(id); setSelected(null); setQuery(""); }}>{name}</button>)}</nav>
         <div class="music-tools"><button class="icon-btn" title="Загрузить аудиозапись" aria-label="Загрузить аудиозапись" onClick={() => uploadDialog.current?.showModal()}><Icon name="upload" /></button><button class="icon-btn" title="Создать плейлист" aria-label="Создать плейлист" onClick={() => { setDialogError(null); createDialog.current?.showModal(); }}><Icon name="plus" /></button></div>
       </div>

@@ -34,9 +34,22 @@ type Message struct {
 	Encrypted      bool         `json:"encrypted"`
 	Attachments    []Attachment `json:"attachments"`
 	CreatedAt      time.Time    `json:"created_at"`
+	EditedAt       *time.Time   `json:"edited_at,omitempty"`
+	DeletedAt      *time.Time   `json:"deleted_at,omitempty"`
 }
 
 func VoiceURL(id string) string { return "/api/v1/voice/" + id }
+
+func (s *Store) MessageByID(ctx context.Context, id int64) (*Message, error) {
+	items, err := s.messages(ctx, `m.id = $1`, id, 0, 1)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return nil, ErrNotFound
+	}
+	return &items[0], nil
+}
 
 func pair(a, b int64) (int64, int64) {
 	if a < b {
@@ -253,9 +266,11 @@ func (s *Store) SendMessage(ctx context.Context, m NewMessage) (*Message, error)
 			case "track":
 				q = `INSERT INTO message_attachments (message_id, position, kind, track_id)
 				     SELECT $1, $2, 'track', id FROM tracks WHERE id = $3::uuid AND removed_at IS NULL AND $4::bigint > 0`
+			case "video":
+				q = `INSERT INTO message_attachments (message_id, position, kind, voice_id) SELECT $1,$2,'video',id FROM voices WHERE id=$3::uuid AND owner_id=$4 AND media_type='video'`
 			case "voice":
 				q = `INSERT INTO message_attachments (message_id, position, kind, voice_id)
-				     SELECT $1, $2, 'voice', id FROM voices WHERE id = $3::uuid AND owner_id = $4`
+				     SELECT $1, $2, 'voice', id FROM voices WHERE id = $3::uuid AND owner_id = $4 AND media_type='voice'`
 			case "document":
 				q = `INSERT INTO message_attachments (message_id, position, kind, document_id)
 				     SELECT $1, $2, 'document', id FROM documents
@@ -291,7 +306,7 @@ func (s *Store) SendMessage(ctx context.Context, m NewMessage) (*Message, error)
 }
 
 const messageSelect = `
-	SELECT m.id, m.conversation_id, m.sender_id, m.kind, m.body, m.ciphertext, m.nonce, m.created_at,
+	SELECT m.id, m.conversation_id, m.sender_id, m.kind, m.body, m.ciphertext, m.nonce, m.created_at, m.edited_at, m.deleted_at,
 	       COALESCE((SELECT json_agg(json_build_object(
 	                   'kind', a.kind, 'media_id', a.media_id, 'track_id', a.track_id, 'voice_id', a.voice_id,
 	                   'document_id', a.document_id,
@@ -322,7 +337,7 @@ func (s *Store) messages(ctx context.Context, where string, arg any, before int6
 		var m Message
 		var att []byte
 		if err := rows.Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.Kind, &m.Body, &m.Ciphertext, &m.Nonce,
-			&m.CreatedAt, &att); err != nil {
+			&m.CreatedAt, &m.EditedAt, &m.DeletedAt, &att); err != nil {
 			return nil, err
 		}
 		m.Encrypted = m.Ciphertext != nil
@@ -360,6 +375,9 @@ func decodeAttachments(raw []byte) ([]Attachment, error) {
 			a.ID, a.URL = *r.TrackID, AudioURL(*r.TrackID)
 		case r.VoiceID != nil:
 			a.ID, a.URL = *r.VoiceID, VoiceURL(*r.VoiceID)
+			if r.Kind == "video" {
+				a.URL = "/api/v1/video-messages/" + *r.VoiceID
+			}
 		case r.DocID != nil:
 			a.ID, a.URL = *r.DocID, DocumentURL(*r.DocID)
 			if r.Ext != nil {
@@ -511,4 +529,9 @@ func (s *Store) IdentityKey(ctx context.Context, user int64) ([]byte, time.Time,
 		return nil, updated, ErrNotFound
 	}
 	return key, updated, err
+}
+
+func (s *Store) CreateVideoMessage(ctx context.Context, id string, owner int64, seconds int) error {
+	_, err := s.pool.Exec(ctx, `INSERT INTO voices (id,owner_id,duration_sec,media_type) VALUES ($1::uuid,$2,$3,'video')`, id, owner, seconds)
+	return err
 }

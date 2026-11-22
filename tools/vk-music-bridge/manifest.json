@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "socialnet — перенос музыки из VK",
+  "version": "0.1.0",
+  "description": "Перенос выбранных записей с открытой страницы VK в локальный socialnet. Без доступа к паролям и cookies.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://*.vkuseraudio.net/*", "https://*.vkuseraudio.com/*", "https://*.useraudio.net/*", "https://*.useraudio.com/*", "https://*.vk-cdn.net/*"],
+  "background": {"service_worker": "background.js"},
+  "action": {"default_popup": "popup.html"},
+  "content_scripts": [{"matches": ["http://127.0.0.1/*", "http://localhost/*"], "js": ["bridge.js"], "run_at": "document_start"}]
+}

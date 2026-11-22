@@ -337,6 +337,8 @@ func (s *Server) Router() http.Handler {
 				r.Post("/users/{id}/messages", s.handleSendMessage)
 				r.Get("/conversations", s.handleConversations)
 				r.Get("/conversations/{id}/messages", s.handleMessages)
+				r.Put("/conversations/{id}/messages/{mid}", s.handleEditMessage)
+				r.Delete("/conversations/{id}/messages/{mid}", s.handleEditMessage)
 				r.Post("/conversations/{id}/read", s.handleMarkRead)
 				r.Get("/conversations/{id}/pin", s.handleGetPin)
 				r.Put("/conversations/{id}/pin", s.handleSetPin)
@@ -353,6 +355,7 @@ func (s *Server) Router() http.Handler {
 				r.Delete("/conversations/{id}/members/{uid}", s.handleRemoveChatMember)
 				r.Put("/conversations/{id}/members/{uid}/role", s.handleSetChatRole)
 				r.Get("/voice/{vid}", s.handleServeVoice)
+				r.Get("/video-messages/{vid}", s.handleServeVideoMessage)
 				r.Put("/users/me/keys", s.handleSetKey)
 				r.Get("/users/{id}/keys", s.handleGetKey)
 				r.Post("/ws/ticket", s.handleWSTicket)
@@ -516,6 +519,9 @@ func (s *Server) Router() http.Handler {
 				r.Post("/events/{id}/contacts", s.handleAddHikeContact)
 				r.Delete("/events/{id}/contacts/{cid}", s.handleDeleteHikeContact)
 				r.Post("/events/{id}/returned", s.handleReturned)
+				r.Get("/nearby", s.handleNearby)
+				r.Post("/nearby", s.handleNearby)
+				r.Delete("/nearby", s.handleNearby)
 				r.Post("/companions", s.handleCreateCompanionAd)
 				r.Get("/companions", s.handleCompanionAds)
 				r.Get("/companions/mine", s.handleMyCompanionAds)
@@ -633,6 +639,7 @@ func (s *Server) Router() http.Handler {
 	// Голосовые сообщения: до 5 МБ.
 	r.With(deadlines(5*time.Minute), middleware.Timeout(4*time.Minute), s.requireAuth).
 		Post("/api/v1/voice", s.handleUploadVoice)
+	r.With(deadlines(5*time.Minute), middleware.Timeout(4*time.Minute), s.requireAuth).Post("/api/v1/video-messages", s.handleUploadVideoMessage)
 
 	// Отдача аудио — публичная, для <audio>, с перемоткой (Range).
 	r.With(deadlines(30*time.Minute)).Get("/audio/{file}", s.handleServeAudio)

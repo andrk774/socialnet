@@ -179,6 +179,7 @@ export function MediaUpload({ kind, onUploaded }) {
         done && h("p", { role: "status" }, music ? "Трек добавлен в вашу музыку." : "Видео загружено. После обработки здесь появится плеер."),
         h(ErrorLine, { error: error }));
 }
+import { VideoDownloads } from "./offlinevideo.js";
 export function VideosPage({ userId }) {
     const list = useLoad(() => get(`/users/${userId}/videos?limit=50`), [userId]);
     const [query, setQuery] = useState("");
@@ -220,6 +221,7 @@ export function VideosPage({ userId }) {
                 " \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u043E\u0432"),
             h("p", { class: "muted" },
                 h(Time, { iso: v.created_at })),
+            v.status === "ready" && h(VideoDownloads, { video: v, userId: userId }),
             v.status === "failed" && h("p", { class: "error" }, "\u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0434\u0440\u0443\u0433\u043E\u0439 \u0444\u0430\u0439\u043B.")))),
         h("dialog", { ref: uploader, class: "music-dialog", "aria-label": "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0432\u0438\u0434\u0435\u043E" },
             h("button", { class: "music-dialog-close", "aria-label": "\u0417\u0430\u043A\u0440\u044B\u0442\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0443 \u0432\u0438\u0434\u0435\u043E", onClick: () => uploader.current?.close() }, "\u00D7"),

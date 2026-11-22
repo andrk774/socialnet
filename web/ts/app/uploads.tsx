@@ -97,6 +97,7 @@ export function MediaUpload({ kind, onUploaded }: { kind: "music" | "video"; onU
   </form>;
 }
 
+import { VideoDownloads } from "./offlinevideo.js";
 interface UploadedVideo { views: number; id: string; title: string; status: string; poster_url?: string; hls_url?: string; mp4_url?: string; duration_sec?: number; created_at: string }
 export function VideosPage({ userId }: { userId: number }) {
   const list = useLoad(() => get<Page<UploadedVideo>>(`/users/${userId}/videos?limit=50`), [userId]);
@@ -125,6 +126,7 @@ export function VideosPage({ userId }: { userId: number }) {
         {v.status !== "ready" && <span class="video-state">{v.status === "failed" ? "Ошибка обработки" : "Обрабатывается…"}</span>}
       </button>
       <h2>{v.title}</h2><p class="muted">{v.views ?? 0} просмотров</p><p class="muted"><Time iso={v.created_at} /></p>
+      {v.status==="ready"&&<VideoDownloads video={v} userId={userId}/>}
       {v.status === "failed" && <p class="error">Попробуйте загрузить другой файл.</p>}
     </article>)}</div>}
     <dialog ref={uploader} class="music-dialog" aria-label="Загрузка видео"><button class="music-dialog-close" aria-label="Закрыть загрузку видео" onClick={() => uploader.current?.close()}>×</button><MediaUpload kind="video" onUploaded={() => { list.reload(); setFilter("all"); setQuery(""); }} /></dialog>

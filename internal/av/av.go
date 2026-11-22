@@ -477,3 +477,15 @@ func Available() bool {
 	_, e2 := exec.LookPath("ffprobe")
 	return e1 == nil && e2 == nil
 }
+
+// TranscodeVideoMessage produces a bounded private MP4, stripping source metadata.
+func TranscodeVideoMessage(ctx context.Context, in, out, format string, maxSeconds int) error {
+	args := append(baseArgs(), "-nostdin", "-y", "-f", format, "-i", "file:"+in,
+		"-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn", "-map_metadata", "-1",
+		"-vf", "scale=480:480:force_original_aspect_ratio=decrease:force_divisible_by=2", "-r", "24",
+		"-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-pix_fmt", "yuv420p",
+		"-c:a", "aac", "-b:a", "64k", "-ac", "1", "-t", strconv.Itoa(maxSeconds),
+		"-movflags", "+faststart", "-f", "mp4", "file:"+out)
+	_, err := run(ctx, 2*time.Minute, "ffmpeg", args...)
+	return err
+}

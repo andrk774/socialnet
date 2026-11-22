@@ -5,6 +5,8 @@ import { Empty, ErrorLine, Loading, duration, useLoad } from "./ui.js";
 import { MediaUpload } from "./uploads.js";
 import { Icon } from "./shellparts.js";
 import { MusicDownloads, OfflineMusic } from "./offlinemusic.js";
+import { MusicImport } from "./musicimport.js";
+import { VKMusicImport } from "./vkimport.js";
 export function MusicPage({ userId, active = true, onPlayerChange }) {
     const [tab, setTab] = useState("home");
     const [tracks, setTracks] = useState([]);
@@ -215,6 +217,8 @@ export function MusicPage({ userId, active = true, onPlayerChange }) {
                             audio.current.volume = value; } })),
                 tracks.some(t => t.id === playing.id) && h("button", { class: "icon-btn", title: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u043C\u043E\u0435\u0439 \u043C\u0443\u0437\u044B\u043A\u0438", "aria-label": "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u043C\u043E\u0435\u0439 \u043C\u0443\u0437\u044B\u043A\u0438", onClick: removeCurrent }, "\u2713"))),
         h("div", { class: "music-panel music-top" },
+            h(MusicImport, { done: () => { void load(); playlists.reload(); } }),
+            h(VKMusicImport, { done: () => { void load(); playlists.reload(); } }),
             h("div", { class: "music-navigation" },
                 h("nav", { "aria-label": "\u0420\u0430\u0437\u0434\u0435\u043B\u044B \u043C\u0443\u0437\u044B\u043A\u0438" }, [["offline", "\u041e\u0444\u043b\u0430\u0439\u043d"], ["home", "Главная"], ["mine", "Моя музыка"], ["playlists", "Плейлисты"]].map(([id, name]) => h("button", { class: tab === id ? "music-tab active" : "music-tab", "aria-pressed": tab === id, onClick: () => { if (id === "offline")
                         audio.current?.pause(); setTab(id); setSelected(null); setQuery(""); } }, name))),

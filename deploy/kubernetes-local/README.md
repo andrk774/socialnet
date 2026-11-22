@@ -45,10 +45,17 @@ kubectl --context docker-desktop -n socialnet logs deployment/socialnet -c api
 kubectl --context docker-desktop -n socialnet rollout restart deployment/socialnet
 ```
 
-Образ `socialnet:security-20261121` импортирован в containerd локального
+Образ `socialnet:chat-20261122` импортирован в containerd локального
 узла. Перед обновлением нужно собрать и импортировать новый образ,
 изменить tag в Kustomization и применить `kubectl apply -k deploy/kubernetes-local`.
 Secret `socialnet-secrets` создаётся отдельно: его нет в репозитории.
+
+22.11.2026 обновлены API, worker и backup; применены миграции 0043–0045
+для людей рядом, редактирования сообщений и приватных видеосообщений.
+После обновления проверены готовность всех трёх контейнеров, `/health`
+и выдача нового клиентского модуля `chatmedia.js` через localhost:8080.
+Дамп БД перед обновлением сохранён в
+`%LOCALAPPDATA%\socialnet\backup-chat-20261122\database.dump`.
 
 Исходные контейнеры Compose остановлены; тома сохранены. Согласованный
 дамп БД и архивы медиа находятся вне репозитория в
