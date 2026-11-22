@@ -59,11 +59,12 @@ func setupFull(t *testing.T, burst int) (*httptest.Server, *Server, *mailer.Memo
 		RefreshTTL: time.Hour,
 		PlusPrice:  199,
 
-		AuthRatePerMin: 1,
-		AuthRateBurst:  burst,
-		MediaDir:       t.TempDir(),
-		TOTPKey:        []byte(strings.Repeat("t", 32)),
-		AppURL:         "https://app.test",
+		AuthRatePerMin:    1,
+		RateLimitsEnabled: true,
+		AuthRateBurst:     burst,
+		MediaDir:          t.TempDir(),
+		TOTPKey:           []byte(strings.Repeat("t", 32)),
+		AppURL:            "https://app.test",
 	}
 	log := slog.New(&failOnError{t: t})
 	srv, err := New(cfg, store.New(pool), log)

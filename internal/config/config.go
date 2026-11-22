@@ -27,8 +27,9 @@ type Config struct {
 	TrustedProxies []string
 
 	// Лимит на /api/v1/auth/* с одного IP: запросов в минуту и размер всплеска.
-	AuthRatePerMin int
-	AuthRateBurst  int
+	AuthRatePerMin    int
+	RateLimitsEnabled bool
+	AuthRateBurst     int
 
 	// Сайты, с которых браузеру разрешено открывать WebSocket
 	// (например "app.example.com"). Пусто = только тот же домен, что у API.
@@ -86,9 +87,6 @@ type Config struct {
 	TileURL         string
 	TileAttribution string
 	TileMaxZoom     int
-
-	// Яндекс SmartCaptcha: ключи из консоли Yandex Cloud. Пусто — выключена.
-	CaptchaSiteKey, CaptchaSecret, CaptchaURL string
 
 	// PLUS_PRICE — цена подписки «Плюс» в монетах за 30 дней.
 	PlusPrice int64
@@ -246,12 +244,6 @@ func Load() (Config, error) {
 		return c, errors.New("TILE_URL must be an http(s) URL template with {z}, {x} and {y}")
 	}
 	c.TileAttribution = getenv("TILE_ATTRIBUTION", "© участники OpenStreetMap")
-	c.CaptchaSiteKey = strings.TrimSpace(os.Getenv("CAPTCHA_SITE_KEY"))
-	c.CaptchaSecret = strings.TrimSpace(os.Getenv("CAPTCHA_SECRET"))
-	c.CaptchaURL = getenv("CAPTCHA_URL", "https://smartcaptcha.cloud.yandex.ru/validate")
-	if (c.CaptchaSiteKey == "") != (c.CaptchaSecret == "") {
-		return c, errors.New("set both CAPTCHA_SITE_KEY and CAPTCHA_SECRET, or neither")
-	}
 	c.PlusPrice = 199
 	if v := os.Getenv("PLUS_PRICE"); v != "" {
 		n, err := strconv.ParseInt(v, 10, 64)
@@ -306,6 +298,9 @@ func Load() (Config, error) {
 		c.TOTPKey = h[:]
 	}
 
+	if c.RateLimitsEnabled, err = boolean("RATE_LIMITS_ENABLED", false); err != nil {
+		return c, err
+	}
 	if c.AuthRatePerMin, err = integer("AUTH_RATE_PER_MIN", 10); err != nil {
 		return c, err
 	}

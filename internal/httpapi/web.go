@@ -54,12 +54,6 @@ func (s *Server) pageCSP() string {
 		media += " " + s.cfg.MediaCDNURL
 	}
 	script, style, connect, frame := "'self'", "'self'", "'self'", ""
-	if s.captchaEnabled() { // виджет SmartCaptcha: скрипт и окно проверки с домена Яндекса
-		script += " " + captchaDomain
-		style += " " + captchaDomain
-		connect += " " + captchaDomain
-		frame = "; frame-src " + captchaDomain
-	}
 	csp := "default-src 'self'; script-src " + script + "; style-src " + style + "; img-src " + media + " data:; media-src " + media +
 		"; connect-src " + connect + frame + "; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 	if s.cfg.CookieSecure {

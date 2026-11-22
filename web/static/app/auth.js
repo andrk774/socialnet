@@ -1,8 +1,7 @@
 import { h } from "../vendor/preact/index.js";
-import { useEffect, useRef, useState } from "../vendor/preact/hooks.js";
+import { useState } from "../vendor/preact/hooks.js";
 import { login, register, verify2FA } from "./api.js";
 import { ConsentChecks, noConsents } from "./legal.js";
-import { Captcha, captchaSiteKey, tokenFrom } from "./captcha.js";
 import { ErrorLine } from "./ui.js";
 import { QRLoginBox } from "./qrlogin.js";
 export function AuthPage() {
@@ -11,9 +10,6 @@ export function AuthPage() {
     const [qr, setQr] = useState(false);
     const [f, setF] = useState({ email: "", password: "", username: "", first_name: "", last_name: "", code: "" });
     const [consents, setConsents] = useState(noConsents);
-    const [siteKey, setSiteKey] = useState("");
-    const captchaBox = useRef(null);
-    useEffect(() => { captchaSiteKey().then(setSiteKey); }, []);
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(false);
     const field = (k) => ({ value: f[k], onInput: (e) => setF({ ...f, [k]: e.target.value }) });
@@ -30,7 +26,7 @@ export function AuthPage() {
                     setMfa(r.mfa_token);
             }
             else
-                await register({ email: f.email, password: f.password, username: f.username, first_name: f.first_name, last_name: f.last_name, ...consents, captcha_token: tokenFrom(captchaBox.current) });
+                await register({ email: f.email, password: f.password, username: f.username, first_name: f.first_name, last_name: f.last_name, ...consents });
         }
         catch (err) {
             setError(err);
@@ -64,8 +60,7 @@ export function AuthPage() {
                 h("label", null,
                     "\u041F\u0430\u0440\u043E\u043B\u044C",
                     h("input", { ...field("password"), type: "password", autoComplete: mode === "login" ? "current-password" : "new-password", minLength: 8, maxLength: 128, required: true })),
-                mode === "register" && h(ConsentChecks, { value: consents, onChange: setConsents }),
-                mode === "register" && h(Captcha, { siteKey: siteKey, box: captchaBox }))),
+                mode === "register" && h(ConsentChecks, { value: consents, onChange: setConsents }))),
             h(ErrorLine, { error: error }),
             h("button", { class: "primary wide", disabled: busy }, mfa ? "Подтвердить" : mode === "login" ? "Войти" : "Создать аккаунт")),
         !mfa && !qr && (h("p", { class: "auth-switch" },

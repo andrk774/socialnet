@@ -107,13 +107,9 @@ func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 // handleForgotPassword всегда отвечает 202, есть такой email или нет.
 func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Email        string `json:"email"`
-		CaptchaToken string `json:"captcha_token"`
+		Email string `json:"email"`
 	}
 	if !decodeJSON(w, r, &req) {
-		return
-	}
-	if !s.requireCaptcha(w, r, req.CaptchaToken) {
 		return
 	}
 	user, err := s.store.UserByEmail(r.Context(), normalizeEmail(req.Email))

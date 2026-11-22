@@ -28,6 +28,10 @@ type limiter interface {
 	allow(key string) bool
 }
 
+type unrestrictedLimiter struct{}
+
+func (unrestrictedLimiter) allow(string) bool { return true }
+
 func limitMiddleware(l limiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -131,6 +135,9 @@ func (t *redisTickets) consume(id string) (int64, bool) {
 }
 
 func (s *Server) limiter(name string, rps float64, burst int) limiter {
+	if !s.cfg.RateLimitsEnabled {
+		return unrestrictedLimiter{}
+	}
 	if s.redis != nil {
 		return newRedisLimiter(s.redis, s.log, name, rps, burst)
 	}

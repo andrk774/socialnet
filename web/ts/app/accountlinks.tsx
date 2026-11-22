@@ -1,9 +1,8 @@
 // Страницы по ссылкам из писем: подтверждение почты и новый пароль, а также
 // форма «Забыли пароль?». Работают и без входа.
 import { ComponentChildren, Fragment, h } from "../vendor/preact/index.js";
-import { useEffect, useRef, useState } from "../vendor/preact/hooks.js";
+import { useEffect, useState } from "../vendor/preact/hooks.js";
 import { api } from "./api.js";
-import { Captcha, captchaSiteKey, tokenFrom } from "./captcha.js";
 import { query } from "./router.js";
 import { ErrorLine, Loading } from "./ui.js";
 
@@ -59,20 +58,16 @@ export function ResetPasswordPage() {
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
-  const [siteKey, setSiteKey] = useState("");
-  const box = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<unknown>(null);
-  useEffect(() => { captchaSiteKey().then(setSiteKey); }, []);
   const submit = (e: Event) => {
     e.preventDefault(); setError(null);
-    api("POST", "/auth/password/forgot", { email, captcha_token: tokenFrom(box.current) }).then(() => setSent(true), setError);
+    api("POST", "/auth/password/forgot", { email }).then(() => setSent(true), setError);
   };
   return (
     <Shell title="Восстановление пароля">
       {sent ? <p>Если такой адрес зарегистрирован, мы отправили на него ссылку. Она действует ограниченное время.</p> : (
         <form class="auth-form" onSubmit={submit}>
           <label>Почта<input type="email" autoComplete="email" required value={email} onInput={(e) => setEmail((e.target as HTMLInputElement).value)} /></label>
-          <Captcha siteKey={siteKey} box={box} />
           <ErrorLine error={error} />
           <button class="primary wide">Отправить ссылку</button>
         </form>
